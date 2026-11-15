@@ -28,7 +28,7 @@ Out of scope:
 - Any behaviour change, any new refusal, any new setting, any UI.
 - Generalising `ProxmoxNode` and `VMMapping` into a "connection with a kind". The tables stay.
 - Proxmox discovery and the node API (`backend/app/proxmox/discovery.py`, `backend/app/api/proxmox_nodes.py`, `proxmox_discovery.py`): they manage connections, not snapshots.
-- Power, guest exec, clone or network operations. Those belong to kennel (stage 11).
+- Power, guest exec, clone or network operations. Those belong to kennel (parked, D-45).
 
 ## Context
 

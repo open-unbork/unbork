@@ -47,3 +47,10 @@ Append-only. Newest entry last.
   edit made stale (for example an Enterprise spec asking whether its hook
   should be an item of its own, which it now is). Specs were written
   against this branch, which predates #297 on `dev`.
+
+## 2026-11-15 kennel parked
+
+- Dennis decided to wait with kennel (D-45). Stage 11 is removed and its
+  seven items are parked; their specs are kept. S-003 and C-044 are
+  unchanged in stage 4. The plan now has stages 0 to 10 and 25 parked
+  items.

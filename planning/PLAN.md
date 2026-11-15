@@ -171,7 +171,8 @@ No board item was dropped. Splits and merges:
   the Enterprise one, so they are shared: S-007 to S-012.
 - The VM operations service (C-028, working name kennel) was split into
   C-028, C-054, C-055, C-057, C-058 and C-059 after decisions D-22 and
-  D-23, with C-045 (PBS restore points) by D-19.
+  D-23, with C-045 (PBS restore points) by D-19. All seven were parked
+  on 2026-11-15 (D-45).
 
 Added after the checkpoint: C-044 and C-045 (Dennis), C-046 (D-05),
 S-013 (a decision about hardening results), S-014 (D-04), C-064 (D-17),
@@ -251,25 +252,25 @@ Community and shared items by class: 23 A, 56 B, 3 H. All 114: 27 A,
 | [S-019](items/S-019-extension-hook-add-a-probe-to-host.md) | Extension hook: add a probe to host state collection | roadmap | P2 | 8.0 | 1/3/2/2 | S | B | 9 | none | Found while writing specs: storage-layout detection for non-Proxmox rollback needs to collect a fact from the host, and the collector list is closed. |
 | [C-018](items/C-018-save-an-action-run-as-a-schedule.md) | Save an action run as a schedule | roadmap | P2 | 7.0 | 3/2/1/1 | S | A | 6 | none | Convenience on top of existing schedule API. |
 | [C-030](items/C-030-rest-api-tokens.md) | REST API tokens | roadmap | P2 | 6.5 | 4/4/3/2 | M | B | 7 | none | Board P3, raised to P2: every integration and the CLI need non-cookie auth. |
-| [C-058](items/C-058-kennel-per-vm-readiness-api.md) | kennel: per-VM readiness API | user | P2 | 6.0 | 3/3/3/3 | M | B | 11 | C-028 | D-22 scope: one call that says whether a VM can be snapshotted, restored or leased. |
-| [C-055](items/C-055-kennel-automatic-backup-restore-tests.md) | kennel: automatic backup restore tests | user | P2 | 5.0 | 5/4/1/5 | L | B | 11 | C-054, C-057, C-045 | Dennis's first use case: a backup that has never been restored is not a backup. |
-| [C-028](items/C-028-kennel-repository-service-skeleton-and-proxmox-pool.md) | kennel: repository, service skeleton and Proxmox pool token | roadmap | P2 | 4.7 | 3/4/5/2 | L | H | 11 | S-003 | D-22: Dennis decided to build it. Class H because the repository, its name on GitHub and the Proxmox tokens are his to create. |
 | [C-029](items/C-029-run-workers-on-more-than-one-box.md) | Run workers on more than one box | roadmap | P2 | 4.7 | 3/4/4/3 | L | B | 10 | none | Board P3, raised to P2 because the HA item depends on it. |
-| [C-054](items/C-054-kennel-leases-and-the-sweeper.md) | kennel: leases and the sweeper | user | P2 | 4.7 | 3/4/4/3 | L | B | 11 | C-028 | D-22 scope: every VM kennel creates has an owner and an expiry, and nothing is left behind. |
-| [C-057](items/C-057-kennel-isolated-sandbox-network-with-a-jump.md) | kennel: isolated sandbox network with a jump host | user | P2 | 4.3 | 3/3/3/4 | L | H | 11 | C-028 | D-23: supported from the start. Class H because it needs a VLAN or SDN zone on Dennis's Proxmox. |
 | [C-009](items/C-009-propose-action-let-the-assistant-request-a.md) | propose_action: let the assistant request a vetted action | roadmap | P2 | 4.0 | 3/4/2/3 | L | B | 8 | none | Design settled in D-13: the tool hands off and never waits. |
 | [C-015](items/C-015-quiesce-playbooks-for-gitlab-upgrade-and-nextcloud.md) | Quiesce playbooks for gitlab-upgrade and nextcloud-vm-update | roadmap | P2 | 4.0 | 3/1/1/3 | M | B | 6 | C-014 | Proves the hooks on real stateful apps; lives in the private pack repository. |
-| [C-045](items/C-045-kennel-pbs-restore-points-restored-beside-the.md) | kennel: PBS restore points, restored beside the original | user | P2 | 4.0 | 4/3/1/4 | L | B | 11 | C-028, C-054 | Asked for by Dennis; D-19 and D-23 put backup restore in kennel, beside the original first. |
 | [C-046](items/C-046-zabbix-alert-intake.md) | Zabbix alert intake | decision | P2 | 4.0 | 3/3/1/1 | M | B | 7 | S-005 | D-05: intake is Community, an adapter on the S-005 seam. |
 | [C-019](items/C-019-command-policy-rules-that-operators-can-edit.md) | Command policy rules that operators can edit | roadmap | P2 | 3.7 | 3/3/2/3 | L | B | 8 | none | D-14: a new ai.policy.manage permission, admins only. |
-| [C-059](items/C-059-unbork-talks-to-kennel-snapshot-provider-and.md) | unbork talks to kennel: snapshot provider and surge nodes for upgrades | user | P2 | 3.7 | 4/4/1/2 | L | B | 11 | S-003, C-054, C-058 | Dennis's second use case: surge nodes during Kubernetes upgrades. |
 | [C-011](items/C-011-ai-verify-second-evidence-producer-with-stored.md) | AI verify: second evidence producer with stored evidence packs | roadmap | P2 | 3.5 | 2/2/1/2 | M | B | 8 | C-010 | Only pays off once a second producer exists; schema change, so reviewed. |
 | [C-025](items/C-025-ci-ubuntu-26-04-runners-and-the.md) | CI: Ubuntu 26.04 runners and the React Compiler lint rules | roadmap | P2 | 3.5 | 2/1/2/2 | M | A | 0 | none | Toolchain drift is cheapest to fix before a run of feature stages. |
+| [C-058](items/C-058-kennel-per-vm-readiness-api.md) | kennel: per-VM readiness API | user | P3 | 6.0 | 3/3/3/3 | M | B | parked | C-028 | D-22 scope: one call that says whether a VM can be snapshotted, restored or leased. |
+| [C-055](items/C-055-kennel-automatic-backup-restore-tests.md) | kennel: automatic backup restore tests | user | P3 | 5.0 | 5/4/1/5 | L | B | parked | C-054, C-057, C-045 | Dennis's first use case: a backup that has never been restored is not a backup. |
+| [C-028](items/C-028-kennel-repository-service-skeleton-and-proxmox-pool.md) | kennel: repository, service skeleton and Proxmox pool token | roadmap | P3 | 4.7 | 3/4/5/2 | L | H | parked | S-003 | D-22: Dennis decided to build it. Class H because the repository, its name on GitHub and the Proxmox tokens are his to create. |
+| [C-054](items/C-054-kennel-leases-and-the-sweeper.md) | kennel: leases and the sweeper | user | P3 | 4.7 | 3/4/4/3 | L | B | parked | C-028 | D-22 scope: every VM kennel creates has an owner and an expiry, and nothing is left behind. |
+| [C-057](items/C-057-kennel-isolated-sandbox-network-with-a-jump.md) | kennel: isolated sandbox network with a jump host | user | P3 | 4.3 | 3/3/3/4 | L | H | parked | C-028 | D-23: supported from the start. Class H because it needs a VLAN or SDN zone on Dennis's Proxmox. |
 | [C-031](items/C-031-command-line-tool-for-the-api.md) | Command-line tool for the API | roadmap | P3 | 4.0 | 3/3/1/1 | M | B | parked | C-030 | Useful after tokens exist; board P3. |
 | [C-032](items/C-032-host-tagging-and-filtering.md) | Host tagging and filtering | roadmap | P3 | 4.0 | 3/2/2/1 | M | B | parked | none | Board P3 idea. |
 | [C-036](items/C-036-enable-or-disable-modules-per-group.md) | Enable or disable modules per group | roadmap | P3 | 4.0 | 3/2/1/2 | M | B | parked | C-016 | Board P3 idea; overlaps protected hosts. |
 | [C-039](items/C-039-notification-channels-webhook-ntfy-slack-matrix-email.md) | Notification channels: webhook, ntfy, Slack, Matrix; email follow-ups | roadmap | P3 | 4.0 | 3/3/1/1 | M | B | parked | C-013 | Board P3; email covers the need for now. |
 | [C-041](items/C-041-k8s-upgrade-on-rhel-family-hosts.md) | k8s-upgrade on RHEL-family hosts | roadmap | P3 | 4.0 | 3/3/1/1 | M | B | parked | none | Needs RHEL-family test hosts. |
+| [C-045](items/C-045-kennel-pbs-restore-points-restored-beside-the.md) | kennel: PBS restore points, restored beside the original | user | P3 | 4.0 | 4/3/1/4 | L | B | parked | C-028, C-054 | Asked for by Dennis; D-19 and D-23 put backup restore in kennel, beside the original first. |
+| [C-059](items/C-059-unbork-talks-to-kennel-snapshot-provider-and.md) | unbork talks to kennel: snapshot provider and surge nodes for upgrades | user | P3 | 3.7 | 4/4/1/2 | L | B | parked | S-003, C-054, C-058 | Dennis's second use case: surge nodes during Kubernetes upgrades. |
 | [C-027](items/C-027-application-rollback-and-cluster-rejoin-starting-with.md) | Application rollback and cluster rejoin, starting with etcd | roadmap | P3 | 3.3 | 3/2/1/4 | L | B | parked | C-014 | Needs a real cluster to test against; board P3. |
 | [C-033](items/C-033-export-gitops-yaml-standalone-playbooks-settings-backup.md) | Export: GitOps YAML, standalone playbooks, settings backup | roadmap | P3 | 3.3 | 3/3/1/3 | L | B | parked | none | Three exports in one item; split when promoted. |
 | [C-038](items/C-038-assistant-usage-plan-quota-and-session-limits.md) | Assistant usage: plan quota and session limits | roadmap | P3 | 3.0 | 2/2/1/1 | M | B | parked | none | Board P3. |
@@ -408,10 +409,9 @@ generated). The chains that matter:
 - C-048 then C-049 and C-050; the rename and S-009 before the release.
 - C-001 and C-052 then C-002 then C-003.
 - C-004 then C-005, C-006, C-007, C-014; S-003 then C-005, C-044 and,
-  much later, kennel (C-059) and the Enterprise non-Proxmox providers.
+  later, the Enterprise non-Proxmox providers.
 - S-013 then the Enterprise hardening results view.
 - S-015 (background jobs for extensions) then six Enterprise items.
-- C-028 then every other kennel item.
 
 ## Stages
 
@@ -432,8 +432,7 @@ run from the Enterprise repository's own stage file with the same number.
 | [8](stages/stage-8.md) | A safer assistant | C-010, C-020, C-037, C-011, C-019, C-009 |
 | [9](stages/stage-9.md) | Rollback beyond Proxmox, tickets and teams | S-019, S-020, E-011, E-012, E-008, E-014 |
 | [10](stages/stage-10.md) | Scale and assurance | C-029, E-018, E-019, E-017, E-016 |
-| [11](stages/stage-11.md) | kennel, a VM operations service | C-028, C-058, C-054, C-057, C-045, C-055, C-059 |
-| parked | P3, not scheduled | C-027, C-031, C-032, C-033, C-034, C-035, C-036, C-038, C-039, C-040, C-041, C-042, C-043, E-009, E-010, E-013, E-015, E-025 |
+| parked | P3, not scheduled | C-027, C-028, C-031, C-032, C-033, C-034, C-035, C-036, C-038, C-039, C-040, C-041, C-042, C-043, C-045, C-054, C-055, C-057, C-058, C-059, E-009, E-010, E-013, E-015, E-025 |
 
 Critical path: stage 1 (audit and the two hooks), stage 2 (rename), stage
 3 (release 2.0.0). Everything after stage 3 ships through the release
@@ -452,8 +451,6 @@ Main risks:
   through, in the same stage that changes rollback behaviour. Its spec
   requires the existing snapshot tests to pass unchanged before anything
   else in stage 4 builds on it.
-- Stage 11 (kennel) needs a repository that does not exist yet, and its
-  design is the least settled part of the plan.
 
 ## What the stages need from Dennis
 
@@ -466,7 +463,6 @@ Main risks:
 - Before stage 3: the README wording (S-007) and D-31, D-32.
 - Before stage 4: a VM named "test" with a Proxmox mapping.
 - Before stage 6: test GitLab and Nextcloud VMs named "test" for C-015.
-- Before stage 11: the kennel repository, and D-24.
 - This branch was cut before the visible rename (#297) merged to `dev`.
   `/run-stage` always starts from `origin/dev`; line numbers in the specs
   may have moved, and the skill tells the session to re-read the code.

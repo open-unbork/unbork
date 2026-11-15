@@ -4,11 +4,14 @@
 |---|---|
 | Edition | community |
 | Source | user (Dennis: "restore points beyond the run"); decisions D-19, D-22, D-23 |
-| Tier / score | P2 / 4.0 |
-| Stage | 11 |
+| Tier / score | P3 / 4.0 |
+| Stage | parked (was 11; decision D-45) |
 | Effort | L |
 | Autonomy | B |
 | Depends on | C-028, C-054 |
+
+> Parked on 2026-11-15 (decision D-45). This spec is kept as written for
+> when kennel is taken up again; its scope will be revisited first.
 
 ## Goal
 

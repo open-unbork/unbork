@@ -14,10 +14,6 @@ Dennis confirms or corrects it at the stage review. Stage numbers in the
 log below that differ from `roadmap.yaml` predate the final staging;
 `roadmap.yaml` wins.
 
-### D-24 Sandbox network for kennel
-Blocks: C-057. Which Proxmox bridge or SDN zone, which subnet, and which
-subnets a sandboxed VM must never reach.
-
 ### D-25 What the CLA check needs from Dennis
 Blocks: finishing S-011. A private repository for signatures, a token
 secret in `unbork` and `unbork-playbooks`, the GitHub logins to put on the
@@ -74,10 +70,13 @@ but loopback, so verify still works. Alternative: let a pack ask for
 unquiesce before verify.
 
 ### D-36 kennel shape
-Items: C-028, C-059. Assumed: Python, FastAPI and Postgres with a job
-table, no Celery. kennel restores beside the original (D-23), so as a
-snapshot provider it can take and delete restore points but not roll back
-in place; unbork's own Proxmox provider stays the default.
+Parked with kennel (D-45). The questions to settle before it is taken up
+again: where kennel's responsibility ends and other services begin (for
+example Kubernetes autoscalers), whether to specialise in Proxmox,
+whether it ships from this repository or its own (revisits D-22), whether
+surge nodes are in its first scope, the stack, and the sandbox network
+(formerly D-24). A strategy document is being written; the evaluation is
+at https://claude.ai/artifact/5LMKqifR89FUAqhCDiYbTb
 
 ## Assumptions made without asking
 
@@ -95,6 +94,7 @@ in place; unbork's own Proxmox provider stays the default.
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-15 | D-45: Wait with kennel. S-003 (snapshot provider interface) and C-044 (RAM in the rollback snapshot) stay in stage 4; C-028, C-045, C-054, C-055, C-057, C-058 and C-059 are parked and stage 11 is removed. First decide where kennel's responsibility ends. | Dennis |
 | 2026-11-14 | D-23 (kennel scope): an isolated sandbox network is supported from the start (a VLAN or SDN zone with no route to production, a jump host for unbork's SSH, outbound NAT), so rehearsing a change on a copy of a VM is in scope. PBS restore goes beside the original first; in-place restore over a production VM comes later, opt-in, with a second token, and only inside an unbork run. The name stays "kennel" for now and is renamed later. | Dennis, in the kennel thread |
 | 2026-11-14 | D-22: build kennel (working name). C-028 leaves the parked list and is split and staged in Phase 4 as its own track. Scope to plan, from the exploration write-up and not yet confirmed by Dennis: a standalone AGPL "VM operations service" owning restore tests, PBS restore points, leases for surge nodes and test VMs, sandbox copies, a sweeper and a per-VM readiness API. Sandbox networking, in-place restore and the name are settled in D-23. C-045 moves with it. | Dennis, in the kennel thread |
 | 2026-11-14 | D-04: Claude Code is installed on first use and no longer ships in the image (S-009, C-026). Community keeps only the operator's own Claude Code sign-in: new item S-014 removes the subscription token field and corrects its help text (`frontend/app/(dashboard)/ai-providers/client-page.tsx`, `docs/ui/assistant.md`), stage 1, S, class B. | Dennis, as relayed by the coordinator |

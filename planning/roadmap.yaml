@@ -59,11 +59,6 @@ stages:
     base_commit: null
     status: todo
     items: [C-029]
-  - stage: 11
-    goal: "kennel, a VM operations service"
-    base_commit: null
-    status: todo
-    items: [C-028, C-058, C-054, C-057, C-045, C-055, C-059]
 
 items:
   - id: C-064
@@ -934,104 +929,6 @@ items:
     branch: null
     spec: items/C-029-run-workers-on-more-than-one-box.md
     notes: "Board P3, raised to P2 because the HA item depends on it."
-  - id: C-028
-    title: "kennel: repository, service skeleton and Proxmox pool token"
-    edition: community
-    source: roadmap
-    tier: P2
-    score: 4.7
-    stage: 11
-    depends_on: [S-003]
-    autonomy: H
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-028-kennel-repository-service-skeleton-and-proxmox-pool.md
-    notes: "D-22: Dennis decided to build it. Class H because the repository, its name on GitHub and the Proxmox tokens are his to create."
-  - id: C-058
-    title: "kennel: per-VM readiness API"
-    edition: community
-    source: user
-    tier: P2
-    score: 6.0
-    stage: 11
-    depends_on: [C-028]
-    autonomy: B
-    effort: M
-    status: todo
-    branch: null
-    spec: items/C-058-kennel-per-vm-readiness-api.md
-    notes: "D-22 scope: one call that says whether a VM can be snapshotted, restored or leased."
-  - id: C-054
-    title: "kennel: leases and the sweeper"
-    edition: community
-    source: user
-    tier: P2
-    score: 4.7
-    stage: 11
-    depends_on: [C-028]
-    autonomy: B
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-054-kennel-leases-and-the-sweeper.md
-    notes: "D-22 scope: every VM kennel creates has an owner and an expiry, and nothing is left behind."
-  - id: C-057
-    title: "kennel: isolated sandbox network with a jump host"
-    edition: community
-    source: user
-    tier: P2
-    score: 4.3
-    stage: 11
-    depends_on: [C-028]
-    autonomy: H
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-057-kennel-isolated-sandbox-network-with-a-jump.md
-    notes: "D-23: supported from the start. Class H because it needs a VLAN or SDN zone on Dennis's Proxmox."
-  - id: C-045
-    title: "kennel: PBS restore points, restored beside the original"
-    edition: community
-    source: user
-    tier: P2
-    score: 4.0
-    stage: 11
-    depends_on: [C-028, C-054]
-    autonomy: B
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-045-kennel-pbs-restore-points-restored-beside-the.md
-    notes: "Asked for by Dennis; D-19 and D-23 put backup restore in kennel, beside the original first."
-  - id: C-055
-    title: "kennel: automatic backup restore tests"
-    edition: community
-    source: user
-    tier: P2
-    score: 5.0
-    stage: 11
-    depends_on: [C-054, C-057, C-045]
-    autonomy: B
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-055-kennel-automatic-backup-restore-tests.md
-    notes: "Dennis's first use case: a backup that has never been restored is not a backup."
-  - id: C-059
-    title: "unbork talks to kennel: snapshot provider and surge nodes for upgrades"
-    edition: community
-    source: user
-    tier: P2
-    score: 3.7
-    stage: 11
-    depends_on: [S-003, C-054, C-058]
-    autonomy: B
-    effort: L
-    status: todo
-    branch: null
-    spec: items/C-059-unbork-talks-to-kennel-snapshot-provider-and.md
-    notes: "Dennis's second use case: surge nodes during Kubernetes upgrades."
   - id: C-027
     title: "Application rollback and cluster rejoin, starting with etcd"
     edition: community
@@ -1046,6 +943,20 @@ items:
     branch: null
     spec: items/C-027-application-rollback-and-cluster-rejoin-starting-with.md
     notes: "Needs a real cluster to test against; board P3."
+  - id: C-028
+    title: "kennel: repository, service skeleton and Proxmox pool token"
+    edition: community
+    source: roadmap
+    tier: P3
+    score: 4.7
+    stage: parked
+    depends_on: [S-003]
+    autonomy: H
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-028-kennel-repository-service-skeleton-and-proxmox-pool.md
+    notes: "D-22: Dennis decided to build it. Class H because the repository, its name on GitHub and the Proxmox tokens are his to create."
   - id: C-031
     title: "Command-line tool for the API"
     edition: community
@@ -1214,3 +1125,87 @@ items:
     branch: null
     spec: items/C-043-readability-refactors-left-from-the-phase-2.md
     notes: "No frontend unit tests exist, so each refactor needs its own behaviour harness first (see proposal PR-06)."
+  - id: C-045
+    title: "kennel: PBS restore points, restored beside the original"
+    edition: community
+    source: user
+    tier: P3
+    score: 4.0
+    stage: parked
+    depends_on: [C-028, C-054]
+    autonomy: B
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-045-kennel-pbs-restore-points-restored-beside-the.md
+    notes: "Asked for by Dennis; D-19 and D-23 put backup restore in kennel, beside the original first."
+  - id: C-054
+    title: "kennel: leases and the sweeper"
+    edition: community
+    source: user
+    tier: P3
+    score: 4.7
+    stage: parked
+    depends_on: [C-028]
+    autonomy: B
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-054-kennel-leases-and-the-sweeper.md
+    notes: "D-22 scope: every VM kennel creates has an owner and an expiry, and nothing is left behind."
+  - id: C-055
+    title: "kennel: automatic backup restore tests"
+    edition: community
+    source: user
+    tier: P3
+    score: 5.0
+    stage: parked
+    depends_on: [C-054, C-057, C-045]
+    autonomy: B
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-055-kennel-automatic-backup-restore-tests.md
+    notes: "Dennis's first use case: a backup that has never been restored is not a backup."
+  - id: C-057
+    title: "kennel: isolated sandbox network with a jump host"
+    edition: community
+    source: user
+    tier: P3
+    score: 4.3
+    stage: parked
+    depends_on: [C-028]
+    autonomy: H
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-057-kennel-isolated-sandbox-network-with-a-jump.md
+    notes: "D-23: supported from the start. Class H because it needs a VLAN or SDN zone on Dennis's Proxmox."
+  - id: C-058
+    title: "kennel: per-VM readiness API"
+    edition: community
+    source: user
+    tier: P3
+    score: 6.0
+    stage: parked
+    depends_on: [C-028]
+    autonomy: B
+    effort: M
+    status: todo
+    branch: null
+    spec: items/C-058-kennel-per-vm-readiness-api.md
+    notes: "D-22 scope: one call that says whether a VM can be snapshotted, restored or leased."
+  - id: C-059
+    title: "unbork talks to kennel: snapshot provider and surge nodes for upgrades"
+    edition: community
+    source: user
+    tier: P3
+    score: 3.7
+    stage: parked
+    depends_on: [S-003, C-054, C-058]
+    autonomy: B
+    effort: L
+    status: todo
+    branch: null
+    spec: items/C-059-unbork-talks-to-kennel-snapshot-provider-and.md
+    notes: "Dennis's second use case: surge nodes during Kubernetes upgrades."

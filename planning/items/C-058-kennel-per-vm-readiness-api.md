@@ -4,11 +4,14 @@
 |---|---|
 | Edition | community |
 | Source | user (Dennis, kennel thread); decisions D-19 and D-22 |
-| Tier / score | P2 / 6.0 |
-| Stage | 11 |
+| Tier / score | P3 / 6.0 |
+| Stage | parked (was 11; decision D-45) |
 | Effort | M |
 | Autonomy | B |
 | Depends on | C-028 |
+
+> Parked on 2026-11-15 (decision D-45). This spec is kept as written for
+> when kennel is taken up again; its scope will be revisited first.
 
 ## Goal
 
