@@ -57,13 +57,13 @@ Append-only. Newest entry last.
 
 ## 2026-11-15 Stage 0 run
 
-Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in place of `roadmap/stage-0`). Base: `de69a7b` plus #300 (CLA secret name) cherry-picked.
+Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in place of `roadmap/stage-0`). Base: `de69a7b` plus #300 (CLA secret name), so merging this branch also merges #300.
 
-- 2026-11-15 C-064 done 194b3b4. Open: whether `main` should carry `planning/` (D-32).
-- 2026-11-15 S-012 done 841bbbe. GitHub licence detection to check after merge; unbork-playbooks LICENSE left as is (spec assumption).
-- 2026-11-15 S-011 review 1e71ee4 (+ unbork-playbooks#26). Open: steps 7 and 8 (co-author and fork tests) can only run once cla.yml is on dev, since pull_request_target runs the base branch's workflow; the fork test needs Dennis's second account. Dennis marks CLAAssistant required after the first green run.
-- 2026-11-15 C-024 done 1d55ef6. To confirm on the stage PR's CI run: one pushed tag, trivy passes, :test digest unchanged; fork-PR skip checked with the S-011 fork test.
+- 2026-11-15 C-064 done f31b2c0. Open: whether `main` should carry `planning/` (D-32).
+- 2026-11-15 S-012 done 59904e2. GitHub licence detection to check after merge; unbork-playbooks LICENSE left as is (spec assumption).
+- 2026-11-15 S-011 review cf4811a (+ unbork-playbooks#26). Open: steps 7 and 8 (co-author and fork tests) can only run once cla.yml is on dev, since pull_request_target runs the base branch's workflow; the fork test needs Dennis's second account. Dennis marks CLAAssistant required after the first green run.
+- 2026-11-15 C-024 done 59a11e8. To confirm on the stage PR's CI run: one pushed tag, trivy passes, :test digest unchanged; fork-PR skip checked with the S-011 fork test.
   (C-024: `unbork/unbork:test` digest before the stage PR: `sha256:e57d503a55a1027c5a08a036f3ed20883be6ec876e42009265d0914df912ce2b`.)
-- 2026-11-15 C-025 in_progress aea214d..a2b1ba1. Done once every job is green on 26.04 in the stage PR's CI; release-guard and packaging-smoke must pass there before the next release PR.
-- 2026-11-15 C-062 in_progress d2fa69e. Done once the stage PR's CI prints the figure and PLAN.md records it.
-- 2026-11-15 C-061 done 9aadf97. frontend-test CI job to confirm on the stage PR.
+- 2026-11-15 C-025 in_progress cb2761d..a61cfed. Done once every job is green on 26.04 in the stage PR's CI; release-guard and packaging-smoke must pass there before the next release PR.
+- 2026-11-15 C-062 in_progress 04bc864. Done once the stage PR's CI prints the figure and PLAN.md records it.
+- 2026-11-15 C-061 done 87278f6. frontend-test CI job to confirm on the stage PR.
