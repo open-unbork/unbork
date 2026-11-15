@@ -99,8 +99,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: in_progress
+    branch: claude/project-thread-bs6l27
     spec: items/S-011-contributor-licence-agreement-and-a-cla-check.md
     notes: "D-01 fixed the form: Apache-style ICLA and CCLA, CLA Assistant Lite. Dennis creates the private signatures repository and marks the check required."
   - id: C-024

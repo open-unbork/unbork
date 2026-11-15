@@ -68,6 +68,9 @@ The format follows [Keep a Changelog]; LabDog follows
 
 ### Changed
 
+- Contributions now require a signed contributor licence agreement,
+  checked on every pull request. See CONTRIBUTING.md.
+
 - `LICENSE` now names the copyright holder (Dennis Tyresson and
   contributors). The licence is unchanged.
 

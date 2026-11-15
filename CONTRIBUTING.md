@@ -1,7 +1,8 @@
 # Contributing to unbork
 
-Thanks for the interest. unbork is AGPL-3.0-or-later; contributions
-land under the same license (inbound = outbound).
+Thanks for the interest. unbork is AGPL-3.0-or-later. Contributions are
+accepted under a contributor licence agreement (see
+[Licensing & copyright](#licensing--copyright)).
 
 ## Reporting issues
 
@@ -138,10 +139,26 @@ Where work is tracked:
 
 ## Licensing & copyright
 
-You retain copyright in your contributions. By submitting a PR you
-agree your contribution is licensed under AGPL-3.0-or-later — same
-as the rest of the project. We don't use a CLA; GitHub's default
-"inbound = outbound" model applies.
+You keep the copyright in your contributions. Pull requests are
+accepted under a contributor licence agreement (CLA), which you sign
+once, by commenting on your first pull request:
+
+- On your first PR the `CLAAssistant` check fails and a bot comments.
+  Read the [individual agreement](legal/cla/v1/ICLA.md), then post the
+  sentence the bot quotes. The check turns green, and the signature
+  covers later PRs here and in `unbork-playbooks`.
+- The agreement is a licence, not an assignment: you grant the
+  maintainer a licence to use your contribution, and the copyright stays
+  yours.
+- The maintainer promises that your contribution stays available under
+  AGPL-3.0-or-later (or another OSI-approved licence).
+- The agreement also lets the maintainer license the project under
+  other terms as well as the AGPL.
+- A company that owns its employees' work signs the
+  [corporate agreement](legal/cla/v1/CCLA.md) instead.
+
+See [`legal/cla/`](legal/cla/README.md) for both texts, how to sign, and
+what is recorded when you do.
 
 Per-file AGPL headers are **not** required. The repository-level
 [LICENSE](LICENSE) covers the whole tree. Don't add headers to new
