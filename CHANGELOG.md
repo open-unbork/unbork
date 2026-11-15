@@ -14,11 +14,16 @@ The format follows [Keep a Changelog]; unbork follows
 
 - **The README says unbork.** LabDog is now called unbork: the README,
   badges and links point at `open-unbork/unbork` on GitHub and
-  `unbork/unbork` on Docker Hub. This release changes no code. It
+  `unbork/unbork` on Docker Hub. It changes no application code and
   publishes the 1.1.0 application under the new image name, so
   `docker run unbork/unbork:latest` works. Paths, environment variables
   and package names keep their LabDog names until 2.0.0, which renames
   them with fallbacks.
+
+### Security
+
+- **dnspython 2.9.2.** Fixes CVE-2026-128089 in the bundled dnspython
+  2.9.0 (the same bump dev already carries).
 
 ## [1.1.0] — 2026-11-06
 
