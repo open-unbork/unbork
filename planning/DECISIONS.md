@@ -19,6 +19,19 @@ Item: S-011, its fork test only (near the end of the item). A second
 GitHub account that is not on the allowlist, to prove the check on a pull
 request from a fork. Everything else is settled: see D-48 in the log.
 
+### D-49 How to close the CLA allowlist's name loophole
+Item: S-011, found in the stage 0 review (PR-19). The check can be
+passed by committing under an allowlisted *name* with an unlinked email.
+Options: (a) commit identity linked to Dennis's account and drop
+`Claude` from the allowlist; (b) an extra job that fails fork PRs with
+commits linked to no account; (c) accept it, since every PR is read
+before merge. Recommended: (b). Does not block stage 0; the gap is
+written down in `cla.yml`.
+
+Also for S-011: `legal/cla/README.md` tells a company to send the CCLA
+"to the maintainer" and has no address. Which contact address should it
+give (the same question as D-31's source-offer address)?
+
 ### D-26 A destructive run on a host that cannot be snapshotted
 Item: C-005. Today it proceeds with a log line. Assumed: refuse by
 default, with a setting to get the old behaviour back. This will stop

@@ -24,6 +24,8 @@ later and are unranked.
 | PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | open |
 | PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | open |
 | PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
+| PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | open |
+| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | open |
 
 ## PR-01 Audit rows for firewall rule changes
 - **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has
@@ -111,6 +113,31 @@ later and are unranked.
   Vitest 4. Bumping `@types/node` to `^24` may surface type errors to fix.
 - **Edition and effort:** Community, S.
 - **Where:** any stage; no item depends on it.
+
+## PR-19 Close the CLA allowlist's name loophole
+- **Finding (stage 0 review, medium):** CLA Assistant Lite checks a
+  commit's GitHub login, but falls back to the git author *name* when
+  neither the author nor the committer email is linked to an account.
+  Anyone can then pass the check by committing as `Claude` or
+  `therealscienta`. `Claude` is in the allowlist because most commits on
+  `dev` are authored and committed as `Claude <noreply@anthropic.com>`.
+- **Options:** (a) have the maintainer's coding sessions commit with a
+  committer linked to Dennis's account, then drop `Claude` from the
+  allowlist; (b) add a second job, no checkout, that fails a PR from a
+  fork when any of its commits has neither a linked author nor a linked
+  committer (`GET /pulls/{n}/commits`, `author == null && committer ==
+  null`).
+- **Recommendation:** (b) now, since it needs nobody to change how they
+  commit; (a) later if wanted. Community and playbooks, S. Decision D-49.
+
+## PR-20 Backend tests fail when `frontend/out` exists
+- **Finding (stage 0 review, low):** with a built `frontend/out/`,
+  `app.main` mounts the SPA catch-all `GET/HEAD /{full_path:path}`, which
+  has no `require()`, and four tests in `tests/test_permissions.py` fail.
+  CI is unaffected (backend-test never builds the frontend), but a
+  developer who ran `npm run build` sees a red suite.
+- **Fix:** list the catch-all in the test's `PUBLIC` set, or have the
+  test app skip the static mount. Community, S.
 
 ## Other work Dennis asked to add
 
