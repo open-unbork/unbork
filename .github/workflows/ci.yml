@@ -56,7 +56,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       && github.base_ref == 'main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,7 +99,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -122,7 +122,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -142,7 +142,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -167,7 +167,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -231,7 +231,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -267,7 +267,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -380,7 +380,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -410,7 +410,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive Docker Hub username from DOCKER_HUB_REPO
@@ -458,7 +458,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     outputs:
       image_ref: ${{ steps.meta.outputs.image_ref }}
@@ -500,7 +500,7 @@ jobs:
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -541,7 +541,7 @@ jobs:
     # follows immediately after. A manual dispatch on dev also publishes,
     # so the docs can be fixed between releases (e.g. after the repo
     # rename moved the Pages address). The next push to main overwrites it.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: >-
       ((github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main')
@@ -577,7 +577,7 @@ jobs:
       && github.ref == 'refs/heads/main')
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
     needs: [pages-build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       pages: write
       id-token: write
@@ -599,7 +599,7 @@ jobs:
   # a hard gate: `release-artifacts` needs it, so a broken install path
   # blocks the release. See packaging/tests/ for the harness and assertions.
   packaging-smoke:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -708,7 +708,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -802,7 +802,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write # push the auto-tag and create the release
       id-token: write # sign the provenance attestation
@@ -949,7 +949,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1023,7 +1023,7 @@ jobs:
       always() &&
       needs.build-test-image.result == 'success'
     needs: [build-test-image]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       # Check out so the scanner can read .trivyignore. Without this the
       # ignore file is absent from the runner workspace and silently has no
@@ -1053,7 +1053,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1081,7 +1081,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -1117,7 +1117,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
