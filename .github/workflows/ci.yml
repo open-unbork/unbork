@@ -244,7 +244,12 @@ jobs:
           uv pip install --system --no-deps .
       - name: pytest
         working-directory: backend
-        run: python -m pytest tests/ -v --cov --cov-report=term --cov-report=xml:coverage.xml
+        # sysmon (PEP 669) watches the whole interpreter, so lines run inside
+        # SQLAlchemy's greenlets are counted without concurrency=greenlet,
+        # which would force the much slower C tracer. Same totals, measured.
+        env:
+          COVERAGE_CORE: sysmon
+        run: python -m pytest tests/ -v --cov --cov-report=term:skip-covered --cov-report=xml:coverage.xml
       # Printed on every PR (also from forks: it needs no permissions) so
       # each stage review has a figure to compare. No fail_under: this is
       # a measurement, not a gate.
@@ -252,8 +257,12 @@ jobs:
         if: always()
         working-directory: backend
         run: |
-          total=$(python -m coverage report --format=total)
-          echo "Backend coverage: ${total}% of statements" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ -f .coverage ]; then
+            total=$(python -m coverage report --format=total)
+            echo "Backend coverage: ${total}% of statements" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Backend coverage: not measured (pytest did not run)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

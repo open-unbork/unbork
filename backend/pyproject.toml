@@ -101,7 +101,7 @@ markers = ["integration: marks tests as integration tests (deselect with '-m not
 
 [tool.coverage.run]
 source = ["app"]
-concurrency = ["greenlet", "thread"]
+concurrency = ["thread"]
 omit = ["app/_build_info.py"]
 
 [tool.coverage.report]
