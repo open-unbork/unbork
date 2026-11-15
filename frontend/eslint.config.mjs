@@ -37,15 +37,9 @@ export default defineConfig([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // Two React Compiler readiness rules that `react-hooks` 7.1 promoted
-      // to errors. They flag four established patterns here — debounced
-      // validation in an effect, prop→state sync, seeding state from query
-      // data, `Date.now()` in a relative-time helper called during render —
-      // none of which is a bug, and restructuring them is React work, not
-      // lint work. Warnings, like `no-unused-vars` below and for the same
-      // reason: advisory until someone takes the pass (roadmap board).
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/purity": "warn",
+      // `react-hooks/set-state-in-effect` and `react-hooks/purity` are errors
+      // (from the recommended set): derive state during render, or reset it
+      // with a `key`, instead of setting it synchronously in an effect.
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
       // `eslint-plugin-import-x` is the maintained fork of

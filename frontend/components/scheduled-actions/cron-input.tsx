@@ -35,27 +35,23 @@ function presetForCron(cron: string): string {
 }
 
 export function CronInput({ value, onChange }: CronInputProps) {
-  const [validation, setValidation] = useState<ValidateCronResponse | null>(null)
-  const [validating, setValidating] = useState(false)
+  // The last answer from the server, tagged with the expression it is
+  // for. Written only from the timer callback; whether it applies to the
+  // current value, and whether a check is pending, is derived below.
+  const [result, setResult] = useState<{ forValue: string; data: ValidateCronResponse } | null>(null)
   const timezone = useScheduleTimezone()
 
   // Debounced server-side validation. The endpoint is cheap; the
   // debounce keeps us from hammering it on every keystroke.
   useEffect(() => {
-    if (!value) {
-      setValidation(null)
-      return
-    }
+    if (!value) return
     let cancelled = false
-    setValidating(true)
     const handle = setTimeout(async () => {
       try {
         const resp = await apiFetch<ValidateCronResponse>("/api/scheduled-actions/validate-cron", { method: "POST", json: { cron: value } })
-        if (!cancelled) setValidation(resp)
+        if (!cancelled) setResult({ forValue: value, data: resp })
       } catch {
-        if (!cancelled) setValidation({ valid: false, message: "Validation failed", next_run_at: [], timezone: "UTC" })
-      } finally {
-        if (!cancelled) setValidating(false)
+        if (!cancelled) setResult({ forValue: value, data: { valid: false, message: "Validation failed", next_run_at: [], timezone: "UTC" } })
       }
     }, 250)
     return () => {
@@ -63,6 +59,9 @@ export function CronInput({ value, onChange }: CronInputProps) {
       clearTimeout(handle)
     }
   }, [value])
+
+  const validation = value && result?.forValue === value ? result.data : null
+  const validating = Boolean(value) && result?.forValue !== value
 
   const presetValue = presetForCron(value)
 
