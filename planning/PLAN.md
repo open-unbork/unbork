@@ -454,7 +454,7 @@ Main risks:
 
 ## What the stages need from Dennis
 
-- Before stage 0: the answers in D-25 (CLA check), and a Remote Control session
+- Before stage 0: a second GitHub account for the CLA fork test (D-25), and a Remote Control session
   on Dennis's computer for the load-test baseline on `lin-manager-2`
   (D-47; about 100 minutes, 6 GB of RAM).
 - Before stage 2: two hosts named "test", one on iptables and one on

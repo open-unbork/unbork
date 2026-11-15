@@ -10,6 +10,13 @@
 | Autonomy | B |
 | Depends on | none |
 
+> Decision D-48 (2026-11-15): the signatures repository exists
+> (`open-unbork/cla-signatures`), the token is an organisation secret
+> scoped to `unbork` and `unbork-playbooks` (not a per-repository secret;
+> confirm its name before writing the workflow), and the allowlist is
+> Dennis's login, `dependabot[bot]`, `github-actions[bot]` and the Claude
+> app's bot. Only the second account for the fork test is still needed.
+
 ## Goal
 Every pull request from someone outside the project carries a signed contributor licence agreement before it can merge. Signing is one comment on the PR, done once, and the record stays in a private repository in the organisation.
 

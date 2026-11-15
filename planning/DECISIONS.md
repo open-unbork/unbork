@@ -14,11 +14,12 @@ Dennis confirms or corrects it at the stage review. Stage numbers in the
 log below that differ from `roadmap.yaml` predate the final staging;
 `roadmap.yaml` wins.
 
-### D-25 What the CLA check needs from Dennis
-Blocks: finishing S-011. A private repository for signatures, a token
-secret in `unbork` and `unbork-playbooks`, the GitHub logins to put on the
-allowlist, and a second account to prove the check on a fork. Settled on
-2026-11-15: the CLA texts live in this repository under `legal/cla/v1/`.
+### D-25 What the CLA check still needs from Dennis
+Item: S-011, its fork test only (near the end of the item). A second
+GitHub account that is not on the allowlist, to prove the check on a pull
+request from a fork. Everything else is settled: see D-48 in the log.
+Also confirm the name of the organisation secret; the spec assumes
+`CLA_SIGNATURES_TOKEN`.
 
 ### D-26 A destructive run on a host that cannot be snapshotted
 Item: C-005. Today it proceeds with a log line. Assumed: refuse by
@@ -96,6 +97,7 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-15 | D-48: For the CLA check (S-011): the private repository `open-unbork/cla-signatures` exists; the token is an organisation secret scoped to `unbork` and `unbork-playbooks`; the suggested allowlist is accepted (Dennis's own login, the Dependabot and GitHub Actions bots, and the Claude app's bot); the CLA texts live in this repository under `legal/cla/v1/`. | Dennis |
 | 2026-11-15 | D-46: The Community hooks S-015 to S-020 and the Enterprise item that follows the rename stay scheduled items, not proposals. | Dennis (decision card) |
 | 2026-11-15 | D-47: The load-test baseline (C-063) is run through a Remote Control session on Dennis's computer, with his own SSH key to lin-manager-2. Cloud sessions cannot reach that network. | Dennis (decision card) |
 | 2026-11-15 | D-45: Wait with kennel. S-003 (snapshot provider interface) and C-044 (RAM in the rollback snapshot) stay in stage 4; C-028, C-045, C-054, C-055, C-057, C-058 and C-059 are parked and stage 11 is removed. First decide where kennel's responsibility ends. | Dennis |
