@@ -6,8 +6,8 @@
 stages:
   - stage: 0
     goal: "Foundations: safety nets and contributor terms"
-    base_commit: null
-    status: todo
+    base_commit: de69a7bb6f0df0a2e157a58f8dfa2ecba4ccb10a
+    status: in_progress
     items: [C-064, S-012, S-011, C-024, C-025, C-062, C-061, C-063]
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
