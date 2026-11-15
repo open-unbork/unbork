@@ -402,7 +402,7 @@ jobs:
   #                   (tag-release-image, after the release job, adds
   #                   :X.Y.Z, :X.Y and :X to that same image)
   # build-dev-image — push to dev           → :dev-latest + :dev-<short_sha>
-  # build-test-image — PRs (unless labelled no-test-image) + workflow_dispatch (non-main) → :test + :test-<short_sha>
+  # build-test-image — PRs (unless labelled no-test-image) + workflow_dispatch (non-main) → :test-<short_sha> (same-repository PRs only)
   # All three log into Docker Hub using DOCKER_HUB_PAT.
   # The username is extracted from the first segment of DOCKER_HUB_REPO.
 
@@ -443,13 +443,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # A PR labelled `no-test-image` builds no image. :test floats, and an
-  # install that follows it would pick up a work-in-progress branch (a
-  # plan, an experiment) at its next pull. Add the label *before* pushing;
-  # the lint and test jobs still run.
+  # Test images are published as :test-<short sha> only; there is no
+  # floating :test tag (an install following one picked up whatever PR
+  # built last). Follow :dev-latest to track dev. A PR labelled
+  # `no-test-image` builds no image, which only saves a build: add the
+  # label before pushing; the lint and test jobs still run. PRs from forks
+  # build no image either, because DOCKER_HUB_PAT is not available to them.
   build-test-image:
     if: >-
       (github.event_name == 'pull_request'
+       && github.event.pull_request.head.repo.full_name == github.repository
        && !contains(github.event.pull_request.labels.*.name, 'no-test-image')) ||
       (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
       (github.event_name == 'workflow_dispatch'
@@ -486,7 +489,6 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ vars.DOCKER_HUB_REPO }}:test
             ${{ vars.DOCKER_HUB_REPO }}:test-${{ steps.meta.outputs.short_sha }}
           build-args: |
             GIT_SHA=${{ github.sha }}

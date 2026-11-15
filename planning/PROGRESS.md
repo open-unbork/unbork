@@ -61,3 +61,4 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 
 - 2026-11-15 C-064 done 194b3b4. Open: whether `main` should carry `planning/` (D-32).
 - 2026-11-15 S-012 done 841bbbe. GitHub licence detection to check after merge; unbork-playbooks LICENSE left as is (spec assumption).
+- 2026-11-15 S-011 review 1e71ee4 (+ unbork-playbooks#26). Open: steps 7 and 8 (co-author and fork tests) can only run once cla.yml is on dev, since pull_request_target runs the base branch's workflow; the fork test needs Dennis's second account. Dennis marks CLAAssistant required after the first green run.

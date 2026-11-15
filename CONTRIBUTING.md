@@ -104,6 +104,9 @@ the decision points and what was considered and rejected.
   link the PR on that item. If it fixes a bug listed in
   [`BUGS.md`](BUGS.md), delete the entry and reference the bug ID in
   the commit.
+- CI publishes a test image for PRs from branches in this repository as
+  `unbork/unbork:test-<short sha>`. There is no floating test tag; use
+  `:dev-latest` to follow `dev`.
 
 ### Working with `plans/` — branch-scoped scratchpad
 

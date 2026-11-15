@@ -68,6 +68,9 @@ The format follows [Keep a Changelog]; LabDog follows
 
 ### Changed
 
+- CI no longer publishes a floating `:test` image tag. Test images are
+  `:test-<short sha>`; follow `:dev-latest` to track `dev`.
+
 - Contributions now require a signed contributor licence agreement,
   checked on every pull request. See CONTRIBUTING.md.
 
