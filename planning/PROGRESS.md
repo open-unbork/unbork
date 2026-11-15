@@ -68,3 +68,5 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 - 2026-11-15 C-062 in_progress 04bc864. Done once the stage PR's CI prints the figure and PLAN.md records it.
 - 2026-11-15 C-061 done 87278f6. frontend-test CI job to confirm on the stage PR.
 - 2026-11-15 stage 0 review: pass, 27 findings (0 critical, 0 high, 9 medium, 18 low); 20 fixed, 2 deferred (PR-19, PR-20), 4 rejected, 1 to verify live. planning/reviews/stage-0.md.
+- 2026-11-15 C-062 done 04bc864, b3cafa1. CI on 320a361 prints "Backend coverage: 83% of statements"; recorded in PLAN.md.
+- 2026-11-15 C-024 check: the stage PR's build-test-image pushed only `:test-d214e8b` (19:30Z). `:test` moved once more at 19:06Z, from the `dev` push that merged #300 with the old workflow, to `sha256:506dff7b33deaeb4a2c870b63d4ba0dbc8b97d0e1c0909b5fc3b620d750dacc0`; the stage PR's run left it there. That digest is the new reference for after merge.

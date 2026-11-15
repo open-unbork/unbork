@@ -91,7 +91,7 @@ alert remediation, verify), `auth/` (roles, permissions, plugin contract),
 | Check | Command (from the directory shown) | Baseline 2026-11-14 |
 |---|---|---|
 | Backend tests | `backend/`: `pytest tests/ -q` (Postgres through testcontainers, or `DATABASE_URL=postgresql+asyncpg://...` as in CI) | 4,721 passed, 2 failed, 5 skipped in 8 min 14 s with coverage on (CONTRIBUTING.md quotes about 40 s for an older suite). Both failures are the environment: see notes |
-| Backend coverage | `backend/`: `pytest tests/ -q --cov=app --cov-report=term` | 76% of statements (30,478 statements, 7,301 missed) |
+| Backend coverage | `backend/`: `pytest tests/ -q --cov=app --cov-report=term` | 76% of statements (30,478 statements, 7,301 missed). CI from stage 0 (C-062): **83%** of 30,486 statements on `320a361`, 2026-11-15 (the `backend-test` job prints it on every PR; the rise is mostly sysmon seeing greenlet lines the default tracer missed) |
 | Backend lint | `backend/`: `ruff check .` and `ruff format --check .` | 0 findings; 715 files formatted |
 | Backend SAST | `backend/`: `bandit -q -r app -b bandit-baseline.json` | no new findings against the baseline |
 | Frontend types | `frontend/`: `npx tsc --noEmit` | clean |
@@ -115,7 +115,8 @@ Notes:
 - CI is one workflow, `.github/workflows/ci.yml`: lint, bandit, pytest,
   frontend build, docs build, gitleaks, pip-audit, npm audit, trivy on PRs
   to `dev`; image, packages, tag and docs site on push to `main`.
-  Coverage is not measured in CI.
+  Coverage is measured in CI since stage 0 (C-062): `backend-test`
+  prints "Backend coverage: NN% of statements".
 - Release: bump `VERSION` and `CHANGELOG.md` on `dev`, open a
   `dev` to `main` PR with the `release.md` template, merge. See
   CONTRIBUTING.md, "Release process".
