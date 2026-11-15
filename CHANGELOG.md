@@ -1,11 +1,29 @@
 # Changelog
 
-All notable changes to LabDog are documented in this file.
+All notable changes to unbork (formerly LabDog) are documented
+in this file. Released sections keep the name they shipped under.
 
-The format follows [Keep a Changelog]; LabDog follows
+The format follows [Keep a Changelog]; unbork follows
 [Semantic Versioning].
 
 ## [Unreleased]
+
+## [1.1.1] — 2026-11-15
+
+### Changed
+
+- **The README says unbork.** LabDog is now called unbork: the README,
+  badges and links point at `open-unbork/unbork` on GitHub and
+  `unbork/unbork` on Docker Hub. It changes no application code and
+  publishes the 1.1.0 application under the new image name, so
+  `docker run unbork/unbork:latest` works. Paths, environment variables
+  and package names keep their LabDog names until 2.0.0, which renames
+  them with fallbacks.
+
+### Security
+
+- **dnspython 2.9.2.** Fixes CVE-2026-128089 in the bundled dnspython
+  2.9.0 (the same bump dev already carries).
 
 ## [1.1.0] — 2026-11-06
 
@@ -3343,7 +3361,8 @@ SSH-pushed Ansible reconciliation, and a per-host detail tab:
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[Unreleased]: https://github.com/open-labdog/labdog/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/open-unbork/unbork/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/open-unbork/unbork/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/open-labdog/labdog/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/open-labdog/labdog/compare/v0.10.0...v1.0.0
 [0.10.0]: https://github.com/open-labdog/labdog/compare/v0.9.0...v0.10.0
