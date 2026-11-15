@@ -229,6 +229,12 @@ runs into one stream; `lib/pending.ts` builds the Pending queue's lanes.
 
 ## Component Patterns
 
+State and effects: `react-hooks/set-state-in-effect` and
+`react-hooks/purity` are lint errors. Derive values during render rather
+than copying them into state from an effect, reset state with a `key`, and
+set state in an effect only from an asynchronous callback (see
+`components/scheduled-actions/cron-input.tsx`).
+
 ### A screen
 
 ```tsx
