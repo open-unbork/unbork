@@ -75,8 +75,11 @@ again: where kennel's responsibility ends and other services begin (for
 example Kubernetes autoscalers), whether to specialise in Proxmox,
 whether it ships from this repository or its own (revisits D-22), whether
 surge nodes are in its first scope, the stack, and the sandbox network
-(formerly D-24). A strategy document is being written; the evaluation is
-at https://claude.ai/artifact/5LMKqifR89FUAqhCDiYbTb
+(formerly D-24). Dennis confirmed the hold on 2026-11-15 and asked for
+the findings to be kept. They are in three places: the evaluation at
+https://claude.ai/artifact/5LMKqifR89FUAqhCDiYbTb, the Proxmox strategy
+document at https://claude.ai/artifact/Ts94GFSUAKVx7BfHDeWAMC, and a
+summary in the project's shared files (`kennel/kennel-status.md`).
 
 ## Assumptions made without asking
 
