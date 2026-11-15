@@ -169,7 +169,7 @@ items:
     depends_on: []
     autonomy: A
     effort: M
-    status: in_progress
+    status: done
     branch: claude/project-thread-bs6l27
     spec: items/C-063-record-a-load-test-baseline.md
     notes: "Accepted proposal PR-07: the only performance measure the project has."
