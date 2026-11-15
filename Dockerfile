@@ -1,4 +1,4 @@
-# LabDog — single-image build
+# unbork — single-image build
 # Produces a container that runs the API, the Celery workers and beat, and serves
 # the static frontend — all from `python -m app`.
 #
@@ -96,7 +96,7 @@ RUN rm -f /usr/local/bin/uv /usr/local/bin/uvx
 # `claude` from PATH with no code change, while both backends stay on one
 # binary that uv.lock pins transitively.
 #
-# LabDog points the CLI at /var/lib/labdog/claude-cli via
+# unbork points the CLI at /var/lib/labdog/claude-cli via
 # CLAUDE_CONFIG_DIR rather than letting it use $HOME, so a stored login
 # can never shadow the token configured in the UI — see
 # app/ai/providers/claude_cli.py and app/ai/agent_sdk/environment.py.

@@ -1,5 +1,5 @@
 # Load-test stack. Never point this at a live install or real hosts.
-# See README.md. LabDog runs the published image of the code under test.
+# See README.md. unbork runs the published image of the code under test.
 name: labdog-loadtest
 
 x-fakehost-log: &small-log
@@ -80,8 +80,8 @@ services:
 networks:
   loadtest:
     # Two-host mode (FAKEHOST_DOCKER, see README): fake hosts get 172.30/16
-    # with nat-unprotected so LabDog on the other box can reach them by a
-    # plain route; the LabDog side moves to 172.29/16.
+    # with nat-unprotected so unbork on the other box can reach them by a
+    # plain route; the unbork side moves to 172.29/16.
     driver_opts:
       com.docker.network.bridge.gateway_mode_ipv4: ${LT_GW_MODE:-nat}
     ipam:

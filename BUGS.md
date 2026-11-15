@@ -1,6 +1,6 @@
 # Bug Registry
 
-Open bugs in LabDog. New entries are added as bugs are surfaced.
+Open bugs in unbork. New entries are added as bugs are surfaced.
 
 ## Convention: open-only
 
@@ -257,7 +257,7 @@ the audit log, the scheduler tick poisoning itself, two temp-dir leaks,
 the sync-tray request loop, the CSRF-less password change). Search the
 log: `git log --grep "SEC"`.
 
-**Note on the privilege model.** LabDog is deliberately flat — every
+**Note on the privilege model.** unbork is deliberately flat — every
 authenticated user has the same permissions and `is_superuser` gates only
 user administration. That is a confirmed design decision, not a finding.
 Its consequence shapes the severities below: the AI classifier, the

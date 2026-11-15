@@ -28,7 +28,7 @@ nothing is being sent, while anything is missing.
 | **smtp server**, **port** | Your provider's submission server, or a relay on the LAN. |
 | **security** | **STARTTLS** (usually port 587), **TLS from the start** (usually 465), or **None** — for a relay on the same machine or a trusted LAN only. Changing it moves the port to the usual one, unless you typed a port of your own. The server's certificate is verified against the system trust store. |
 | **username**, **password** | Blank username for a relay that needs no login. The password is encrypted at rest and never sent back to the browser: the field shows that one is stored, blank keeps it, and **remove the stored password** clears it. |
-| **from address** | A plain address such as `labdog@example.com`. Domains like `home.arpa` and `.lan` are fine — whether the server will send as that address is the server's decision, and the test tells you. |
+| **from address** | A plain address such as `unbork@example.com`. Domains like `home.arpa` and `.lan` are fine — whether the server will send as that address is the server's decision, and the test tells you. |
 
 **Send test** sends one email with what is in the form, saved or not, to
 the address beside it (yours if blank), and shows the server's own answer
@@ -42,7 +42,7 @@ password, and STARTTLS on 587.
 
 ### 2. unbork's address
 
-`notifications.public_url` — for example `https://labdog.example.com`.
+`notifications.public_url` — for example `https://unbork.example.com`.
 Every notification links back to the page it is about, and **nothing is
 sent while this is empty**. unbork does not guess its own address from a
 web request's `Host` header: most notifications are not triggered by a

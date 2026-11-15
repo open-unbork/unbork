@@ -207,7 +207,7 @@ the rest of the cluster keeps serving traffic. Such actions declare
   the re-run skip already-succeeded hosts (k8s-upgrade detects
   already-on-target nodes via a `kubelet --version` probe).
 
-`labdog-playbooks`' `k8s-upgrade` discovers control-plane vs worker by
+`unbork-playbooks`' `k8s-upgrade` discovers control-plane vs worker by
 probing each node for `/etc/kubernetes/manifests/kube-apiserver.yaml`
 in a setup play, then `serial: 1` upgrades control-plane nodes
 followed by workers. The action is currently **apt-only** — Debian
@@ -281,8 +281,8 @@ global pack ordering.
 
 ### The labdog-playbooks pack
 
-A fresh install registers one pack, `labdog-playbooks`, on the git
-repository
+A fresh install registers one pack, `labdog-playbooks` (it kept its
+name from before the rename), on the git repository
 [`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 (branch `main`). It syncs on startup like any other pack and supplies
 the baseline actions, among them:
@@ -338,7 +338,7 @@ root and walks the whole repo to find them — `packs/<name>/`,
 `actions/<name>/`, the repo root itself, all work. If no `pack.yml`
 exists anywhere but the repo root has an `actions/*/manifest.yml`
 tree, the repo is treated as a single root-level pack (matches the
-[`labdog-playbooks`](https://github.com/open-unbork/unbork-playbooks)
+[`unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 convention).
 
 **Per-pack alternative.** When you want to add a single pack, or the
@@ -350,7 +350,7 @@ Packs** (Integrations → Action Packs) → **Add Pack**. Fields:
 | Name | Admin-chosen label; must be unique. |
 | Source | `Git repository` or `Local directory`. |
 | Git repository | Dropdown of configured `GitRepository` rows. Only shown for source = Git. If empty, add one under [Git Repos](gitops-ui.md) first. |
-| Path inside the repo | Subpath where the pack lives (e.g. `packs/labdog-default`). Leave empty when the pack is at the repo root. Only shown for source = Git. |
+| Path inside the repo | Subpath where the pack lives (e.g. `packs/unbork-default`). Leave empty when the pack is at the repo root. Only shown for source = Git. |
 | Filesystem path | Absolute path on the unbork host. Only shown for source = Local. unbork reads the directory in place — nothing is cloned. |
 | Enabled | Uncheck to keep the pack configured but out of the registry. |
 
@@ -550,7 +550,7 @@ parameters:                  # passed as --extra-vars at run time
 Unknown fields are rejected (the manifest is validated with pydantic
 `extra="forbid"`), so typos fail loudly instead of silently doing
 nothing. The manifests in
-[`labdog-playbooks/actions/`](https://github.com/open-unbork/unbork-playbooks/tree/main/actions)
+[`unbork-playbooks/actions/`](https://github.com/open-unbork/unbork-playbooks/tree/main/actions)
 are working examples of every field.
 
 ### Playbook conventions
@@ -671,7 +671,7 @@ currently-desired service is running and every desired package is
 installed). The full working example is
 [`docs/examples/action-packs/with-verify/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-verify).
 
-**Reusable verify templates** ship in the `labdog-playbooks` repo
+**Reusable verify templates** ship in the `unbork-playbooks` repo
 under [`verify/`](https://github.com/open-unbork/unbork-playbooks/tree/main/verify)
 — point `verify_playbook:` at one of them (e.g.
 `../../verify/post-upgrade.yml` — `../../` reaches the pack root from
@@ -835,7 +835,7 @@ post_run_register:
 
 After success, unbork inserts each declared resource as a **host-
 scope override row** (`host_id=<target>`, `group_id=NULL`) so the
-resource becomes labdog-managed from that point on. After the
+resource becomes unbork-managed from that point on. After the
 inserts, a `post_run_sync` is automatically queued for the
 affected modules so the Host detail tabs reflect the new state
 as soon as the action finishes (no waiting for the next drift check).

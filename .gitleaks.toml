@@ -1,4 +1,4 @@
-# gitleaks config for LabDog
+# gitleaks config for unbork
 #
 # Extends the default ruleset (so new leaks still get caught) and adds
 # narrow allowlist entries for known-fixture / known-historical

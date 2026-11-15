@@ -5,7 +5,7 @@ export LC_ALL=C  # mawk honours a comma-decimal locale and would truncate 1.2GiB
 out=$1; interval=${2:-10}
 pg() { docker exec labdog-loadtest-postgres-1 psql -U labdog -d labdog -At -F, -c "$1" 2>/dev/null; }
 rd() { docker exec labdog-loadtest-redis-1 redis-cli LLEN "$1" 2>/dev/null; }
-# LabDog may be one container ("all") or several role containers ("split"):
+# unbork may be one container ("all") or several role containers ("split"):
 # sum memory and CPU over every stack container that isn't postgres/redis/fakehost.
 mib() { docker stats --no-stream --format '{{.Name}},{{.MemUsage}},{{.CPUPerc}}' \
     $(docker ps --filter label=com.docker.compose.project=labdog-loadtest --format '{{.Names}}' | grep -v fakehost) \

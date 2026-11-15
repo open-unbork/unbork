@@ -1,7 +1,7 @@
 # ============================================================
-# LabDog Configuration
+# unbork Configuration
 # ============================================================
-# Production configuration for LabDog.
+# Production configuration for unbork.
 # Copy this file to /etc/labdog/labdog.toml and update
 # all REQUIRED values before starting the service.
 #
@@ -28,8 +28,8 @@ port = 8000
 # limit, which keys on the client address). CIDR entries work, so a
 # containerised proxy on a dynamic address can be covered by its network:
 #   trusted_proxies = ["172.18.0.0/16"]
-# Leave empty if nothing sits in front of LabDog. If a proxy is present
-# and this is empty, LabDog logs a warning once and treats every request
+# Leave empty if nothing sits in front of unbork. If a proxy is present
+# and this is empty, unbork logs a warning once and treats every request
 # as coming from the proxy.
 trusted_proxies = []
 # Uvicorn's --forwarded-allow-ips (comma-separated string)
@@ -64,11 +64,11 @@ secret_key = "CHANGE_ME"
 # Generate with: openssl rand -base64 32
 encryption_key = "CHANGE_ME"
 
-# IP of the LabDog server — used in the auto-injected SSH
+# IP of the unbork server — used in the auto-injected SSH
 # lockout prevention rule (REQUIRED)
 labdog_server_ip = "127.0.0.1"
 
-# Origins of a frontend served from somewhere other than LabDog itself
+# Origins of a frontend served from somewhere other than unbork itself
 # (CORS, and the web terminal's origin check). Not needed when the UI is
 # reached through the same host as the API, as behind a reverse proxy.
 allowed_origins = ["http://localhost:3000"]
@@ -101,13 +101,13 @@ api = "100/minute"
 
 # ── Prometheus metrics export ────────────────────────────────
 [metrics]
-# Expose LabDog's own fleet state and health at GET /metrics in
+# Expose unbork's own fleet state and health at GET /metrics in
 # Prometheus text exposition format.
 #
 # ⚠️  WHEN ENABLED, THIS ENDPOINT IS UNAUTHENTICATED.
-#     Prometheus cannot use LabDog's cookie session auth, so the
+#     Prometheus cannot use unbork's cookie session auth, so the
 #     endpoint is deliberately open-and-opt-in rather than half-gated.
-#     Restrict it at your reverse proxy before exposing LabDog to an
+#     Restrict it at your reverse proxy before exposing unbork to an
 #     untrusted network -- see docs/security-hardening.md.
 #     It discloses aggregate counts only: no hostnames, no IP
 #     addresses, no usernames, no secrets, no error text.

@@ -1,4 +1,4 @@
-# LabDog split by runtime role: same image, one container per role.
+# unbork split by runtime role: same image, one container per role.
 # See docs/scaling-out.md. The default single-container install
 # (dev/docker-compose.yml, role "all") is unchanged.
 #

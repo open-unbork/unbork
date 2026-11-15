@@ -1,5 +1,8 @@
 <p align="left">
-  <img src="assets/logo-banner.svg" alt="unbork — A homelabber's best friend" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/unbork-logo-dark.svg" />
+    <img src="assets/unbork-logo-light.svg" alt="unbork" width="320" />
+  </picture>
 </p>
 
 # unbork
@@ -7,7 +10,7 @@
 [![ci](https://img.shields.io/github/actions/workflow/status/open-unbork/unbork/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=ci)](https://github.com/open-unbork/unbork/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/open-unbork/unbork?style=for-the-badge&logo=github&color=16a34a)](https://github.com/open-unbork/unbork/releases/latest)
 [![docker pulls](https://img.shields.io/docker/pulls/unbork/unbork?style=for-the-badge&logo=docker&logoColor=white&color=2563eb)](https://hub.docker.com/r/unbork/unbork)
-[![docs](https://img.shields.io/badge/docs-labdog-1e293b?style=for-the-badge)](https://open-unbork.github.io/unbork/)
+[![docs](https://img.shields.io/badge/docs-unbork-1e293b?style=for-the-badge)](https://open-unbork.github.io/unbork/)
 [![license](https://img.shields.io/badge/license-AGPL--3.0--or--later-d97706?style=for-the-badge)](LICENSE)
 
 Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more from a single web UI. Declare state in groups, preview the exact Ansible diff before applying, detect drift, and roll it back if something looks wrong.
@@ -15,8 +18,8 @@ Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more 
 ## Try it in 30 seconds
 
 ```bash
-docker run -d --name labdog -p 8000:8000 \
-  -v labdog-data:/var/lib/labdog \
+docker run -d --name unbork -p 8000:8000 \
+  -v unbork-data:/var/lib/labdog \
   unbork/unbork:latest
 ```
 
@@ -93,7 +96,7 @@ Anthropic API, or a Claude subscription. See the
 - **SSH** — push config to hosts and serve an in-browser terminal (asyncssh + xterm.js)
 - **Git** — pull GitOps configs and Action packs from any Git server; SSH key or HTTPS PAT auth, credentials encrypted at rest
 - **Proxmox VE** — automatic snapshot + rollback, VM discovery
-- **Grafana Mimir/Loki** — register a Prometheus-compatible endpoint to show instant CPU/memory/disk on the host page; ties into the Alloy install action from `labdog-playbooks` so metrics flow back automatically
+- **Grafana Mimir/Loki** — register a Prometheus-compatible endpoint to show instant CPU/memory/disk on the host page; ties into the Alloy install action from [`unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks) so metrics flow back automatically
 - **Prometheus / Alloy** — the other direction: an opt-in `/metrics` endpoint exposing fleet state and unbork's own health for your existing scraper, with a ready-made Grafana dashboard and alert rules
 - **Webhooks** — inbound triggers from your Git host for GitOps sync, and
   from Grafana Alerting for alert intake

@@ -21,7 +21,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Build LabDog as a pre-built tarball and Linux packages.
+Build unbork as a pre-built tarball and Linux packages.
 
 Options:
   --version=X.Y.Z   Package version (default: $VERSION, auto-read from pyproject.toml)

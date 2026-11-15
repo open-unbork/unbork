@@ -1,5 +1,5 @@
 # ============================================================
-# LabDog Development Configuration
+# unbork Development Configuration
 # ============================================================
 # This file is used by dev.sh and local development.
 # For production, see packaging/etc/labdog.toml

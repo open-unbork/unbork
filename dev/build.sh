@@ -7,7 +7,7 @@ ROOT_DIR="${SCRIPT_DIR}/.."
 TAG="latest"
 IMAGE="labdog"
 
-echo "=== LabDog Local Build ==="
+echo "=== unbork Local Build ==="
 echo ""
 
 # Remove previous image
