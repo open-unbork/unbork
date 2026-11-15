@@ -38,6 +38,7 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v                                # everything, integration included
 pytest tests/ -v -m "not integration"           # skip the git round-trip tests
+pytest tests/ -q --cov --cov-report=term        # with coverage (as CI measures it)
 ```
 
 Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`LABDOG_SECURITY__SECRET_KEY`, `LABDOG_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
@@ -479,11 +480,16 @@ and are started by a person, never automatically. Decisions go in
 ## CI/CD
 
 GitHub Actions pipeline (`.github/workflows/ci.yml`):
-- **lint + test + scan**: ruff, bandit, ESLint, pytest,
-  frontend build check, docs build check, gitleaks, pip-audit, npm
-  audit — runs on PRs to `dev` and `workflow_dispatch`
-- **build-test-image**: pushes a `:test-<sha>` Docker image and feeds
-  trivy — runs on PRs to `dev` and `workflow_dispatch`
+- **lint + test + scan**: ruff, bandit, ESLint, pytest (prints the
+  backend coverage total and uploads `coverage.xml`), Vitest
+  (`frontend-test`), frontend build check, docs build check, gitleaks,
+  pip-audit, npm audit — runs on PRs to `dev` and `workflow_dispatch`
+- **build-test-image**: pushes a `:test-<sha>` Docker image (there is no
+  floating `:test`; `:dev-latest` follows `dev`) and feeds trivy — runs
+  on same-repository PRs to `dev`, pushes to `dev` and
+  `workflow_dispatch`
+- **CLA** (`.github/workflows/cla.yml`): the `CLAAssistant` check on
+  every PR; see `legal/cla/`
 - **build-image**: publishes `:latest` and `:<sha>` to Docker Hub —
   runs on push to `main` (PR-from-dev merges only; direct pushes are
   blocked by branch protection)

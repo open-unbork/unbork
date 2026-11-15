@@ -157,6 +157,8 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+  # ---- TEST -------------------------------------------------------------
+
   frontend-test:
     if: >-
       github.event_name == 'pull_request' ||
@@ -178,9 +180,6 @@ jobs:
       - name: npm test (Vitest unit tests)
         working-directory: frontend
         run: npm test
-
-
-  # ---- TEST -------------------------------------------------------------
 
   backend-test:
     if: >-
@@ -448,7 +447,7 @@ jobs:
   #                   (tag-release-image, after the release job, adds
   #                   :X.Y.Z, :X.Y and :X to that same image)
   # build-dev-image — push to dev           → :dev-latest + :dev-<short_sha>
-  # build-test-image — PRs (unless labelled no-test-image) + workflow_dispatch (non-main) → :test-<short_sha> (same-repository PRs only)
+  # build-test-image — same-repository PRs (unless labelled no-test-image) + push to dev + workflow_dispatch (non-main) → :test-<short_sha>
   # All three log into Docker Hub using DOCKER_HUB_PAT.
   # The username is extracted from the first segment of DOCKER_HUB_REPO.
 

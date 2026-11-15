@@ -233,7 +233,10 @@ State and effects: `react-hooks/set-state-in-effect` and
 `react-hooks/purity` are lint errors. Derive values during render rather
 than copying them into state from an effect, reset state with a `key`, and
 set state in an effect only from an asynchronous callback (see
-`components/scheduled-actions/cron-input.tsx`).
+`components/scheduled-actions/cron-input.tsx`). The one sanctioned
+exception is a single read of browser-only state after mount, which
+carries an `eslint-disable-next-line` with its reason (see
+`lib/local-pref.ts`).
 
 ### A screen
 
@@ -465,6 +468,8 @@ config in `vitest.config.mts`).
   `<name>.test.tsx`, under `lib/`, `components/` or `hooks/`. Never under
   `app/`: pages are covered by the Playwright specs in `e2e/`
   (`*.spec.ts`), and the two suffixes keep the runners apart.
+- Tests run in node by default. A test that renders a component starts
+  with `// @vitest-environment jsdom`.
 - Import `describe`, `it`, `expect` and `vi` from `"vitest"` (no globals),
   so `npx tsc --noEmit` type-checks tests like any other file.
 - Mock `@/lib/api` per test file with `vi.mock` and a `vi.hoisted` spy;
