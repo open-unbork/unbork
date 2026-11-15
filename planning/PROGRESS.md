@@ -67,3 +67,4 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 - 2026-11-15 C-025 in_progress cb2761d..a61cfed. Done once every job is green on 26.04 in the stage PR's CI; release-guard and packaging-smoke must pass there before the next release PR.
 - 2026-11-15 C-062 in_progress 04bc864. Done once the stage PR's CI prints the figure and PLAN.md records it.
 - 2026-11-15 C-061 done 87278f6. frontend-test CI job to confirm on the stage PR.
+- 2026-11-15 stage 0 review: pass, 27 findings (0 critical, 0 high, 9 medium, 18 low); 20 fixed, 2 deferred (PR-19, PR-20), 4 rejected, 1 to verify live. planning/reviews/stage-0.md.
