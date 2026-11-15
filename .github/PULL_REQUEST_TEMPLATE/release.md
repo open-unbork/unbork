@@ -20,7 +20,7 @@ the items below are the human-owned ones CI cannot verify.
 - [ ] **Roadmap board** — items shipped this cycle set to Done, with the PR linked
 - [ ] **`BUGS.md`** — bugs fixed this cycle deleted (the fixing commit references the bug ID)
 - [ ] **`plans/` is absent** — it must never ship on `dev` or `main`. (`planning/` is the staged roadmap and stays.)
-- [ ] **CI is green on this PR** — `version-check` (required), `packaging-smoke`, lint, `backend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`, trivy
+- [ ] **CI is green on this PR** — `version-check` (required), `packaging-smoke`, lint, `backend-test`, `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`, trivy
 
 > **Do not hand-bump** `backend/pyproject.toml` or `frontend/package.json`.
 > The `release-artifacts` job syncs both from `VERSION` on merge, then

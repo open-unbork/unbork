@@ -456,6 +456,21 @@ if (!user?.is_superuser) {
 
 ---
 
+## Unit tests
+
+Vitest with jsdom and Testing Library (`npm test`, `npm run test:watch`;
+config in `vitest.config.mts`).
+
+- A test sits next to the code it tests, as `<name>.test.ts` or
+  `<name>.test.tsx`, under `lib/`, `components/` or `hooks/`. Never under
+  `app/`: pages are covered by the Playwright specs in `e2e/`
+  (`*.spec.ts`), and the two suffixes keep the runners apart.
+- Import `describe`, `it`, `expect` and `vi` from `"vitest"` (no globals),
+  so `npx tsc --noEmit` type-checks tests like any other file.
+- Mock `@/lib/api` per test file with `vi.mock` and a `vi.hoisted` spy;
+  no test talks to a backend. `components/scheduled-actions/cron-input.test.tsx`
+  shows the pattern, with fake timers for a debounce.
+
 ## Toast Notifications
 
 Use `showSuccess`, `showError`, `showInfo` from `@/lib/toast` (wraps Sonner).

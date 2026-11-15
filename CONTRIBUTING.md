@@ -54,10 +54,11 @@ pytest tests/ -q --cov --cov-report=term   # with coverage (slower)
 ruff check .
 ruff format --check .   # --diff shows what it would change
 
-# Frontend type-check + lint
+# Frontend type-check + lint + unit tests (Vitest, no stack needed)
 cd frontend
 npx tsc --noEmit
 npm run lint
+npm test
 
 # Frontend E2E (Playwright) — requires the full stack running
 npx playwright test
@@ -253,7 +254,7 @@ the human-owned steps it cannot verify:
   references the bug ID.
 - [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
-  `frontend-build-check`, `docs-build-check`, `build-test-image`,
+  `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`,
   trivy.
 
 Note: `main` is protected and the `version-check` context is a

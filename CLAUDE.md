@@ -14,7 +14,7 @@ LabDog is a centralized Linux configuration management tool with a FastAPI backe
 | Task Queue | Celery + Redis (RedBeat scheduler) |
 | Config Mgmt | Ansible (ansible-runner) |
 | SSH | asyncssh (terminal + host connections) |
-| Testing | pytest + testcontainers (backend), Playwright (frontend E2E) |
+| Testing | pytest + testcontainers (backend), Vitest (frontend unit), Playwright (frontend E2E) |
 
 ## Development Setup
 
@@ -45,6 +45,16 @@ Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `py
 **Test session architecture**: Each test gets a database session wrapped in a savepoint that rolls back after the test. The `get_db` dependency is overridden to return this test session. Any `session.commit()` in application code translates to savepoint release/create (not actual commit) via `join_transaction_mode="create_savepoint"`.
 
 **Important**: The `auth_setup.py` register endpoint uses `AsyncSessionLocal()` directly (not `get_db`) for its user count check. This is intentional — it avoids asyncpg "another operation in progress" errors when sharing a session with `user_manager.create()`. Tests that need to test registration must mock `AsyncSessionLocal` in `app.api.auth_setup`.
+
+### Frontend unit
+```bash
+cd frontend
+npm test                     # Vitest, no stack needed
+npm run test:watch           # re-run on change
+```
+
+Unit tests are `*.test.ts(x)` next to the code under `lib/`,
+`components/` and `hooks/`; see `frontend/FRONTEND.md`, "Unit tests".
 
 ### Frontend E2E
 ```bash

@@ -155,8 +155,8 @@ items:
     depends_on: []
     autonomy: A
     effort: M
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-061-a-unit-test-harness-for-the-frontend.md
     notes: "Accepted proposal PR-06: stage reviews cannot reproduce a frontend bug with a failing test without one."
   - id: C-063
