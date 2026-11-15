@@ -66,3 +66,4 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
   (C-024: `unbork/unbork:test` digest before the stage PR: `sha256:e57d503a55a1027c5a08a036f3ed20883be6ec876e42009265d0914df912ce2b`.)
 - 2026-11-15 C-025 in_progress aea214d..a2b1ba1. Done once every job is green on 26.04 in the stage PR's CI; release-guard and packaging-smoke must pass there before the next release PR.
 - 2026-11-15 C-062 in_progress d2fa69e. Done once the stage PR's CI prints the figure and PLAN.md records it.
+- 2026-11-15 C-061 done 9aadf97. frontend-test CI job to confirm on the stage PR.

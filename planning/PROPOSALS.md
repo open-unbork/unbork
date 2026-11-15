@@ -23,6 +23,7 @@ later and are unranked.
 | PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | open |
 | PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | open |
 | PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | open |
+| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
 
 ## PR-01 Audit rows for firewall rule changes
 - **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has
@@ -102,6 +103,14 @@ later and are unranked.
   module; a loader and a route are missing. Much smaller than C-033's L.
 - **PR-17:** the quota half of C-038 is fully designed on the board; the
   per-session allowance is not.
+
+## PR-18 Match @types/node to Node 24, then Vitest 5
+- **Why:** CI and the image run the frontend build on Node 24, but
+  `frontend/package.json` pins `@types/node` to `^20`. Vitest 5 declares
+  `@types/node ^22 || >=24` as an optional peer, so C-061 had to take
+  Vitest 4. Bumping `@types/node` to `^24` may surface type errors to fix.
+- **Edition and effort:** Community, S.
+- **Where:** any stage; no item depends on it.
 
 ## Other work Dennis asked to add
 
