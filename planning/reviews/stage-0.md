@@ -102,3 +102,54 @@ misses lines run inside greenlets; sysmon sees them. No test was removed.
 
 **Pass.** No critical or high finding is open. Open mediums: F-01
 (PR-19, decision D-49) and F-03 (to check live).
+
+# Stage 0 report
+
+## Items
+
+| Item | Class | Status | Commits | Open |
+|---|---|---|---|---|
+| C-064 planning/ named exception | A | done | `f31b2c0` | whether `main` carries `planning/` (D-32) |
+| S-012 Copyright line in LICENSE | A | done | `59904e2` | GitHub licence detection, after merge |
+| S-011 CLA and CLA check | B | review | `cf4811a`, `69ea4ee`, `320a361`; unbork-playbooks#26 | Dennis reviews the texts; co-author and fork tests after merge (second account); mark `CLAAssistant` required; D-49 |
+| C-024 Stop moving `:test` | A | done | `59a11e8` | none |
+| C-025 26.04 runners, compiler lint rules | A | done | `cb2761d`..`a61cfed`, `9038476` | none |
+| C-062 Coverage in CI | A | done | `04bc864`, `b3cafa1` | none |
+| C-061 Frontend unit harness | A | done | `87278f6`, `673a119` | PR-18 (Vitest 5) |
+| C-063 Load-test baseline | A | in_progress | none yet | lin-manager-2 has too little memory and disk; moved to a test host reached through lin-manager, waiting for Dennis to allow SSH from lin-manager-2 |
+
+Enterprise half (unbork-enterprise#8): E-001 licence placeholder
+(review, class B), E-022 CI parity (done; gitleaks red on two committed
+test-realm secrets until rotated), E-028 no-Ansible-imports check (done).
+E-021 skipped by Dennis.
+
+## Exit criteria
+
+| Criterion | Result |
+|---|---|
+| Backend tests, ruff, bandit | met in CI (4,822 passed); locally the same 2 environmental failures as the baseline |
+| Frontend tsc, lint, unit tests | met: clean; 0 errors, 10 warnings (11 before); 31 passed |
+| docs/ and CHANGELOG `[Unreleased]` | met: CHANGELOG has the `:test`, CLA and LICENSE lines; no user-visible `docs/` change; no BUGS.md entry fixed |
+| roadmap.yaml and PROGRESS.md current | met |
+| Review done, no critical or high open | met (this file) |
+| Fork PR fails the CLA check until signed | not verified: runs only once `cla.yml` is on `dev`; needs a second account |
+| LICENSE names Dennis Tyresson | met |
+| A PR no longer moves `:test` | met: the stage PR's run pushed only `:test-d214e8b` |
+| CI prints coverage; PLAN.md records it | met: 83%, recorded |
+| `npm test` runs a real test, CI runs it | met: `frontend-test` green |
+| `baseline-loadtest.md` holds an S2 300 run | not met yet: C-063 in progress (see above). The spec named lin-manager-2, which cannot hold the run |
+| planning/ vs plans/ in docs, template, .dockerignore | met |
+
+## Before and after
+
+See "Numbers before and after" above: tests unchanged, coverage 76% to
+83% (measurement change), frontend lint warnings 11 to 10, frontend unit
+tests 0 to 31.
+
+## Blocked and waiting
+
+- C-063: SSH approval for the load-test session (Dennis).
+- S-011 and E-001: Dennis's review of the CLA texts and the Enterprise
+  licence placeholder.
+- unbork-enterprise#8 gitleaks: rotating the two test-realm client
+  secrets (offered, waiting for Dennis).
