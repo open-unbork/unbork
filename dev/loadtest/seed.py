@@ -25,7 +25,9 @@ def wait_syncs(api, stall_s=1800):
     last, since = None, time.time()
     while True:
         time.sleep(10)
-        jobs = api.get("/api/sync/jobs?limit=1000")
+        # The route caps limit at 500 (backend/app/api/sync.py); one job per
+        # host per seed sync, so 500 covers the 300-host scenarios.
+        jobs = api.get("/api/sync/jobs?limit=500")
         done = sum(j["status"] not in ("pending", "running") for j in jobs)
         if done != last:
             last, since = done, time.time()
