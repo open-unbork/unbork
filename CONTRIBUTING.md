@@ -44,6 +44,7 @@ spin up Postgres via testcontainers, so you need Docker available.
 # Backend — runs in ~40s
 cd backend && source .venv/bin/activate
 pytest tests/ -q
+pytest tests/ -q --cov --cov-report=term   # with coverage (slower)
 
 # Backend lint + format (still in backend/, ruff comes from .[dev]).
 # `ruff format --check` is a separate CI gate from `ruff check`, so a
@@ -63,7 +64,10 @@ npx playwright test
 ```
 
 CI runs all of the above on every PR; expect it to fail if you skip
-them locally.
+them locally. The `backend-test` job also prints the backend coverage
+total (`Backend coverage: NN% of statements`) in its log and on the
+run's summary page, and uploads `coverage.xml` as the `backend-coverage`
+artifact.
 
 ## Code style
 

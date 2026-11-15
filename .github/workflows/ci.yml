@@ -222,7 +222,22 @@ jobs:
           uv pip install --system --no-deps .
       - name: pytest
         working-directory: backend
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -v --cov --cov-report=term --cov-report=xml:coverage.xml
+      # Printed on every PR (also from forks: it needs no permissions) so
+      # each stage review has a figure to compare. No fail_under: this is
+      # a measurement, not a gate.
+      - name: Coverage summary
+        if: always()
+        working-directory: backend
+        run: |
+          total=$(python -m coverage report --format=total)
+          echo "Backend coverage: ${total}% of statements" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 14
 
   frontend-build-check:
     if: >-

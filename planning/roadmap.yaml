@@ -141,8 +141,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: in_progress
+    branch: claude/project-thread-bs6l27
     spec: items/C-062-measure-backend-coverage-in-ci.md
     notes: "Accepted proposal PR-07: gives every stage review a number to compare."
   - id: C-061
