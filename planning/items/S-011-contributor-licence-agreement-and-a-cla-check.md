@@ -44,7 +44,7 @@ Out of scope:
 - Decision [D-01](../DECISIONS.md).
 - From Dennis, before the workflow can go green:
   1. A private repository in the organisation for signatures. Name assumed: `open-unbork/cla-signatures`, default branch `main`.
-  2. A fine-grained personal access token with Contents read and write on that repository only, saved as the Actions secret `CLA_SIGNATURES_TOKEN` in both `unbork` and `unbork-playbooks`. The session never sees or handles the token.
+  2. A fine-grained personal access token with Contents read and write on that repository only, saved as the organisation Actions secret `PERSONAL_ACCESS_TOKEN`, scoped to `unbork` and `unbork-playbooks` (confirmed by Dennis, D-48). The session never sees or handles the token.
   3. After the first green run: mark the `CLAAssistant` status required on `dev` and `main` in both repositories.
   4. The list of his own GitHub logins for the allowlist.
 - A second GitHub account that is not on the allowlist, for the fork test (step 8).
@@ -58,7 +58,7 @@ Out of scope:
    - `permissions: actions: write, contents: read, pull-requests: write, statuses: write`.
    - One job, `if:` the comment is `recheck` or the signing sentence, or the event is `pull_request_target`.
    - One step: `uses: contributor-assistant/github-action@<commit SHA of v2.6.1> # v2.6.1`. Resolve the SHA at implementation time with `git ls-remote https://github.com/contributor-assistant/github-action refs/tags/v2.6.1` and write it in the file.
-   - `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` and `PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}`.
+   - `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` and `PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}`.
    - `with: path-to-signatures: signatures/v1/cla.json`, `path-to-document: https://github.com/open-unbork/unbork/blob/main/legal/cla/v1/ICLA.md`, `branch: main`, `remote-organization-name: open-unbork`, `remote-repository-name: cla-signatures`, `allowlist: dependabot[bot],github-actions[bot],<Dennis's logins>`, `custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA`, `lock-pullrequest-aftermerge: false`.
    - No `actions/checkout` step. A comment at the top of the file says why: the workflow runs with a write token on untrusted PRs.
 5. Rewrite `CONTRIBUTING.md`: line 3 to 4 becomes "LabDog is AGPL-3.0-or-later. Contributions are accepted under a contributor licence agreement (see Licensing & copyright)." The "Licensing & copyright" section says: you keep your copyright; you sign once by commenting on your first PR; the agreement is a licence, not an assignment; the maintainer promises your contribution stays available under the AGPL; the agreement also lets the maintainer license the project under other terms; link to `legal/cla/`. Keep the paragraph about per-file headers.
@@ -95,7 +95,7 @@ Out of scope:
 ## Assumptions
 - [D-01](../DECISIONS.md) fixes the form, the grantee, the two added clauses, the tool and the two repositories.
 - Assumption (not yet confirmed): the texts live in this repository under `legal/cla/v1/`. D-01's write-up suggests "a public repo, for example `open-unbork/.github`". Question for Dennis: here, or in `open-unbork/.github`?
-- Assumption (not yet confirmed): repository name `cla-signatures` and secret name `CLA_SIGNATURES_TOKEN`.
+- Confirmed (D-48): repository `open-unbork/cla-signatures` and organisation secret `PERSONAL_ACCESS_TOKEN`.
 - Assumption (not yet confirmed): a company covered by a CCLA is handled by adding its employees' logins to `allowlist`, with the signed document kept in the signatures repository. The action itself records individuals only.
 - Assumption (not yet confirmed): no exemption for trivial changes. D-01's write-up leaves this open.
 - Assumption (not yet confirmed): no governing-law clause is added beyond what the Apache text has. Question for Dennis, ideally with a lawyer.
