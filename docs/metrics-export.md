@@ -38,7 +38,7 @@ LABDOG_METRICS__ENABLED=true
 Restart unbork, then verify:
 
 ```bash
-curl -i http://labdog.example.com:8000/metrics
+curl -i http://unbork.example.com:8000/metrics
 ```
 
 Expect `HTTP/1.1 200` and
@@ -97,9 +97,9 @@ Minimal config (full version, with `remote_write` and basic-auth variants, in
 [`examples/prometheus/labdog.alloy`](examples/prometheus/labdog.alloy)):
 
 ```alloy
-prometheus.scrape "labdog" {
-  targets         = [{ __address__ = "labdog.example.com" }]
-  job_name        = "labdog"
+prometheus.scrape "unbork" {
+  targets         = [{ __address__ = "unbork.example.com" }]
+  job_name        = "unbork"
   scheme          = "https"
   metrics_path    = "/metrics"
   scrape_interval = "30s"

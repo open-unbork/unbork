@@ -1,8 +1,9 @@
 # Changelog
 
-All notable changes to LabDog are documented in this file.
+All notable changes to unbork (formerly LabDog) are documented
+in this file. Released sections keep the name they shipped under.
 
-The format follows [Keep a Changelog]; LabDog follows
+The format follows [Keep a Changelog]; unbork follows
 [Semantic Versioning].
 
 ## [Unreleased]
@@ -28,7 +29,7 @@ The format follows [Keep a Changelog]; LabDog follows
   `user_identities` table links an account to its directory identity.
   Plugin API 1.1.
 
-- **Run LabDog as separate containers, one per role.** `LABDOG_ROLE` (or
+- **Run unbork as separate containers, one per role.** `LABDOG_ROLE` (or
   `--role`) picks `api`, `beat`, `orchestrator`, `worker` or
   `worker-drift`; the default `all` is the single container as before.
   Only `api` runs migrations; the other roles wait for the schema. The
@@ -61,7 +62,7 @@ The format follows [Keep a Changelog]; LabDog follows
   button now sits on the Fleet state resource hot spots, a host's Metrics
   tab and header, failed syncs, the Pending stuck and drift lanes, and
   each Drift finding. It starts a read-only assistant session about that
-  subject, with a prompt LabDog writes from its own data, and reopens the
+  subject, with a prompt unbork writes from its own data, and reopens the
   earlier one on a second press. New endpoints:
   `POST`/`GET /api/ai/investigations`; `ai_sessions` gains `subject_kind`
   and `subject_key` (alembic 0056).
@@ -93,6 +94,15 @@ The format follows [Keep a Changelog]; LabDog follows
   when it still holds the old default; a pack the operator pointed
   elsewhere is left alone. Release artifacts from before the move verify
   with `gh attestation verify <file> --repo open-labdog/labdog`.
+
+- **The README, the docs and the developer guide say unbork.** The
+  remaining prose that still said LabDog is renamed, the README shows the
+  new logo, and examples use `unbork` for names you choose yourself
+  (hostnames, compose services and volumes, directories). Names the code
+  still uses keep the old spelling and the docs show them as they are:
+  the `LABDOG_*` variables, `labdog.toml`, `/etc/labdog` and
+  `/var/lib/labdog`, the `labdog` package, service and user, metric names,
+  alert labels and on-host markers.
 
 - **The roadmap moved to a GitHub project.** `ROADMAP.md` and `TODO.md`
   are gone; planned work, open tasks and their design notes now live on the
@@ -131,7 +141,7 @@ The format follows [Keep a Changelog]; LabDog follows
 - **A rolled-back host keeps no snapshot.** Deleting the pre-run snapshot
   right after a rollback hit the VM lock Proxmox holds for about 30 s
   while it cleans up the killed QEMU process, so it failed every time.
-  LabDog now retries a locked delete for up to two minutes (BUG-168).
+  unbork now retries a locked delete for up to two minutes (BUG-168).
 - **Leftover snapshots are cleaned up on their own.** An hourly sweep
   removes action-run snapshots older than `workflow.snapshot_max_age_hours`
   that no running action uses. Before, only **Clean up orphaned
@@ -144,7 +154,7 @@ The format follows [Keep a Changelog]; LabDog follows
   `paste`, and `awk`, `gawk` and `mawk` programs without `system()`,
   pipes, `getline`, a redirection after `print`, gawk's `@` forms or
   `ARGV`, now count as reads (BUG-171).
-- **Users with keys or a sudo rule no longer drift for ever when LabDog
+- **Users with keys or a sudo rule no longer drift for ever when unbork
   logs in as a non-root user.** The `authorized_keys` file and the
   sudoers drop-in are read through `sudo -n`, and a file that exists but
   cannot be read is reported as an error instead of an empty one
@@ -3495,7 +3505,7 @@ SSH-pushed Ansible reconciliation, and a per-host detail tab:
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[Unreleased]: https://github.com/open-labdog/labdog/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/open-unbork/unbork/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/open-labdog/labdog/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/open-labdog/labdog/compare/v0.10.0...v1.0.0
 [0.10.0]: https://github.com/open-labdog/labdog/compare/v0.9.0...v0.10.0

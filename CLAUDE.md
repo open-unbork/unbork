@@ -1,15 +1,15 @@
-# LabDog Development Guide
+# unbork Development Guide
 
 ## Project Overview
 
-LabDog is a centralized Linux configuration management tool with a FastAPI backend and Next.js frontend. It manages firewall rules, services, packages, users, cron jobs, DNS resolver config, and /etc/hosts via Ansible playbooks synced over SSH.
+unbork is a centralized Linux configuration management tool with a FastAPI backend and Next.js frontend. It manages firewall rules, services, packages, users, cron jobs, DNS resolver config, and /etc/hosts via Ansible playbooks synced over SSH.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.12+, FastAPI, SQLAlchemy (async), asyncpg |
-| Frontend | Next.js 16 (App Router, static export), the LabDog kit (`components/ld`), TanStack Query |
+| Frontend | Next.js 16 (App Router, static export), the unbork kit (`components/ld`), TanStack Query |
 | Database | PostgreSQL 18 |
 | Task Queue | Celery + Redis (RedBeat scheduler) |
 | Config Mgmt | Ansible (ansible-runner) |
@@ -32,7 +32,8 @@ cd frontend && npm install
 
 ## Running Tests
 
-### Backend (326 tests)
+### Backend
+`pytest tests/ --collect-only -q | tail -1` prints the current test count.
 ```bash
 cd backend
 source .venv/bin/activate
@@ -57,6 +58,13 @@ npx playwright test --ui     # interactive mode
 
 Settings are loaded from `dev/labdog.toml` (dev — set via `LABDOG_CONFIG` env var by `dev.sh`), or `/etc/labdog/labdog.toml` (production). Environment variables override TOML settings using `LABDOG_` prefix with `__` separators (e.g., `LABDOG_SECURITY__SECRET_KEY`).
 
+The product is called unbork, but code-level names still carry the old
+name LabDog: the `LABDOG_` env prefix, `labdog.toml`, `/etc/labdog` and
+`/var/lib/labdog`, the `labdog` package, service and user, the
+`labdog-backend` distribution, metric and alert-label names, and the
+on-host markers. Write them as they are in the code. Their rename, with
+the old names kept as fallbacks, is planned in `planning/` (C-048 to C-050).
+
 **Required secrets** (validated at startup — insecure defaults are rejected):
 - `security.secret_key` — JWT signing key
 - `security.encryption_key` — AES-256-GCM key for SSH key encryption
@@ -69,7 +77,7 @@ Each configuration module follows: **model → schemas → merge engine → API 
 ### Firewall backends
 Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app/models/host.py` defines: `nftables`, `iptables`, `unknown`.
 
-- **iptables** isolates LabDog's rules in dedicated `LABDOG-INPUT` /
+- **iptables** isolates unbork's rules in dedicated `LABDOG-INPUT` /
   `LABDOG-OUTPUT` chains jumped from the base chains (so a reapply/flush never
   clobbers Docker's or other tools' base-chain rules). **nftables** instead owns
   the whole `inet filter` table (delete + recreate) — table-level isolation is
@@ -81,14 +89,15 @@ Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app
   only runs while `host.firewall_backend == "unknown"` — an operator-set or
   previously-detected value is authoritative (operator override + stickiness are
   enforced at that gate). Because both binaries are usually installed, the
-  greenfield choice is a first-match ladder: single-installed → LabDog-marker
-  stickiness → container-runtime constraint (Docker/kube-proxy/nerdctl force
-  iptables) → active-ruleset → default nftables.
-- **Dual-stack hosts:** every firewall sync tears down LabDog's footprint in the
+  greenfield choice is a first-match ladder: single-installed → marker
+  stickiness (`LABDOG-*` chains, `Managed by LabDog` comments) →
+  container-runtime constraint (Docker/kube-proxy/nerdctl force iptables) →
+  active-ruleset → default nftables.
+- **Dual-stack hosts:** every firewall sync tears down unbork's footprint in the
   *inactive* backend (`_iptables_teardown_task` / `_nftables_teardown_task` in
   `app/ansible_runtime/generator.py`), and collection surfaces a competing-store
   warning (`_probe_competing_firewall_store`) so stale rules can't hide in the
-  store LabDog isn't reading.
+  store unbork isn't reading.
 
 ### Priority-based merge
 Groups have priorities (higher number wins). When a host belongs to multiple groups, configurations merge with higher-priority groups winning conflicts. Host-level overrides always win.
@@ -135,14 +144,15 @@ Network scanning is async via Celery tasks. Bulk-add requires SSH verification �
 
 ### Action packs (BYO playbooks)
 Action playbooks are supplied by pluggable packs, not the hardcoded
-registry. **Nothing pack-supplied ships with LabDog**: packs are
+registry. **Nothing pack-supplied ships with unbork**: packs are
 `action_packs` rows, configured from the UI at `/actions?tab=packs`
 (Operations → Actions → Packs), synced at FastAPI lifespan + Celery
 `worker_ready`, and can be git-backed (public, SSH-key, or HTTPS-PAT) or
 local-filesystem. Until a pack has synced, the registry holds only the
 built-in pseudo-actions (`_builtin.*`, `app/actions/builtins.py`).
 
-A fresh install seeds one pack, `labdog-playbooks`, pointing at
+A fresh install seeds one pack, `labdog-playbooks` (the pack row keeps the old
+name), pointing at
 [`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 `main` (git repo + pack rows in `alembic 0001`). It is an ordinary pack:
 operators edit, disable or delete it like any other, and re-add it by
@@ -175,13 +185,13 @@ See `app/packs/` for the subsystem, the user guide at
 `docs/ui/actions.md`, and starter packs at `docs/examples/action-packs/`.
 Backend tests that need real actions use the `sample_pack` fixture
 (`tests/fixtures/packs/sample`, registered as a local pack). Dev:
-`LABDOG_PLAYBOOKS_LOCAL=/path/to/labdog-playbooks ./dev/dev.sh start`
+`LABDOG_PLAYBOOKS_LOCAL=/path/to/unbork-playbooks ./dev/dev.sh start`
 registers a working copy as a local pack (and disables the seeded git
 pack) for iterating on playbooks without pushing.
 
 The Python runtime that consumes packs (playbook generation,
 ansible-runner) lives at `backend/app/ansible_runtime/` and is part of
-the labdog source tree.
+the unbork source tree.
 
 ### Celery workers and queues
 
@@ -228,7 +238,7 @@ single-host inventory + parallelism). Actions whose manifest declares
 `supports_host: false` are dispatched as a single ansible-playbook
 invocation against a flat `all` Ansible inventory of every member of
 the targeted group (no `children`/`control_plane`/`workers` shaping —
-labdog has no per-member roles). The pack's playbook owns all
+unbork has no per-member roles). The pack's playbook owns all
 cluster-wide coordination via Ansible primitives (`serial:`,
 `add_host`, `delegate_to`, `run_once`). The first concrete user is
 `k8s-upgrade`, which probes for

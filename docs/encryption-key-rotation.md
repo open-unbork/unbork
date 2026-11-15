@@ -56,7 +56,7 @@ progress.
 **.deb / systemd install:**
 
 ```
-systemctl stop labdog labdog-celery
+systemctl stop labdog   # the Celery workers run inside this service
 ```
 
 **Docker Compose:**
@@ -71,7 +71,7 @@ The script connects to the database, checks that all migrations are applied,
 then re-encrypts every encrypted column in a single transaction.
 
 ```
-cd /path/to/labdog/backend
+cd /path/to/unbork/backend
 LABDOG_OLD_KEY=<old-base64-key> \
 LABDOG_NEW_KEY=<new-base64-key> \
     .venv/bin/python -m scripts.rotate_encryption_key
@@ -132,7 +132,7 @@ the credentials it just had re-encrypted.
 **.deb / systemd install:**
 
 ```
-systemctl start labdog labdog-celery
+systemctl start labdog
 ```
 
 **Docker Compose:** restart is handled by `docker compose up -d` in step 4.

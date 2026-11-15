@@ -32,19 +32,19 @@ hosts.
 ### nginx
 
 ```nginx
-# /etc/nginx/sites-available/labdog
+# /etc/nginx/sites-available/unbork
 server {
     listen 80;
-    server_name labdog.example.com;
+    server_name unbork.example.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name labdog.example.com;
+    server_name unbork.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/labdog.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/labdog.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/unbork.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/unbork.example.com/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
 
@@ -88,7 +88,7 @@ Caddy provisions and renews ACME certificates automatically:
 
 ```caddy
 # /etc/caddy/Caddyfile
-labdog.example.com {
+unbork.example.com {
     encode gzip
 
     # WebSocket for the SSH terminal
@@ -172,7 +172,7 @@ add_header Content-Security-Policy "default-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
     img-src 'self' data:; \
     font-src 'self' data:; \
-    connect-src 'self' wss://labdog.example.com; \
+    connect-src 'self' wss://unbork.example.com; \
     frame-ancestors 'none'; \
     base-uri 'self'; \
     form-action 'self'" always;
@@ -200,19 +200,19 @@ Add a network-layer cap at the reverse proxy as a second line of
 defence. nginx `limit_req_zone` for the auth endpoints:
 
 ```nginx
-# /etc/nginx/conf.d/labdog-ratelimit.conf
-limit_req_zone $binary_remote_addr zone=labdog_auth:10m rate=10r/m;
-limit_req_zone $binary_remote_addr zone=labdog_api:10m  rate=120r/m;
+# /etc/nginx/conf.d/unbork-ratelimit.conf
+limit_req_zone $binary_remote_addr zone=unbork_auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=unbork_api:10m  rate=120r/m;
 
-# Inside server { ... } block in the labdog vhost:
+# Inside server { ... } block in the unbork vhost:
 location /api/auth/jwt/login {
-    limit_req zone=labdog_auth burst=5 nodelay;
+    limit_req zone=unbork_auth burst=5 nodelay;
     proxy_pass http://127.0.0.1:8000;
     # ...same proxy_set_header lines as the catch-all location
 }
 
 location /api/ {
-    limit_req zone=labdog_api burst=20 nodelay;
+    limit_req zone=unbork_api burst=20 nodelay;
     proxy_pass http://127.0.0.1:8000;
     # ...same proxy_set_header lines
 }
@@ -243,7 +243,7 @@ no usernames, no secrets, no free-text error messages).
 Restrict it at the reverse proxy. nginx:
 
 ```nginx
-# Inside server { ... } in the labdog vhost, BEFORE the catch-all location.
+# Inside server { ... } in the unbork vhost, BEFORE the catch-all location.
 location = /metrics {
     allow 10.0.0.0/8;        # your monitoring network
     allow 127.0.0.1;

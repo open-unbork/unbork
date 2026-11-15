@@ -1,4 +1,4 @@
-# LabDog packaging Makefile
+# unbork packaging Makefile
 # Build orchestration for venv, frontend, tarball, deb, rpm
 
 SHELL := /bin/bash
@@ -24,7 +24,7 @@ BUILD_DATE   ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # --- Default ---
 help:
-	@echo "LabDog packaging targets:"
+	@echo "unbork packaging targets:"
 	@echo ""
 	@echo "  build           Build all components (venv + frontend)"
 	@echo "  build-venv      Create Python venv with production dependencies"

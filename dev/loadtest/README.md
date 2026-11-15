@@ -1,6 +1,6 @@
 # Load test harness
 
-Runs a LabDog image against N fake SSH hosts and measures queues,
+Runs an unbork image against N fake SSH hosts and measures queues,
 waits, drift sweeps and resources. Used to size the worker roles in
 [`docs/scaling-out.md`](../../docs/scaling-out.md); the results are in
 PR #270.
@@ -10,7 +10,7 @@ containers (300 hosts used about 6 GB RAM in total).
 
 ```sh
 ./prepare.sh                     # SSH key, .env secrets, ansible.posix, fakehost image
-LABDOG_IMAGE=openlabdog/labdog:dev-5cb85d7 ./run_one.sh S2 300 default
+LABDOG_IMAGE=unbork/unbork:dev-<sha> ./run_one.sh S2 300 default
 ./run_matrix.sh                  # S1-S5 x default/raised at 300, then S1 at 50/150
 ```
 
@@ -53,10 +53,10 @@ is a free label for the results directory):
 ## Two hosts
 
 With `FAKEHOST_DOCKER=ssh://user@host` the fake hosts run on a second
-Docker host, so their CPU does not compete with LabDog's. The fake-host
+Docker host, so their CPU does not compete with unbork's. The fake-host
 network there is a NAT bridge on 172.30.0.0/16 (`gateway_mode_ipv4:
-nat-unprotected`), and the LabDog host needs a route to it:
-`ip route replace 172.30.0.0/16 via <second host>`. The LabDog stack
+nat-unprotected`), and the unbork host needs a route to it:
+`ip route replace 172.30.0.0/16 via <second host>`. The unbork stack
 uses 172.29.0.0/16. Raise `MaxStartups` in the second host's sshd
 config: Compose opens many SSH sessions at once.
 
@@ -73,5 +73,5 @@ runs (`SID:N:config`).
 - Postgres `max_connections` is 400 for the raised config (`PG_MAX_CONNECTIONS`);
   16/12 needs more than the default 100.
 - 10 min warm-up, 60 min window, then up to 15 min drain before measuring.
-- On one host, LabDog and the fake hosts share the CPU, so contention
+- On one host, unbork and the fake hosts share the CPU, so contention
   from the fake hosts is part of the numbers; use two hosts to avoid it.

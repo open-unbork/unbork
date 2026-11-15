@@ -1,6 +1,6 @@
 # Packaging smoke harness
 
-Containerised install-path smoke tests for LabDog's release artifacts.
+Containerised install-path smoke tests for unbork's release artifacts.
 They turn the smoke procedure that used to be run by hand before a release
 into something CI runs automatically (and that you can run locally).
 

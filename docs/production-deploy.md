@@ -26,7 +26,7 @@ and env-sourced secrets.
 ## Layout
 
 ```
-/srv/labdog/
+/srv/unbork/
 ├── compose.yaml
 ├── Caddyfile
 ├── .env                    # secrets — chmod 0600, NOT in git
@@ -39,7 +39,7 @@ Volumes managed by the compose file:
 - `postgres_data` — PostgreSQL 18 data directory. Mounted at
   `/var/lib/postgresql` (PG 18 keeps the cluster in a version-specific
   subdirectory below that — do **not** mount at `.../data`).
-- `labdog_packs` — DB-backed action-pack checkouts. Mounts onto
+- `unbork_packs` — DB-backed action-pack checkouts. Mounts onto
   `ansible.packs_root_dir` (default `/var/lib/labdog/packs` —
   see `backend/app/config.py`). Every action pack is synced into it,
   including the seeded `labdog-playbooks` one; without the volume they
@@ -80,7 +80,7 @@ services:
       retries: 5
     restart: unless-stopped
 
-  labdog:
+  unbork:
     image: unbork/unbork:1.0.0    # pin a real version
     environment:
       LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:${POSTGRES_PASSWORD}@postgres:5432/labdog
@@ -89,18 +89,18 @@ services:
       LABDOG_SECURITY__ENCRYPTION_KEY: ${LABDOG_SECURITY__ENCRYPTION_KEY}
       LABDOG_SECURITY__LABDOG_SERVER_IP: ${LABDOG_SECURITY__LABDOG_SERVER_IP}
       LABDOG_SECURITY__COOKIE_SECURE: "true"
-      LABDOG_SECURITY__ALLOWED_ORIGINS: '["https://labdog.example.com"]'
+      LABDOG_SECURITY__ALLOWED_ORIGINS: '["https://unbork.example.com"]'
       LABDOG_TLS__FORCE_HTTPS: "true"
       LABDOG_SERVER__TRUSTED_PROXIES: '["caddy"]'
       LABDOG_SERVER__FORWARDED_ALLOW_IPS: "*"
     volumes:
-      - labdog_packs:/var/lib/labdog/packs
+      - unbork_packs:/var/lib/labdog/packs
       # Claude Code's own session files. Only needed if you use a Claude
       # subscription provider — but then it is load-bearing: an AI session
       # paused waiting for your approval resumes from here, and a pause can
       # last a day. Without the volume, upgrading the image mid-approval
       # loses everything the assistant established before it stopped.
-      - labdog_claude:/var/lib/labdog/claude-cli
+      - unbork_claude:/var/lib/labdog/claude-cli
       # Optional: mount a host-side TOML for non-secret tunables.
       - ./labdog.toml:/etc/labdog/labdog.toml:ro
     depends_on:
@@ -123,13 +123,13 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - labdog
+      - unbork
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  labdog_packs:
-  labdog_claude:
+  unbork_packs:
+  unbork_claude:
   caddy_data:
   caddy_config:
 ```
@@ -139,13 +139,13 @@ volumes:
 ## Caddyfile
 
 ```caddy
-labdog.example.com {
+unbork.example.com {
     encode gzip
 
     @ws path /api/ssh-terminal/ws/*
-    reverse_proxy @ws labdog:8000
+    reverse_proxy @ws unbork:8000
 
-    reverse_proxy labdog:8000 {
+    reverse_proxy unbork:8000 {
         header_up X-Real-IP {remote}
         header_up X-Forwarded-For {remote}
         header_up X-Forwarded-Proto {scheme}
@@ -159,8 +159,8 @@ labdog.example.com {
 
 Caddy provisions and renews the certificate via ACME on first
 start. For internal deployments where ACME isn't reachable, swap
-in a local CA cert via `tls /etc/ssl/certs/labdog.crt
-/etc/ssl/private/labdog.key` and bind-mount the cert files.
+in a local CA cert via `tls /etc/ssl/certs/unbork.crt
+/etc/ssl/private/unbork.key` and bind-mount the cert files.
 
 ---
 
@@ -172,7 +172,7 @@ container image, a git repo, or a backup snapshot tarball by
 accident.
 
 ```bash
-# /srv/labdog/.env  — chmod 0600, owned by root or the deploy user
+# /srv/unbork/.env  — chmod 0600, owned by root or the deploy user
 POSTGRES_PASSWORD=<run: openssl rand -base64 24>
 LABDOG_SECURITY__SECRET_KEY=<run: openssl rand -base64 32>
 LABDOG_SECURITY__ENCRYPTION_KEY=<run: openssl rand -base64 32>
@@ -191,8 +191,8 @@ openssl rand -base64 24      # POSTGRES_PASSWORD
 to `compose.yaml`). Lock the file down:
 
 ```bash
-sudo chown root:root /srv/labdog/.env
-sudo chmod 0600 /srv/labdog/.env
+sudo chown root:root /srv/unbork/.env
+sudo chmod 0600 /srv/unbork/.env
 ```
 
 For an extra layer, hand the keys to the container as Docker
@@ -264,15 +264,15 @@ Postgres.
 ## Bring it up
 
 ```bash
-cd /srv/labdog
+cd /srv/unbork
 docker compose pull
 docker compose up -d
 
 # First-boot logs — alembic creates the schema, lifespan syncs packs
-docker compose logs -f labdog
+docker compose logs -f unbork
 ```
 
-Open `https://labdog.example.com`, register the first user, and
+Open `https://unbork.example.com`, register the first user, and
 proceed with [post-install configuration](./README.md#post-install-configuration)
 in the main README.
 
@@ -299,14 +299,14 @@ right method (not in-place `pg_upgrade`).
 > key makes every credential undecryptable.
 
 ```bash
-cd /srv/labdog
+cd /srv/unbork
 
 # 1. Belt-and-suspenders: back up the raw PG 16 volume.
-docker run --rm -v labdog_postgres_data:/data -v "$PWD":/backup alpine \
+docker run --rm -v unbork_postgres_data:/data -v "$PWD":/backup alpine \
   tar czf /backup/pg16-volume-$(date +%F).tgz -C /data .
 
 # 2. Quiesce the app (stop writes; leave PG 16 running).
-docker compose stop labdog
+docker compose stop unbork
 
 # 3. Dump the database from the running PG 16 container.
 docker compose exec -T postgres pg_dump -U labdog -Fc labdog > labdog-$(date +%F).dump
@@ -331,11 +331,11 @@ docker compose exec -T postgres pg_restore -U labdog -d labdog \
 
 # 8. Start the app (Alembic is a no-op — the dump is already at head).
 docker compose up -d
-docker compose logs -f labdog
+docker compose logs -f unbork
 
 # 9. Once verified (log in, check hosts + stored SSH creds work),
 #    reclaim the old volume. Keep the .dump + tarball as a rollback path.
-docker volume rm labdog_postgres_data
+docker volume rm unbork_postgres_data
 ```
 
 **Redis needs none of this** — Redis 8 reads 7.x RDB/AOF and unbork's
@@ -356,10 +356,10 @@ production blueprint. Concrete differences:
 | `force_https` | unset (`false`) | `true` (via env) |
 | Postgres port | Published on host `:5432` | Internal docker network only |
 | Backend port | Published on host `:8000` | Internal docker network only |
-| Pack volume | None — DB-backed packs lost on restart | `labdog_packs` volume |
+| Pack volume | None — DB-backed packs lost on restart | `unbork_packs` volume |
 | Postgres data | `postgres_data` named volume | Same — kept |
 | Secret source | Inline `${VAR:-default}` with insecure fallbacks | `.env`, no defaults |
-| Allowed origins | `http://localhost:3000` (config default) | `https://labdog.example.com` |
+| Allowed origins | `http://localhost:3000` (config default) | `https://unbork.example.com` |
 | Logging format | `text` | `json` |
 
 If you're starting from `dev/docker-compose.yml`, working through

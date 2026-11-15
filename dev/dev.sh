@@ -6,7 +6,7 @@ ROOT_DIR="${SCRIPT_DIR}/.."
 PIDFILE_DIR="${ROOT_DIR}/.dev-pids"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-# Seed .env with dev-only secrets on first run. LabDog rejects the insecure
+# Seed .env with dev-only secrets on first run. unbork rejects the insecure
 # placeholder keys in labdog.toml at startup, so we generate a real pair here
 # and persist them for subsequent runs.
 ensure_dev_env() {
@@ -161,7 +161,7 @@ start_backend() {
   # missing from subprocess PATH even though the Python imports work.
   local venv_path="${VENV}:${PATH}"
 
-  # LabDog (python -m app with auto-reload, no embedded celery, skip migrate since we ran it above)
+  # unbork (python -m app with auto-reload, no embedded celery, skip migrate since we ran it above)
   # LABDOG_DEV_MODE disables static frontend serving so the Next.js dev server on :3000 is used.
   log "Starting labdog..."
   (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" LABDOG_DEV_MODE=1 LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/python" -m app --reload --no-celery --skip-migrate \

@@ -1,4 +1,4 @@
-"""Tiny stdlib client for the LabDog API (session cookie + CSRF header)."""
+"""Tiny stdlib client for the unbork API (session cookie + CSRF header)."""
 import http.cookiejar
 import json
 import time
@@ -25,7 +25,7 @@ class Api:
             except (urllib.error.URLError, OSError):
                 pass
             time.sleep(3)
-        raise SystemExit("LabDog never became ready")
+        raise SystemExit("unbork never became ready")
 
     def _csrf(self):
         return next((c.value for c in self.jar if c.name == "labdog_csrf"), "")

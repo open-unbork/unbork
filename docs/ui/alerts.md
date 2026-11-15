@@ -67,7 +67,7 @@ investigating.
 Point a webhook contact point at:
 
 ```
-POST https://labdog.example.com/api/webhooks/grafana-alerts
+POST https://unbork.example.com/api/webhooks/grafana-alerts
 Authorization: Bearer <your webhook_token>
 ```
 

@@ -312,7 +312,7 @@ sudo ./uninstall.sh --purge  # removes everything
 
 1. Clone and configure:
    ```bash
-   git clone <repo-url> labdog && cd labdog
+   git clone https://github.com/open-unbork/unbork.git && cd unbork
    cp .env.example dev/.env
    ```
 
@@ -600,7 +600,7 @@ See [ui/alerts.md](./ui/alerts.md) for the labels, the intake paths, deduplicati
 | `POST` | `/api/grafana/instances/{id}/test` · `/api/grafana/instances/test` | Connection test (saved instance / pre-save draft) |
 | `GET` | `/api/grafana/hosts/{id}/metrics` | Instant CPU/memory/disk for a host (queried from the default Mimir instance by the `labdog_host_id` label) |
 
-See [ui/host-metrics.md](./ui/host-metrics.md) for the end-to-end loop with the Alloy install action from `labdog-playbooks`.
+See [ui/host-metrics.md](./ui/host-metrics.md) for the end-to-end loop with the Alloy install action from `unbork-playbooks`.
 
 ### Metrics export (outbound — Prometheus scrapes unbork)
 | Method | Path | Description |
@@ -613,7 +613,7 @@ See [metrics-export.md](./metrics-export.md) for the metric reference and [examp
 ## Project Structure
 
 ```
-labdog/
+unbork/
 ├── backend/
 │   ├── app/
 │   │   ├── actions/         # Pack loader, registry, manifest schema, git sync

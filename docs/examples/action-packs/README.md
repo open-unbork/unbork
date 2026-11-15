@@ -8,7 +8,7 @@ and group detail pages.
 For the mechanics — what a pack is, how it loads, how overrides resolve
 — see [the Actions user guide](../../ui/actions.md). For the end-to-end
 reference of all manifest fields, see
-[the `labdog-playbooks` README](https://github.com/open-unbork/unbork-playbooks).
+[the `unbork-playbooks` README](https://github.com/open-unbork/unbork-playbooks).
 
 | Example | What it demonstrates |
 |---|---|
@@ -21,10 +21,10 @@ reference of all manifest fields, see
 
 ```bash
 # Clone or copy one of these into a place on your unbork host
-cp -r docs/examples/action-packs/minimal-pack /srv/labdog-packs/my-first-pack
+cp -r docs/examples/action-packs/minimal-pack /srv/unbork-packs/my-first-pack
 
 # Or make it a git repo
-cd /srv/labdog-packs/my-first-pack
+cd /srv/unbork-packs/my-first-pack
 git init -b main
 git add -A
 git commit -m "initial pack"

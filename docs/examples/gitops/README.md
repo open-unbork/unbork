@@ -56,7 +56,7 @@ This directory contains:
    the repo and the YAML file path.
    c. Add a webhook on the git provider — imports run only when a push
    arrives:
-      - URL: `https://<your-labdog-host>/api/webhooks/github` (or
+      - URL: `https://<your-unbork-host>/api/webhooks/github` (or
         `/api/webhooks/gitlab`, `/api/webhooks/gitea`; the repository row's
         **webhooks** shows all three)
       - Content type: `application/json`
@@ -67,7 +67,7 @@ This directory contains:
 
 There is no manual import: a bound group's file is read only when a push
 arrives, so the webhook is required. During setup, push an empty commit
-(`git commit --allow-empty -m "labdog: import"`) to trigger the first
+(`git commit --allow-empty -m "unbork: import"`) to trigger the first
 import.
 
 ---
@@ -307,7 +307,7 @@ the repo and only imports the ones whose file actually changed.
 ### Single repo, single group
 
 ```
-labdog-prod-repo/
+unbork-prod-repo/
 └── config.yaml
 ```
 
