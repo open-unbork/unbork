@@ -10,7 +10,9 @@ is what counts.
 
 This agreement is adapted from the Apache Software Foundation's Software
 Grant and Corporate Contributor License Agreement (r190612), without its
-software-grant schedule. It has not been reviewed by a lawyer.
+software-grant schedule, and keeps its American spelling "license" in
+the clauses; "licence" and "license" mean the same here. It has not been
+reviewed by a lawyer.
 
 ---
 
@@ -38,7 +40,7 @@ employees are not asked to sign the individual agreement. See
 
     Corporation name:    ________________________________________________
     Corporation address: ________________________________________________
-    Point of contact:    ________________________________________________
+    Point of Contact:    ________________________________________________
     E-mail:              ________________________________________________
 
 You accept and agree to the following terms and conditions for Your

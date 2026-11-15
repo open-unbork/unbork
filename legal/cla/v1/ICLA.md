@@ -8,8 +8,9 @@ licence, not a transfer of your copyright. The legal text below is what
 counts.
 
 This agreement is adapted from the Apache Software Foundation's
-Individual Contributor License Agreement V2.2. It has not been reviewed
-by a lawyer.
+Individual Contributor License Agreement V2.2, and keeps its American
+spelling "license" in the clauses; "licence" and "license" mean the same
+here. It has not been reviewed by a lawyer.
 
 ---
 
@@ -24,7 +25,9 @@ Maintainer and the users of the Work. It does not change your rights to
 use your own Contributions for any other purpose.
 
 **How to sign.** You accept this Agreement by posting the following
-sentence, exactly as written, as a comment on a pull request to a
+sentence, exactly as written, as a comment on a pull request to
+`open-unbork/unbork` or `open-unbork/unbork-playbooks`, the repositories
+that check for it. The Agreement covers Contributions to every
 repository in the `open-unbork` organisation:
 
 > I have read the CLA Document and I hereby sign the CLA

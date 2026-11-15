@@ -1,7 +1,8 @@
 # Contributor licence agreements
 
-Pull requests to `open-unbork/unbork` and `open-unbork/unbork-playbooks`
-are accepted under a contributor licence agreement (CLA). You keep the
+Contributions to the repositories in the `open-unbork` organisation are
+accepted under a contributor licence agreement (CLA). Pull requests to
+`open-unbork/unbork` and `open-unbork/unbork-playbooks` check for it. You keep the
 copyright in your contribution; the agreement is a licence, not an
 assignment.
 
@@ -19,12 +20,21 @@ pull request, exactly as written:
     I have read the CLA Document and I hereby sign the CLA
 
 The check turns green. You sign once: the same signature covers later
-pull requests in both repositories. If the check does not update, post
-`recheck`.
+pull requests in both repositories. If the check does not update, or
+signing reports an error (two signatures written at the same moment can
+collide), post `recheck`. If it still shows red, push a new commit to the
+pull request: the check runs again on the new head.
+
+Commits are matched to GitHub accounts by their email address. Make sure
+the email your commits carry is
+[added to your GitHub account](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-email-preferences/adding-an-email-address-to-your-github-account),
+or the check cannot tell that the commits are yours.
 
 **Companies.** Fill in and sign the CCLA, list the GitHub logins of the
 employees it covers in Schedule A, and send it to the maintainer. Those
-logins are then allowed through the check without signing the ICLA.
+logins are then added to the check's allowlist in both repositories, so
+they are not asked to sign the ICLA. Their commit emails must be linked
+to those GitHub accounts, as above.
 
 ## What is stored, where, and why
 
