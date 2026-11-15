@@ -71,8 +71,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-064-make-planning-a-named-exception-to-the.md
     notes: "D-17: without it the release checklist and the image build treat the plan as a mistake."
   - id: S-012

@@ -122,12 +122,18 @@ workflow:
    never carry it.
 5. **Merge.** Reviewers read commits, not plan files.
 
+`planning/` is a different directory and is not covered by this rule.
+It holds the staged roadmap (`PLAN.md`, `roadmap.yaml`, `DECISIONS.md`,
+`PROPOSALS.md`, `PROGRESS.md`, `stages/`, `items/`, `reviews/`), is
+committed on `dev` and is updated by the PRs that carry out a stage.
+
 Where work is tracked:
 
 | File | Purpose |
 |---|---|
 | [Roadmap board](https://github.com/orgs/open-unbork/projects/1) | Direction and open tasks, with priority and status. Research and design notes go in each item. |
 | [`BUGS.md`](BUGS.md) | Open bug registry. Open-only — fixed bugs are deleted, with a commit referencing the bug ID. |
+| `planning/` | Staged execution plan: one spec per item, one file per stage, decisions and progress log. Long-lived, kept on `dev`. |
 | `plans/` (work branches) | Private scratchpad for one piece of in-flight work. Created and deleted within a single branch's lifetime. |
 
 ## Licensing & copyright
@@ -221,7 +227,7 @@ the human-owned steps it cannot verify:
 - [ ] Roadmap board: items shipped this cycle set to Done, with the PR linked.
 - [ ] `BUGS.md`: bugs fixed this cycle deleted, fixing commit
   references the bug ID.
-- [ ] `plans/` is absent (never ships on `dev` or `main`).
+- [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
   `frontend-build-check`, `docs-build-check`, `build-test-image`,
   trivy.

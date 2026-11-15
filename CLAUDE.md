@@ -431,10 +431,13 @@ scratchpad:
 4. **Delete `plans/` before opening the PR.** `dev` and `main` must
    never carry it.
 
+This rule is about `plans/` only; `planning/` (next section) stays on `dev`.
+
 Where work is tracked: the [roadmap board](https://github.com/orgs/open-unbork/projects/1)
 (direction and open tasks; research and design notes go in each item),
-[`BUGS.md`](BUGS.md) (open bug registry, open-only), `plans/` (private
-in-flight scratchpad on work branches). See
+[`BUGS.md`](BUGS.md) (open bug registry, open-only), `planning/` (the
+staged roadmap, kept on `dev`), `plans/` (private in-flight scratchpad on
+work branches). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full workflow.
 
 ## Staged roadmap (`planning/`)
