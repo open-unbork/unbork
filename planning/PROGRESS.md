@@ -54,3 +54,9 @@ Append-only. Newest entry last.
   seven items are parked; their specs are kept. S-003 and C-044 are
   unchanged in stage 4. The plan now has stages 0 to 10 and 25 parked
   items.
+
+## 2026-11-15 Stage 0 run
+
+Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in place of `roadmap/stage-0`). Base: `de69a7b` plus #300 (CLA secret name) cherry-picked.
+
+- 2026-11-15 C-064 done 194b3b4. Open: whether `main` should carry `planning/` (D-32).

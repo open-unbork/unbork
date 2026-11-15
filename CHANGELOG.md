@@ -68,6 +68,9 @@ The format follows [Keep a Changelog]; LabDog follows
 
 ### Changed
 
+- `LICENSE` now names the copyright holder (Dennis Tyresson and
+  contributors). The licence is unchanged.
+
 - **New logo and colours.** The dog is replaced by the mark for the
   coming name, unbork: a timeline with a restore point, and a U that
   turns back to it. It is in the rail, on the sign-in page and in the

@@ -85,8 +85,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/S-012-copyright-holder-line-in-license.md
     notes: "D-07: Dennis personally. One line."
   - id: S-011
