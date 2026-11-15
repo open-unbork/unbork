@@ -97,6 +97,8 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-15 | D-46: The Community hooks S-015 to S-020 and the Enterprise item that follows the rename stay scheduled items, not proposals. | Dennis (decision card) |
+| 2026-11-15 | D-47: The load-test baseline (C-063) is run through a Remote Control session on Dennis's computer, with his own SSH key to lin-manager-2. Cloud sessions cannot reach that network. | Dennis (decision card) |
 | 2026-11-15 | D-45: Wait with kennel. S-003 (snapshot provider interface) and C-044 (RAM in the rollback snapshot) stay in stage 4; C-028, C-045, C-054, C-055, C-057, C-058 and C-059 are parked and stage 11 is removed. First decide where kennel's responsibility ends. | Dennis |
 | 2026-11-14 | D-23 (kennel scope): an isolated sandbox network is supported from the start (a VLAN or SDN zone with no route to production, a jump host for unbork's SSH, outbound NAT), so rehearsing a change on a copy of a VM is in scope. PBS restore goes beside the original first; in-place restore over a production VM comes later, opt-in, with a second token, and only inside an unbork run. The name stays "kennel" for now and is renamed later. | Dennis, in the kennel thread |
 | 2026-11-14 | D-22: build kennel (working name). C-028 leaves the parked list and is split and staged in Phase 4 as its own track. Scope to plan, from the exploration write-up and not yet confirmed by Dennis: a standalone AGPL "VM operations service" owning restore tests, PBS restore points, leases for surge nodes and test VMs, sandbox copies, a sweeper and a per-VM readiness API. Sandbox networking, in-place restore and the name are settled in D-23. C-045 moves with it. | Dennis, in the kennel thread |

@@ -454,9 +454,9 @@ Main risks:
 
 ## What the stages need from Dennis
 
-- Before stage 0: the answers in D-25 (CLA check), and SSH from the
-  session to `lin-manager-2` for the load-test baseline (about 100
-  minutes, 6 GB of RAM).
+- Before stage 0: the answers in D-25 (CLA check), and a Remote Control session
+  on Dennis's computer for the load-test baseline on `lin-manager-2`
+  (D-47; about 100 minutes, 6 GB of RAM).
 - Before stage 2: two hosts named "test", one on iptables and one on
   nftables, first synced by a 1.1.0 install, to prove the rename of the
   on-host markers. Stage 3 uses the same two for the upgrade test.
