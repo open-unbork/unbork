@@ -128,8 +128,11 @@ Notes:
   hosts, scenarios S1 to S5, `measure_live.sql`), whose last results are
   in PR #270. It needs Docker, so it was not run here; under the project's
   testing rules it belongs on local Docker on lin-manager-2. Stage 0
-  should record one `./run_one.sh S2 300 default` run as the number later
-  stages compare against (see proposal PR-07).
+  recorded one `./run_one.sh S2 300 default` run as the number later
+  stages compare against: [reviews/baseline-loadtest.md](reviews/baseline-loadtest.md)
+  (2026-11-15, `de69a7b`, on `tester`: bulk sync 18 s average, 692 in the
+  hour, median wait 18 min, backlog never cleared; unbork 1.3 GB, 12
+  Postgres connections).
   Hot paths to watch: the per-host sync orchestrator
   (`app/tasks/host_sync_orchestrator.py`), the host lock claim
   (`app/tasks/host_lock.py`), drift sweeps (`app/tasks/drift_sweep.py`),

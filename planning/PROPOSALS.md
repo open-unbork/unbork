@@ -26,6 +26,7 @@ later and are unranked.
 | PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
 | PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | open |
 | PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | open |
+| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | open |
 
 ## PR-01 Audit rows for firewall rule changes
 - **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has
@@ -138,6 +139,18 @@ later and are unranked.
   developer who ran `npm run build` sees a red suite.
 - **Fix:** list the catch-all in the test's `PUBLIC` set, or have the
   test app skip the static mount. Community, S.
+
+## PR-21 Bulk syncs cannot keep up with 300 hosts every 15 minutes
+- **Finding (C-063 baseline):** in `S2 300 default` a bulk sync takes
+  about 18 s and only 4 run at once (about 800 an hour), against 1,200
+  an hour requested. The backlog never cleared: median 209 pending,
+  median wait 18 min, and 120 to 136 hosts skipped per tick. The host's
+  4 cores were also 92% busy, shared with the fake hosts, so part of this
+  is the test machine.
+- **Next step:** repeat the run in two-host mode (fake hosts elsewhere)
+  and with more sync slots, to tell CPU from slot count, then decide
+  whether the default slot count or the per-sync cost should change.
+  Community, M.
 
 ## Other work Dennis asked to add
 

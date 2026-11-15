@@ -116,7 +116,7 @@ misses lines run inside greenlets; sysmon sees them. No test was removed.
 | C-025 26.04 runners, compiler lint rules | A | done | `cb2761d`..`a61cfed`, `9038476` | none |
 | C-062 Coverage in CI | A | done | `04bc864`, `b3cafa1` | none |
 | C-061 Frontend unit harness | A | done | `87278f6`, `673a119` | PR-18 (Vitest 5) |
-| C-063 Load-test baseline | A | in_progress | none yet | lin-manager-2 has too little memory and disk; moved to a test host reached through lin-manager, waiting for Dennis to allow SSH from lin-manager-2 |
+| C-063 Load-test baseline | A | done | `290c7d1` (harness fix) | run on `tester`, not lin-manager-2 (too small); PR-21 from its finding |
 
 Enterprise half (unbork-enterprise#8): E-001 licence placeholder
 (review, class B), E-022 CI parity (done; gitleaks red on two committed
@@ -137,7 +137,7 @@ E-021 skipped by Dennis.
 | A PR no longer moves `:test` | met: the stage PR's run pushed only `:test-d214e8b` |
 | CI prints coverage; PLAN.md records it | met: 83%, recorded |
 | `npm test` runs a real test, CI runs it | met: `frontend-test` green |
-| `baseline-loadtest.md` holds an S2 300 run | not met yet: C-063 in progress (see above). The spec named lin-manager-2, which cannot hold the run |
+| `baseline-loadtest.md` holds an S2 300 run | met, on `tester` instead of lin-manager-2 (7.75 GB RAM, 3 GB disk), as Dennis directed: `done rc=0 ... ooms=0` |
 | planning/ vs plans/ in docs, template, .dockerignore | met |
 
 ## Before and after
@@ -148,7 +148,6 @@ tests 0 to 31.
 
 ## Blocked and waiting
 
-- C-063: SSH approval for the load-test session (Dennis).
 - S-011 and E-001: Dennis's review of the CLA texts and the Enterprise
   licence placeholder.
 - unbork-enterprise#8 gitleaks: rotating the two test-realm client
