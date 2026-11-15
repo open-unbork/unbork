@@ -1,13 +1,16 @@
 <p align="left">
-  <img src="assets/logo-banner.svg" alt="LabDog — A homelabber's best friend" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/unbork-logo-dark.svg" />
+    <img src="assets/unbork-logo-light.svg" alt="unbork" width="320" />
+  </picture>
 </p>
 
-# LabDog
+# unbork
 
-[![ci](https://img.shields.io/github/actions/workflow/status/open-labdog/labdog/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=ci)](https://github.com/open-labdog/labdog/actions/workflows/ci.yml)
-[![release](https://img.shields.io/github/v/release/open-labdog/labdog?style=for-the-badge&logo=github&color=16a34a)](https://github.com/open-labdog/labdog/releases/latest)
-[![docker pulls](https://img.shields.io/docker/pulls/openlabdog/labdog?style=for-the-badge&logo=docker&logoColor=white&color=2563eb)](https://hub.docker.com/r/openlabdog/labdog)
-[![docs](https://img.shields.io/badge/docs-labdog-1e293b?style=for-the-badge)](https://open-labdog.github.io/labdog/)
+[![ci](https://img.shields.io/github/actions/workflow/status/open-unbork/unbork/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=ci)](https://github.com/open-unbork/unbork/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/open-unbork/unbork?style=for-the-badge&logo=github&color=16a34a)](https://github.com/open-unbork/unbork/releases/latest)
+[![docker pulls](https://img.shields.io/docker/pulls/unbork/unbork?style=for-the-badge&logo=docker&logoColor=white&color=2563eb)](https://hub.docker.com/r/unbork/unbork)
+[![docs](https://img.shields.io/badge/docs-unbork-1e293b?style=for-the-badge)](https://open-unbork.github.io/unbork/)
 [![license](https://img.shields.io/badge/license-AGPL--3.0--or--later-d97706?style=for-the-badge)](LICENSE)
 
 Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more from a single web UI. Declare state in groups, preview the exact Ansible diff before applying, detect drift, and roll it back if something looks wrong.
@@ -15,20 +18,20 @@ Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more 
 ## Try it in 30 seconds
 
 ```bash
-docker run -d --name labdog -p 8000:8000 \
-  -v labdog-data:/var/lib/labdog \
-  openlabdog/labdog:latest
+docker run -d --name unbork -p 8000:8000 \
+  -v unbork-data:/var/lib/labdog \
+  unbork/unbork:latest
 ```
 
 Then open <http://localhost:8000> and register the first admin user.
 
-→ **[Docker Hub](https://hub.docker.com/r/openlabdog/labdog)** for image tags, signed digests, and `compose` examples
+→ **[Docker Hub](https://hub.docker.com/r/unbork/unbork)** for image tags, signed digests, and `compose` examples
 
-→ **[Full installation guide](https://open-labdog.github.io/labdog/#installation)** — `.deb`, `.rpm`, tarball, or Docker
+→ **[Full installation guide](https://open-unbork.github.io/unbork/#installation)** — `.deb`, `.rpm`, tarball, or Docker
 
 ## 📦 Install
 
-The Docker command above is the fastest path — see [`openlabdog/labdog`](https://hub.docker.com/r/openlabdog/labdog) on Docker Hub for image tags, signed digests, and `compose` examples. For `.deb` / `.rpm` / tarball / from source, see the **[installation guide](https://open-labdog.github.io/labdog/#installation)**.
+The Docker command above is the fastest path — see [`unbork/unbork`](https://hub.docker.com/r/unbork/unbork) on Docker Hub for image tags, signed digests, and `compose` examples. For `.deb` / `.rpm` / tarball / from source, see the **[installation guide](https://open-unbork.github.io/unbork/#installation)**.
 
 ## ✨ What you get
 
@@ -52,7 +55,7 @@ Declare state per host or per group. Everything goes through Ansible. Same rule 
 **AI assistant** &nbsp;*(off by default)*
 
 Connect a local or hosted LLM and hand it an investigation. It works through
-LabDog's own tools — every command it runs is classified by a default-deny
+unbork's own tools — every command it runs is classified by a default-deny
 parser, bounded by a host allowlist, redacted, and written to the audit log.
 
 - **Three autonomy levels** — read-only, approval-required, or full-auto. A
@@ -63,10 +66,10 @@ parser, bounded by a host allowlist, redacted, and written to the audit log.
 - **Spend control** — daily and monthly budgets, per-provider caps, and
   per-session iteration/command/token/wall-clock limits, all enforced mid-run.
 - **AI verification** — a destructive action can ask an LLM whether it left
-  the host healthy, judged on evidence LabDog collected rather than anything
+  the host healthy, judged on evidence unbork collected rather than anything
   the model went looking for.
 - **Alert-driven actions, investigation and fixes** — point a Grafana
-  contact point at LabDog and let the alert rule's labels say what
+  contact point at unbork and let the alert rule's labels say what
   happens. `labdog_action` runs an action you have allowed on the alert's
   host, no AI needed. `labdog_ai` has the assistant investigate, within
   budget; it only looks unless you allow more, and can ask for approval
@@ -79,22 +82,22 @@ parser, bounded by a host allowlist, redacted, and written to the audit log.
 
 Runs against OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter), the
 Anthropic API, or a Claude subscription. See the
-[assistant guide](https://open-labdog.github.io/labdog/ui/assistant/).
+[assistant guide](https://open-unbork.github.io/unbork/ui/assistant/).
 
 **Extensibility**
 
-- **GitOps** — webhook-driven sync from any Git repo (see the [YAML schema](https://open-labdog.github.io/labdog/examples/gitops/))
+- **GitOps** — webhook-driven sync from any Git repo (see the [YAML schema](https://open-unbork.github.io/unbork/examples/gitops/))
 - **Action packs** — BYO Ansible playbooks as one-click actions
 - **Scheduled actions** — cron-driven runs with optional Proxmox snapshot + verify + auto-rollback
 
 **Integrations**
 
-- **Ansible** — every change is applied via `ansible-runner`; standard playbook YAML, no LabDog-specific DSL
+- **Ansible** — every change is applied via `ansible-runner`; standard playbook YAML, no unbork-specific DSL
 - **SSH** — push config to hosts and serve an in-browser terminal (asyncssh + xterm.js)
 - **Git** — pull GitOps configs and Action packs from any Git server; SSH key or HTTPS PAT auth, credentials encrypted at rest
 - **Proxmox VE** — automatic snapshot + rollback, VM discovery
-- **Grafana Mimir/Loki** — register a Prometheus-compatible endpoint to show instant CPU/memory/disk on the host page; ties into the Alloy install action from `labdog-playbooks` so metrics flow back automatically
-- **Prometheus / Alloy** — the other direction: an opt-in `/metrics` endpoint exposing fleet state and LabDog's own health for your existing scraper, with a ready-made Grafana dashboard and alert rules
+- **Grafana Mimir/Loki** — register a Prometheus-compatible endpoint to show instant CPU/memory/disk on the host page; ties into the Alloy install action from [`unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks) so metrics flow back automatically
+- **Prometheus / Alloy** — the other direction: an opt-in `/metrics` endpoint exposing fleet state and unbork's own health for your existing scraper, with a ready-made Grafana dashboard and alert rules
 - **Webhooks** — inbound triggers from your Git host for GitOps sync, and
   from Grafana Alerting for alert intake
 
@@ -117,11 +120,11 @@ Anthropic API, or a Claude subscription. See the
 
 ## 📚 Documentation
 
-All technical content lives under **[the documentation site](https://open-labdog.github.io/labdog/)**:
+All technical content lives under **[the documentation site](https://open-unbork.github.io/unbork/)**:
 
-- **Concepts** — [how config is applied](https://open-labdog.github.io/labdog/#how-configuration-is-applied) · [precedence (worked examples)](https://open-labdog.github.io/labdog/examples/precedence/)
-- **Operations** — [installation](https://open-labdog.github.io/labdog/#installation) · [local development](https://open-labdog.github.io/labdog/#local-development) · [API reference](https://open-labdog.github.io/labdog/#api-endpoints)
-- **Guides** — [GitOps](https://open-labdog.github.io/labdog/examples/gitops/) · [Actions & packs](https://open-labdog.github.io/labdog/ui/actions/) · [example packs](https://open-labdog.github.io/labdog/examples/action-packs/) · [Scheduled actions](https://open-labdog.github.io/labdog/ui/scheduled-actions/) · [AI assistant](https://open-labdog.github.io/labdog/ui/assistant/) · [Alerts](https://open-labdog.github.io/labdog/ui/alerts/) · [Live host metrics](https://open-labdog.github.io/labdog/ui/host-metrics/) · [Metrics export](https://open-labdog.github.io/labdog/metrics-export/)
+- **Concepts** — [how config is applied](https://open-unbork.github.io/unbork/#how-configuration-is-applied) · [precedence (worked examples)](https://open-unbork.github.io/unbork/examples/precedence/)
+- **Operations** — [installation](https://open-unbork.github.io/unbork/#installation) · [local development](https://open-unbork.github.io/unbork/#local-development) · [API reference](https://open-unbork.github.io/unbork/#api-endpoints)
+- **Guides** — [GitOps](https://open-unbork.github.io/unbork/examples/gitops/) · [Actions & packs](https://open-unbork.github.io/unbork/ui/actions/) · [example packs](https://open-unbork.github.io/unbork/examples/action-packs/) · [Scheduled actions](https://open-unbork.github.io/unbork/ui/scheduled-actions/) · [AI assistant](https://open-unbork.github.io/unbork/ui/assistant/) · [Alerts](https://open-unbork.github.io/unbork/ui/alerts/) · [Live host metrics](https://open-unbork.github.io/unbork/ui/host-metrics/) · [Metrics export](https://open-unbork.github.io/unbork/metrics-export/)
 
 ## 🐛 Found a bug?
 
@@ -129,6 +132,6 @@ See **[BUGS.md](BUGS.md)** for known issues and **[CONTRIBUTING.md](CONTRIBUTING
 
 ## 📜 License
 
-**AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of LabDog as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+**AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
 
 Copyright © 2026 Dennis Tyresson and contributors.
