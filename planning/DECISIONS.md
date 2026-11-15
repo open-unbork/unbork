@@ -17,9 +17,8 @@ log below that differ from `roadmap.yaml` predate the final staging;
 ### D-25 What the CLA check needs from Dennis
 Blocks: finishing S-011. A private repository for signatures, a token
 secret in `unbork` and `unbork-playbooks`, the GitHub logins to put on the
-allowlist, and a second account to prove the check on a fork. Also: do the
-CLA texts live in this repository (assumed, `legal/cla/v1/`) or in
-`open-unbork/.github`?
+allowlist, and a second account to prove the check on a fork. Settled on
+2026-11-15: the CLA texts live in this repository under `legal/cla/v1/`.
 
 ### D-26 A destructive run on a host that cannot be snapshotted
 Item: C-005. Today it proceeds with a log line. Assumed: refuse by

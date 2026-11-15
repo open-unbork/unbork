@@ -10,6 +10,12 @@
 | Autonomy | A |
 | Depends on | none |
 
+> Decision D-47 (2026-11-15): the run on `lin-manager-2` is driven through a
+> Remote Control session on Dennis's computer, with his own SSH key. A
+> cloud session cannot reach that host; where this spec says the session
+> connects to `lin-manager-2`, start that Remote Control session instead,
+> and ask Dennis for it if it is not available.
+
 ## Goal
 `planning/reviews/baseline-loadtest.md` holds the numbers from one `S2 300 default` run of the existing harness on lin-manager-2, so later stage reviews can rerun the same command and say whether sync waits, drift checks or resource use got worse.
 
