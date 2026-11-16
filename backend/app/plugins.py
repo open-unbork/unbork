@@ -8,7 +8,10 @@ An extension is a Python distribution that declares an entry point in the
 
 The entry point names a callable that takes the FastAPI app. It adds its
 routes and calls the documented hooks (``set_permission_resolver``,
-``register_login_provider_source`` ...) from inside it. It also carries a
+``register_login_provider_source``, ``register_audit_subscriber``,
+``register_run_gate``, ``register_task_module``,
+``register_permission`` ...) from inside it; the full list, by contract
+version, is the comment above ``PLUGIN_API``. It also carries a
 ``requires_plugin_api = "1.0"`` attribute naming the contract version it
 was written against (``app.auth.permissions.PLUGIN_API``):
 

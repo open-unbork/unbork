@@ -319,7 +319,9 @@ NULL means no role and grants nothing). Roles map onto a fixed permission
 catalog in `app/auth/permissions.py` (`hosts.view`, `config.edit`,
 `sync.run`, `actions.run`, `terminal.open`, `integrations.manage`,
 `settings.manage`, `users.manage`, ...), and that dict is the only place a
-role name means anything.
+role name means anything. An extension can add names of its own
+(`register_permission`), so `known_permissions()` is the full catalog,
+not the `Permission` enum alone.
 
 **Every new route declares one permission** with
 `Depends(require("sync.run"))`, which also returns the user, in place of
@@ -436,6 +438,13 @@ after them, none of which Community uses itself:
   and deletes every `ext-` entry no installed extension registers.
   Extension tasks reach the database with `with_task_engine` and
   `task_session`, as core tasks do.
+- `app/auth/permissions.py` (1.6): `register_permission(name, roles=)`
+  declares an `area.action` permission an extension's routes ask for with
+  `require()` / `require_on()`. `roles` are the fixed roles that hold it
+  under the Community resolver, admin always and by default admin only.
+  Call it in `register(app)` *before* importing the routes that use it:
+  `require()` checks the name at import. Repeating the same registration
+  is a no-op; a core name or other roles are refused.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise

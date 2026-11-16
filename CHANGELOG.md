@@ -18,6 +18,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Extension hook for permissions.** An extension can declare
+  permissions of its own for its routes. The built-in catalog and roles
+  are unchanged. Plugin API 1.6.
 - **Extension hook for background work.** An extension can register its
   own task module and periodic jobs. A Community install behaves exactly
   as before. Plugin API 1.5.

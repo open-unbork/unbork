@@ -24,6 +24,7 @@ from app.auth.permissions import (
     Permission,
     Role,
     Scope,
+    known_permissions,
     permissions_for,
     row_scope,
     set_permission_resolver,
@@ -145,7 +146,7 @@ class TestTheRoleMap:
     def test_roles_nest(self):
         assert ROLE_PERMISSIONS[Role.VIEWER] < ROLE_PERMISSIONS[Role.OPERATOR]
         assert ROLE_PERMISSIONS[Role.OPERATOR] < ROLE_PERMISSIONS[Role.ADMIN]
-        assert ROLE_PERMISSIONS[Role.ADMIN] == {p.value for p in Permission}
+        assert ROLE_PERMISSIONS[Role.ADMIN] == known_permissions()
 
     @pytest.mark.parametrize("perm", ["settings.manage", "users.manage", "integrations.manage"])
     def test_admin_only(self, perm):
