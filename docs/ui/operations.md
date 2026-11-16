@@ -103,7 +103,9 @@ action packs, SSH keys, settings…), sync and action runs (ad-hoc and
 scheduled), discovery, assistant commands, and terminal sessions.
 
 Most entries are a plain verb on a typed object — `create`, `update` or
-`delete` of a `host`, a `host_group`, a `package_rule`, a `scan_config` —
+`delete` of a `host`, a `host_group`, a `package_rule`, a `firewall_rule`, a
+`scan_config` (plus `reorder` of a group's firewall rules and `update` of
+its `firewall_policy`) —
 and the rest name a domain event: `sync_triggered` / `sync_completed` /
 `sync_failed`, `scheduled_action.dispatched`, `action_run.started` /
 `action_run.cancelled`, `gitops.import.firewall`, `ai_command`,

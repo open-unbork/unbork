@@ -148,6 +148,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Fixed
 
+- Firewall rule and chain policy changes are now written to the audit
+  log, like every other module's: create, update, delete, reorder, and
+  a group's input and output policy (BUG-147).
 - **Services, packages and users read "never collected".** The group
   member grid and the host page's module states looked these three up
   under spellings the backend doesn't write (`services`, `packages`,

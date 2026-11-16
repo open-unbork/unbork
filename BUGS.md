@@ -52,27 +52,6 @@ suite, or in a browser for the frontend one. The rest were traced by
 reading. Each carries a fix direction for a fix thread. None is fixed
 here.
 
-### Medium
-
-- [ ] **BUG-147** `backend/app/api/rules.py` — firewall rule changes
-      leave no audit row
-
-      Symptom: creating, editing, deleting or reordering a firewall rule,
-      on a group or a host, writes nothing to the audit log. Every other
-      configuration module (packages, repositories, services, cron jobs,
-      hosts entries, CA certificates, Linux users and groups) audits its
-      create, update and delete through `RuleAudit` in
-      `app/api/_scoped_rules.py`. `rules.py` has no `log_action` call at
-      all.
-
-      Fix direction: give `rules.py` a `RuleAudit("firewall_rule", ...)`
-      and end its endpoints with `commit_created` / `commit_updated` /
-      `delete_and_commit`, and write one row for a reorder.
-
-      Severity Medium: every account has the same rights, so the audit
-      log is the only record of who opened a port, and firewall rules are
-      where that record matters most.
-
 ### Low
 
 - [ ] **BUG-143** `backend/app/api/packages.py:368` — renaming a package
