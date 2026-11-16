@@ -231,7 +231,8 @@ schema. Drift sweeps fan out one `drift_sweep.check_host_module` task per
 host on the `drift` queue rather than walking hosts serially. An action
 run's children (`action_host`, `action_group`, `builtin_dispatchers`) go
 to `actions` (`CHILD_QUEUE`), so a bulk-sync backlog on `long_running`
-cannot hold them back.
+cannot hold them back. An extension's own tasks may use any of these
+queues except `orchestrator` (`app/tasks/extensions.py`).
 
 The orchestrator split is load-bearing, not tidiness. `run_action` dispatches per-host
 children to `actions` and then blocks in `result.join()` until they
@@ -423,6 +424,18 @@ after them, none of which Community uses itself:
   human). A gate that raises refuses. `register_run_end_listener(fn)` is
   told, after commit, when each sync, action run and changing assistant
   session ends. With nothing registered neither does any work.
+- `app/tasks/extensions.py` (1.5): `register_task_module(module, queue=)`
+  adds an extension's Celery task module to `conf.include` and routes
+  `<module>.*` to `queue`, which must be a consumed queue other than
+  `orchestrator` (a module under `app.` is refused);
+  `register_periodic_task(name, task, every_seconds)` (10 s minimum) has
+  beat keep a RedBeat entry `ext-<name>`. Extensions load once per Celery
+  process (`load_plugins_once`): in the worker parent and in beat from the
+  `import_modules` signal, before the task modules are imported, and in
+  each pool child. At beat start `register_all` writes the `ext-` entries
+  and deletes every `ext-` entry no installed extension registers.
+  Extension tasks reach the database with `with_task_engine` and
+  `task_session`, as core tasks do.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise

@@ -23,9 +23,18 @@ so an Enterprise package built for 1.1 meeting a 1.2 core is a real case,
 and the version check is what turns it into a log line instead of an
 ``AttributeError`` halfway through startup.
 
-Plugins load once per process, in ``create_app()``, after the core routers
-and before the SPA fallback (whose catch-all route would otherwise shadow
-the plugin's paths).
+Where plugins load, once per process:
+
+* the API: ``create_app()``, after the core routers and before the SPA
+  fallback (whose catch-all route would otherwise shadow the plugin's
+  paths);
+* Celery: the worker parent and beat, from the ``import_modules`` signal,
+  before the task modules are imported (so a task module an extension
+  registers through ``app.tasks.extensions`` is imported with them), and
+  each pool child from ``worker_process_init``. These go through
+  :func:`load_plugins_once`, so a pool child that inherited its parent's
+  loaded plugins does not register them a second time. The routes a
+  plugin adds there land on a throwaway app; only the hooks matter.
 """
 
 from __future__ import annotations
@@ -126,6 +135,19 @@ def load_plugins(app: FastAPI, eps: Iterable[EntryPoint] | None = None) -> list[
         logger.info("plugin %s (%s) loaded", ep.name, dist or ep.value)
     loaded_plugins[:] = loaded
     return loaded
+
+
+_loaded_once: list[LoadedPlugin] | None = None
+
+
+def load_plugins_once(app: FastAPI | None = None) -> list[LoadedPlugin]:
+    """:func:`load_plugins` the first time it is called in this process; the
+    same list afterwards. For the Celery processes, where more than one
+    signal can ask (``create_app()`` calls :func:`load_plugins` itself)."""
+    global _loaded_once
+    if _loaded_once is None:
+        _loaded_once = load_plugins(app or FastAPI())
+    return _loaded_once
 
 
 def run_plugin_migrations(eps: Iterable[EntryPoint] | None = None) -> list[str]:

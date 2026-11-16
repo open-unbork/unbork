@@ -1,7 +1,7 @@
 import logging
 
 from celery import Celery
-from celery.signals import beat_init, worker_process_init, worker_ready
+from celery.signals import beat_init, import_modules, worker_process_init, worker_ready
 
 from app.config import settings
 
@@ -135,13 +135,32 @@ def _load_extensions(**_kwargs):
     throwaway app here; only the hooks matter.
     """
     try:
-        from fastapi import FastAPI
+        from app.plugins import load_plugins_once
 
-        from app.plugins import load_plugins
-
-        load_plugins(FastAPI())
+        load_plugins_once()
     except Exception:
         logger.exception("loading extensions on worker start failed")
+
+
+@import_modules.connect
+def _load_extensions_before_task_modules(**_kwargs):
+    """Load extensions in the worker parent and in beat (S-015).
+
+    Celery sends ``import_modules`` from ``loader.init_worker()`` in both,
+    just before it imports ``conf.include``. Loading here lets an extension
+    add its own task module to that list (``app.tasks.extensions``), so the
+    parent, which decides whether a received task name is known, knows its
+    tasks, and beat registers its periodic entries at ``beat_init``.
+
+    Celery re-raises what a handler of this signal raises, which would stop
+    the process; a broken extension must not, so everything is caught.
+    """
+    try:
+        from app.plugins import load_plugins_once
+
+        load_plugins_once()
+    except Exception:
+        logger.exception("loading extensions before the task modules failed")
 
 
 def _is_orchestrator_worker(sender) -> bool:

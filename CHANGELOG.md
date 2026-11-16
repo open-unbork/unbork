@@ -18,6 +18,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Extension hook for background work.** An extension can register its
+  own task module and periodic jobs. A Community install behaves exactly
+  as before. Plugin API 1.5.
 - **Extension hook to refuse or hold a sync, an action run, a scheduled
   run or an assistant change before it starts, and to hear when it ends.**
   A Community install behaves exactly as before. Plugin API 1.4.

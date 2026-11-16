@@ -75,7 +75,11 @@ logger = logging.getLogger(__name__)
 #:      sync, action run, schedule dispatch or assistant change before it
 #:      starts) and ``register_run_end_listener`` (told after commit when
 #:      each ends); ``gate_retry_at`` on held ``sync_jobs``/``action_runs``.
-PLUGIN_API = "1.4"
+#: 1.5  ``app.tasks.extensions``: ``register_task_module``,
+#:      ``register_periodic_task``; extensions also load in the worker
+#:      parent and in beat; ``app.db.task_session`` and ``with_task_engine``
+#:      may be used by extension tasks.
+PLUGIN_API = "1.5"
 
 
 class Role(StrEnum):
