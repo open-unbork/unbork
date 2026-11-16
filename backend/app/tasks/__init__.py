@@ -125,7 +125,11 @@ def _register_all_models(**_kwargs):
 
 @worker_process_init.connect
 def _load_extensions(**_kwargs):
-    """Load extensions (Enterprise) in workers, for their permission hooks.
+    """Load extensions (Enterprise) in each pool child, for their hooks.
+
+    Usually a no-op: the parent loaded them before forking
+    (:func:`_load_extensions_before_task_modules`) and the child inherits
+    that. This covers a pool that started without the parent loading.
 
     ``create_app()`` loads them in the API process. A worker never builds
     the app, yet tasks ask permission questions too: the scheduler checks

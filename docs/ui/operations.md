@@ -111,12 +111,15 @@ Most entries are a plain verb on a typed object — `create`, `update` or
 its `firewall_policy`) —
 and the rest name a domain event: `sync_triggered` / `sync_completed` /
 `sync_failed`, `scheduled_action.dispatched`, `action_run.started` /
-`action_run.cancelled`, `gitops.import.firewall`, `ai_command`,
+`action_run.cancelled`, `scheduled_action.gate_refused` /
+`sync_job.gate_refused` / `action_run.gate_refused` (an installed
+extension refused it, with its reason), `gitops.import.firewall`, `ai_command`,
 `session_start` / `session_end`, `trust_host_key`.
 
 Every action run has one `action_run.started` entry, written when the run
 is created, whose `origin` says where it came from (`api`, `run_now`,
-`schedule`, `alert` or `assistant`) and whose user is whoever started it
+`schedule` or `alert`; `assistant` is reserved for runs the assistant
+will start) and whose user is whoever started it
 (a schedule's owner for a scheduled run, nobody for an alert). It records
 the action, the target and the names of the parameters, never their
 values. Cancelling a run writes `action_run.cancelled`.

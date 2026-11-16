@@ -162,6 +162,19 @@ async def test_policy_change_writes_one_row(superuser_client, db):
     assert row.after_state == {"input": "accept", "output": "drop"}
 
 
+async def test_a_policy_update_that_changes_nothing_writes_nothing(superuser_client, db):
+    group = await create_group(db)
+    group.input_policy, group.output_policy = "drop", "accept"
+    await db.commit()
+
+    resp = await superuser_client.put(
+        f"/api/groups/{group.id}/policies",
+        json={"input_policy": "drop", "output_policy": "accept"},
+    )
+    assert resp.status_code == 200
+    assert await _rows(db, "firewall_policy") == []
+
+
 async def test_gitops_locked_group_writes_nothing(superuser_client, db):
     group = await create_group(db)
     rule = await create_rule(db, group.id, port_start=22)

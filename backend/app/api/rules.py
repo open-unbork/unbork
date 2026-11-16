@@ -306,15 +306,18 @@ async def update_group_policies(
     before = {"input": group.input_policy, "output": group.output_policy}
     group.input_policy = body.input_policy
     group.output_policy = body.output_policy
-    await log_action(
-        db,
-        action="update",
-        entity_type="firewall_policy",
-        entity_id=group_id,
-        user_id=user.id,
-        before_state=before,
-        after_state={"input": group.input_policy, "output": group.output_policy},
-    )
+    after = {"input": group.input_policy, "output": group.output_policy}
+    # Like a reorder that moves nothing: no change, no row.
+    if after != before:
+        await log_action(
+            db,
+            action="update",
+            entity_type="firewall_policy",
+            entity_id=group_id,
+            user_id=user.id,
+            before_state=before,
+            after_state=after,
+        )
     await db.commit()
     await db.refresh(group)
     return ChainPoliciesResponse(

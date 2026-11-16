@@ -78,8 +78,9 @@ logger = logging.getLogger(__name__)
 #:      each ends); ``gate_retry_at`` on held ``sync_jobs``/``action_runs``.
 #: 1.5  ``app.tasks.extensions``: ``register_task_module``,
 #:      ``register_periodic_task``; extensions also load in the worker
-#:      parent and in beat; ``app.db.task_session`` and ``with_task_engine``
-#:      may be used by extension tasks.
+#:      parent and in beat (so ``register()`` may run before the pool
+#:      forks: start threads and connections lazily); ``app.db.task_session``
+#:      and ``with_task_engine`` may be used by extension tasks.
 #: 1.6  ``register_permission``, ``known_permissions`` (an extension
 #:      declares permissions of its own; register before importing the
 #:      routes that require them).

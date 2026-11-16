@@ -296,12 +296,13 @@ check-and-flip — the actual "host is busy" state lives in the row
 statuses. A row an extension's run gate deferred (`app/run_gate.py`) stays
 `pending` but *held* (`gate_retry_at` in the future): it is not a queue
 candidate until then, so it never stalls the host, and
-`app/tasks/run_gate_retry.py` sends it again when it is due.
-Group-targeted actions acquire locks for all members in
-sorted-host-id order to avoid deadlock against overlapping group ops. The built-in `_builtin.sync` opts out of the outer lock (its
-inner `run_host_sync.apply()` already participates via the sync
-orchestrator) — see the comment on `with_lock=` in
-`builtin_dispatchers.py`.
+`app/tasks/run_gate_retry.py` sends it again when it is due. A gated
+op that does not start hands its hosts on, like a finishing one.
+Group-targeted actions acquire locks for all members in sorted-host-id
+order to avoid deadlock against overlapping group ops. The built-in
+`_builtin.sync` opts out of the outer lock (its inner
+`run_host_sync.apply()` already participates via the sync orchestrator)
+— see the comment on `with_lock=` in `builtin_dispatchers.py`.
 
 The seven periodic drift sweeps participate too, but as *readers*
 rather than claimants: `app/tasks/drift_sweep.py::sweep_module` asks
@@ -423,7 +424,10 @@ after them, none of which Community uses itself:
   ends `failed` with "Refused: ..."; a schedule skips the fire and audits
   it) or `defer(reason, retry_at)` (the run stays `pending`, held as
   above; a schedule stays due; a full-auto assistant session parks for a
-  human). A gate that raises refuses. `register_run_end_listener(fn)` is
+  human; an approval session's call is asked when it is approved and about
+  to run). An action run is asked once, when its orchestrator picks it
+  up, not again after waiting for a busy host. A gate that raises
+  refuses. `register_run_end_listener(fn)` is
   told, after commit, when each sync, action run and changing assistant
   session ends. With nothing registered neither does any work.
 - `app/tasks/extensions.py` (1.5): `register_task_module(module, queue=)`
@@ -434,7 +438,10 @@ after them, none of which Community uses itself:
   beat keep a RedBeat entry `ext-<name>`. Extensions load once per Celery
   process (`load_plugins_once`): in the worker parent and in beat from the
   `import_modules` signal, before the task modules are imported, and in
-  each pool child. At beat start `register_all` writes the `ext-` entries
+  each pool child. So `register()` may run in the worker parent before
+  the pool forks: start threads, sockets or connections lazily, or from
+  your own `worker_process_init` handler, never in `register()`. At beat
+  start `register_all` writes the `ext-` entries
   and deletes every `ext-` entry no installed extension registers.
   Extension tasks reach the database with `with_task_engine` and
   `task_session`, as core tasks do.

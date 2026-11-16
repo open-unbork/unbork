@@ -37,6 +37,9 @@ async def audit_run_started(
     """Add an ``action_run.started`` row for ``run`` to ``db``.
 
     The run must be flushed, so it has an id. Never commits.
+
+    ``ai_session_id`` and the ``assistant`` origin are for runs the
+    assistant will start (C-009); no caller passes them yet.
     """
     if run.id is None:
         raise ValueError("audit_run_started needs a flushed run (run.id is None)")
