@@ -11,8 +11,8 @@ stages:
     items: [C-064, S-012, S-011, C-024, C-025, C-062, C-061, C-063]
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
-    base_commit: null
-    status: todo
+    base_commit: 60176318c9769d0841bc05e3b1dd9aba556ce7ba
+    status: in_progress
     items: [C-008, C-047, C-022, S-001, S-002, S-015, S-016]
   - stage: 2
     goal: "The rename, and a clean image"

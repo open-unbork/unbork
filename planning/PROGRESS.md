@@ -80,3 +80,7 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 - S-012: GitHub detects `dev`'s LICENSE as AGPL-3.0 with the copyright line.
 - S-011: the CLA check does not run in this repository yet. GitHub takes `pull_request_target` and `issue_comment` workflows from the default branch, which is `main`, so `cla.yml` on `dev` starts nothing (#304 got no CLA run; the Actions workflow list shows only CI). It works in unbork-playbooks, whose default branch is `main`. It starts here with the next `dev` to `main` release. Step 7 (co-author) and step 8 (fork) move there, or to a playbooks PR.
 - Still open after merge: S-011 step 8, the fork test (needs Dennis's second account); F-03, a Dependabot PR passing CLAAssistant; Dennis marks `CLAAssistant` and `LinkedCommits` required on `dev` (and `main` in playbooks).
+
+## 2026-11-16 Stage 1 run
+
+Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in place of `roadmap/stage-1`). Base: `6017631`. Entry criterion met: stage 0 merged 2026-11-16. Dennis said to start ("Start stage 1 when ready", 2026-11-16).
