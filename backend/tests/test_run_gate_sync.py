@@ -271,3 +271,41 @@ async def test_a_refused_sync_is_announced_as_ended(db, gate, sent):
     await _claim(db, job_id, host_id)
 
     assert [(e.kind, e.status, e.sync_job_id) for e in ended] == [("sync", "failed", job_id)]
+
+
+async def test_a_held_job_whose_send_fails_is_held_again(db, gate):
+    from app.tasks.run_gate_retry import _retry_held_async
+
+    host_id = (await create_host(db)).id
+    held_id = await _job(db, host_id)
+    await db.execute(
+        update(SyncJob)
+        .where(SyncJob.id == held_id)
+        .values(gate_retry_at=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    await db.commit()
+
+    broken = MagicMock(side_effect=ConnectionError("broker down"))
+    with patch("app.tasks.host_sync_orchestrator.run_host_sync.delay", new=broken):
+        await _retry_held_async()
+
+    job = await _fresh(db, held_id)
+    assert job.status == JobStatus.pending
+    assert job.gate_retry_at is not None
+
+
+def test_the_retry_entry_exists_only_while_a_gate_does(monkeypatch):
+    from app.tasks import run_gate_retry
+
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "app.tasks.beat_registry.ensure_entry", lambda name, **kw: calls.append(("ensure", name))
+    )
+    monkeypatch.setattr(
+        "app.tasks.beat_registry.remove_entry", lambda name, app: calls.append(("remove", name))
+    )
+
+    run_gate_retry._register_beat_schedule()
+    register_run_gate(Gate())
+    run_gate_retry._register_beat_schedule()
+    assert calls == [("remove", "retry-held-runs"), ("ensure", "retry-held-runs")]

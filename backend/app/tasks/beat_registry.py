@@ -57,7 +57,7 @@ def ensure_entry(name: str, task: str, run_every_seconds: float, app: Any, **kwa
     new_schedule = schedule(run_every=run_every_seconds)
 
     try:
-        existing = RedBeatSchedulerEntry.from_key(f"redbeat:{name}", app=app)
+        existing = RedBeatSchedulerEntry.from_key(f"{_prefix(app)}{name}", app=app)
     except Exception:
         # Missing (KeyError) or unreadable — either way, write it.
         existing = None
@@ -76,6 +76,24 @@ def ensure_entry(name: str, task: str, run_every_seconds: float, app: Any, **kwa
         "updated" if existing is not None else "created",
         run_every_seconds,
     )
+    return True
+
+
+def _prefix(app) -> str:
+    """RedBeat's key prefix, as the scheduler itself reads it."""
+    return app.conf.get("redbeat_key_prefix") or "redbeat:"
+
+
+def remove_entry(name: str, app: Any) -> bool:
+    """Delete one RedBeat entry if it exists. Returns True if it did."""
+    from redbeat import RedBeatSchedulerEntry
+
+    try:
+        entry = RedBeatSchedulerEntry.from_key(f"{_prefix(app)}{name}", app=app)
+    except KeyError:
+        return False
+    entry.delete()
+    logger.info("beat entry %r removed", name)
     return True
 
 
@@ -123,9 +141,9 @@ def _stored_extension_entries(app) -> list[str]:
     """Names of the ``ext-`` entries RedBeat holds now."""
     from redbeat.schedulers import get_redis
 
-    prefix = app.conf.get("redbeat_key_prefix") or "redbeat:"
     from app.tasks.extensions import EXTENSION_ENTRY_PREFIX
 
+    prefix = _prefix(app)
     pattern = f"{prefix}{EXTENSION_ENTRY_PREFIX}*"
     names = []
     for key in get_redis(app).scan_iter(match=pattern):
@@ -139,8 +157,6 @@ def _register_extension_entries(app, results: dict[str, str]) -> None:
     then delete every ``ext-`` entry none of them registers any more: an
     uninstalled extension's entry would otherwise keep sending a task no
     worker knows. Core entries are never touched."""
-    from redbeat import RedBeatSchedulerEntry
-
     from app.tasks.extensions import periodic_tasks
 
     wanted = set()
@@ -159,12 +175,10 @@ def _register_extension_entries(app, results: dict[str, str]) -> None:
     except Exception:
         logger.exception("beat registration: could not list extension entries")
         return
-    prefix = app.conf.get("redbeat_key_prefix") or "redbeat:"
     for name in stored:
         if name in wanted:
             continue
         try:
-            RedBeatSchedulerEntry.from_key(f"{prefix}{name}", app=app).delete()
-            logger.info("beat entry %r removed: no installed extension registers it", name)
+            remove_entry(name, app)
         except Exception:
             logger.exception("beat registration: could not remove %s", name)
