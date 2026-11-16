@@ -88,3 +88,4 @@ Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in p
 - 2026-11-16 C-047 done 2f1b702. BUG-147 deleted.
 - 2026-11-16 C-022 done 7a456a1. Manual check against a signing Grafana on lin-manager-2 not done (no route to that network from this session); the scheme was checked against grafana/alerting's http/hmac.go and the automated tests.
 - 2026-11-16 S-001 review 9c7cc71. PLUGIN_API 1.3. Worker delivery on a running stack is left to the stage review.
+- 2026-11-16 S-002 review f05429a. PLUGIN_API 1.4, migration 0061 (gate_retry_at). The live check with a deferring plugin on a host named "test" is left to the stage review.

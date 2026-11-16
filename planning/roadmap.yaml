@@ -239,8 +239,8 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-002-extension-hook-gate-a-run-before-it.md
     notes: "Several planned extensions need to refuse or defer a sync, run, schedule or AI fix; one seam is safer than four."
   - id: S-015
