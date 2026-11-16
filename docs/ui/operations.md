@@ -31,6 +31,9 @@ or a hand-picked set of hosts) and a set of modules.
 3. **Apply** — one coalesced playbook per selected host, queued through the
    per-host serialisation so a busy host waits its turn. The screen polls the
    jobs and shows each host's outcome; the global sync tray follows along.
+   A job (or an action run) can also wait, or end refused, because an
+   installed extension such as a change-window policy said so; its pending
+   reason or its error then gives that extension's reason.
 4. **Result** — applied / failed / excluded / unchanged / skipped, a card
    per failed host with the error and a jump to the host or the assistant,
    and **Plan the remaining** when hosts were excluded.

@@ -292,9 +292,12 @@ either claims the host (status → `running`) or defers (status →
 pending op for that host (FIFO across both queues by `created_at`)
 and re-dispatches it. The advisory lock is held only for the
 check-and-flip — the actual "host is busy" state lives in the row
-statuses. Group-targeted actions acquire locks for all members in
-sorted-host-id order to avoid deadlock against overlapping group
-ops. The built-in `_builtin.sync` opts out of the outer lock (its
+statuses. A row an extension's run gate deferred (`app/run_gate.py`) stays
+`pending` but *held* (`gate_retry_at` in the future): it is not a queue
+candidate until then, so it never stalls the host, and
+`app/tasks/run_gate_retry.py` sends it again when it is due.
+Group-targeted actions acquire locks for all members in
+sorted-host-id order to avoid deadlock against overlapping group ops. The built-in `_builtin.sync` opts out of the outer lock (its
 inner `run_host_sync.apply()` already participates via the sync
 orchestrator) — see the comment on `with_lock=` in
 `builtin_dispatchers.py`.
@@ -410,6 +413,16 @@ after them, none of which Community uses itself:
   loses it; `AuditEntry.id` is the `audit_log` key, a catch-up cursor).
   Subscribers are synchronous, must only enqueue, and one that raises is
   logged and skipped. With none registered `log_action` does no extra work.
+- `app/run_gate.py` (1.4): `register_run_gate(gate)` is asked, with a
+  `RunRequest`, just before a sync (and a CA certificate deploy), an action
+  run, a schedule's fire, or a change the assistant is about to make.
+  It answers `allow`, `refuse(reason)` (the run
+  ends `failed` with "Refused: ..."; a schedule skips the fire and audits
+  it) or `defer(reason, retry_at)` (the run stays `pending`, held as
+  above; a schedule stays due; a full-auto assistant session parks for a
+  human). A gate that raises refuses. `register_run_end_listener(fn)` is
+  told, after commit, when each sync, action run and changing assistant
+  session ends. With nothing registered neither does any work.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise

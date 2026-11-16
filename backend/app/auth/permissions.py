@@ -71,7 +71,11 @@ logger = logging.getLogger(__name__)
 #: 1.3  ``app.audit``: ``register_audit_subscriber``, ``AuditEntry`` (audit
 #:      entries delivered after commit, at most once; the id is a catch-up
 #:      cursor).
-PLUGIN_API = "1.3"
+#: 1.4  ``app.run_gate``: ``register_run_gate`` (allow, refuse or defer a
+#:      sync, action run, schedule dispatch or assistant change before it
+#:      starts) and ``register_run_end_listener`` (told after commit when
+#:      each ends); ``gate_retry_at`` on held ``sync_jobs``/``action_runs``.
+PLUGIN_API = "1.4"
 
 
 class Role(StrEnum):

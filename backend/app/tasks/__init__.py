@@ -303,6 +303,7 @@ celery_app.conf.include = [
     "app.tasks.action_group",
     "app.tasks.builtin_dispatchers",
     "app.tasks.scheduled_action_schedule",
+    "app.tasks.run_gate_retry",
     "app.tasks.scan_schedule",
     "app.tasks.scan_run",
     "app.tasks.facts",

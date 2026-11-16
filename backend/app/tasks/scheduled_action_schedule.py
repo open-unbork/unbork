@@ -49,7 +49,14 @@ async def _check_due_async() -> dict:
     from app.db import task_session
     from app.models.scheduled_action import ScheduledAction
 
-    counts = {"dispatched": 0, "skipped_in_flight": 0, "skipped_orphan": 0, "skipped_owner": 0}
+    counts = {
+        "dispatched": 0,
+        "skipped_in_flight": 0,
+        "skipped_orphan": 0,
+        "skipped_owner": 0,
+        "skipped_gate": 0,
+        "deferred_gate": 0,
+    }
 
     now = datetime.now(UTC)
 
@@ -138,8 +145,60 @@ async def _tick_schedule(db, sa_id: int, now: datetime, tz) -> str | None:  # no
         )
         return "skipped_orphan"
 
+    gated = await _gate_schedule(db, sa, now)
+    if gated is not None:
+        return gated
+
     await _dispatch_scheduled_run(db, sa, action, now)
     return "dispatched"
+
+
+async def _gate_schedule(db, sa, now: datetime) -> str | None:  # noqa: ANN001
+    """Ask an installed extension's run gate (S-002) about this fire.
+
+    None: dispatch. ``skipped_gate``: refused; like an owner block, the
+    fire counts as handled (``last_dispatched_at`` moves on) and the reason
+    is audited. ``deferred_gate``: held; nothing is touched, so the fire
+    stays due and the gate is asked again on the next tick. The run a
+    dispatch creates is asked again as an ``action_run``, with
+    ``scheduled_action_id`` set so a gate can recognise it.
+    """
+    from app.run_gate import RunRequest, check_run, has_run_gates
+
+    if not has_run_gates():
+        return None
+    from app.actions.validation import DRY_RUN_PARAM
+    from app.audit.logger import log_action
+
+    verdict = await check_run(
+        db,
+        RunRequest(
+            kind="schedule_dispatch",
+            host_ids=(sa.target_id,) if sa.target_kind == "host" else (),
+            group_id=sa.target_id if sa.target_kind == "group" else None,
+            action_key=sa.action_key,
+            user_id=sa.owner_user_id,
+            scheduled_action_id=sa.id,
+            dry_run=bool((sa.parameters or {}).get(DRY_RUN_PARAM, False)),
+        ),
+    )
+    if verdict.allowed:
+        return None
+    if verdict.outcome == "defer":
+        logger.info("scheduled_action %d held by the run gate: %s", sa.id, verdict.reason)
+        return "deferred_gate"
+    sa.last_dispatched_at = now
+    await log_action(
+        db,
+        action="scheduled_action.gate_refused",
+        entity_type="scheduled_action",
+        entity_id=sa.id,
+        user_id=None,
+        after_state={"reason": verdict.reason},
+    )
+    await db.commit()
+    logger.warning("scheduled_action %d refused by the run gate: %s", sa.id, verdict.reason)
+    return "skipped_gate"
 
 
 async def _schedule_if_due(db, sa_id: int, now: datetime, tz):  # noqa: ANN001, ANN202

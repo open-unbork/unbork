@@ -18,6 +18,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Extension hook to refuse or hold a sync, an action run, a scheduled
+  run or an assistant change before it starts, and to hear when it ends.**
+  A Community install behaves exactly as before. Plugin API 1.4.
 - **Extension hook for the audit log.** Groundwork for Enterprise audit
   export; a Community install behaves exactly as before. An extension can
   subscribe to audit entries, which are handed over after they are

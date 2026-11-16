@@ -309,3 +309,40 @@ async def finish_session(
     if stopped_reason:
         session.stopped_reason = stopped_reason[:200]
     await db.flush()
+    await _notify_fix_ended(db, session)
+
+
+async def _notify_fix_ended(db: AsyncSession, session: AISession) -> None:
+    """Tell an extension's run-end listeners (S-002) that a session that
+    changed something has ended. Sessions that only read are not reported.
+    """
+    from app.run_gate import RunEnded, has_run_end_listeners, notify_run_ended
+
+    if not has_run_end_listeners():
+        return
+    from sqlalchemy import exists, select
+
+    from app.ai.models import AIToolCall
+
+    changed = await db.scalar(
+        select(
+            exists().where(
+                AIToolCall.session_id == session.id,
+                AIToolCall.status == "executed",
+                AIToolCall.classification == "mutating",
+            )
+        )
+    )
+    if not changed:
+        return
+    notify_run_ended(
+        db,
+        RunEnded(
+            kind="ai_fix",
+            status=session.status,
+            finished_at=session.finished_at,
+            host_ids=tuple(session.target_host_ids or ()),
+            user_id=session.created_by_user_id,
+            ai_session_id=session.id,
+        ),
+    )
