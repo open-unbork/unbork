@@ -225,8 +225,8 @@ items:
     depends_on: [C-008]
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-001-extension-hook-subscribe-to-audit-entries.md
     notes: "One 37-line module is the single choke point for audit writes; a hook there unblocks every consumer of the audit stream."
   - id: S-002
