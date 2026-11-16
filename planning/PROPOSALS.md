@@ -18,15 +18,15 @@ later and are unranked.
 | PR-06 | A unit-test harness for the frontend | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-061 |
 | PR-07 | Measure coverage in CI and record a load-test baseline | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-062, C-063 |
 | PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | accepted 2026-11-16 (D-28), folded into C-016 |
-| PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | open |
-| PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | open |
-| PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | open |
-| PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | open |
-| PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | open |
-| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
+| PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | accepted 2026-11-16, to be scheduled |
+| PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | deferred 2026-11-16, until a user needs it |
+| PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | deferred 2026-11-16, with kennel |
+| PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | accepted 2026-11-16, split out of C-033, to be scheduled |
+| PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | deferred 2026-11-16, to C-038's stage |
+| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | accepted 2026-11-16, any stage |
 | PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16 (D-49 option b), done in S-011 |
-| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | open |
-| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | open |
+| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16, to be scheduled |
+| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | accepted 2026-11-16 for its next step only (rerun, then decide) |
 
 ## PR-01 Audit rows for firewall rule changes
 - **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has

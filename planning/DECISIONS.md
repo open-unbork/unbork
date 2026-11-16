@@ -59,6 +59,7 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-16 | D-52: Open proposals taken as recommended. Accepted: PR-13, PR-16 (split out of C-033), PR-18, PR-20, PR-21 (its next step only: rerun the baseline in two-host mode and with more sync slots, then decide), and the stage 1 review's PR-22 to PR-30, bundled as one "run gate follow-ups" item (PR-22 to PR-25, before the first Enterprise gate ships) and one "stage 1 tidy-up" item (PR-26 to PR-30, PR-28 first; PR-26 caps a reorder at 1,000 ids). Deferred: PR-14 (until a user needs it), PR-15 (with kennel), PR-17 (to C-038's stage), Enterprise PR-18 (while D-16 is on hold). PR-12 is in C-016 (D-28). PR-22 to PR-30 are recorded in PROPOSALS.md by unbork #305; set their status there once it merges. | Dennis (decision card) |
 | 2026-11-16 | D-35: Quiesce closes the service to everything but loopback, so verify still works (C-014, C-015). Packs cannot ask for unquiesce before verify. | Dennis (decision card) |
 | 2026-11-16 | D-34: A run a gate refuses or defers is accepted, then fails or waits with the reason shown; a gate that raises refuses. No 409 at the API. As built in S-002. | Dennis (decision card) |
 | 2026-11-16 | D-33: Every role may create API tokens for itself (`tokens.manage` on viewer, operator and admin); a token acts as its user. No service accounts (C-030). | Dennis (decision card) |
