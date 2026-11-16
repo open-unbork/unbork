@@ -58,6 +58,44 @@ request**, and the **Intake** card on the Handling tab says so. An alert receive
 anyone on the network write rows unbork might then spend money
 investigating.
 
+### Restricting who may send alerts
+
+Two more checks, both off until set, put more than the token between the
+network and a run on a host. Both are in the `[alerts]` section of
+`labdog.toml` (or `LABDOG_ALERTS__…`), and the **Intake** card shows
+whether each is on.
+
+```toml
+[alerts]
+webhook_token = "a-long-random-string"
+# Only these addresses or networks may send (empty: any).
+allowed_sources = ["10.20.0.15", "10.30.0.0/24"]
+# Require an HMAC-SHA256 signature of the body.
+webhook_hmac_secret = "another-long-random-string"
+webhook_hmac_header = "X-Grafana-Alerting-Signature"      # the default
+webhook_hmac_timestamp_header = "X-Grafana-Alerting-Timestamp"  # optional
+webhook_hmac_max_skew_seconds = 300                       # the default
+```
+
+- **`allowed_sources`**: a request from any other address gets 403 and
+  records nothing. The address checked is the client's as resolved
+  through `[server] trusted_proxies`: behind a reverse proxy, list the
+  proxy there first, or every request looks like it comes from the proxy.
+  A value that is not an address or network stops unbork at startup.
+  Each refusal is logged with the address that was checked.
+- **`webhook_hmac_secret`**: the request must carry the hex HMAC-SHA256 of
+  its body under that secret, in `webhook_hmac_header`. In Grafana's
+  webhook contact point, open **Optional Webhook settings › HMAC
+  Signature** and enter the same **Secret**; leave **Header** empty for
+  the default or set it to match `webhook_hmac_header`. If you also set
+  **Timestamp header** there, set `webhook_hmac_timestamp_header` to the
+  same name: the signature then covers `<timestamp>:<body>`, and a
+  timestamp more than `webhook_hmac_max_skew_seconds` from unbork's clock
+  is refused. A missing or wrong signature gets 401. The token is still
+  required. It needs a Grafana whose webhook contact point offers
+  **HMAC Signature** (a 12.x release); unbork checks the signature the way
+  `grafana/alerting`'s `http/hmac.go` computes it.
+
 ---
 
 ## Two ways in — and which one you need

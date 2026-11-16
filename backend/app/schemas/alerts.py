@@ -78,6 +78,10 @@ class AlertIntakeStatus(BaseModel):
     #: At least MIN_WEBHOOK_TOKEN_CHARS: below it, a webhook alert never
     #: runs an action or runs at full auto.
     token_long_enough_for_full_auto: bool
+    #: ``[alerts] allowed_sources`` is set: only listed addresses may send.
+    source_allowlist: bool = False
+    #: ``[alerts] webhook_hmac_secret`` is set: a body signature is required.
+    body_signature: bool = False
     #: Whether an alert labelled labdog_ai / labdog_ai_automate starts an
     #: investigation (ai.enabled and ai.auto_investigate_enabled).
     ai_enabled: bool

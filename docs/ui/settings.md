@@ -53,7 +53,8 @@ Two of them cover what comes *in* to unbork:
   `labdog.toml`, and when alerts are listed for full auto but the token is
   shorter than 32 characters. **Configure…** opens Settings › Fleet
   defaults, where intake is switched on; **Alerts** opens the [Alerts](alerts.md) page.
-  The token itself is never shown.
+  The token itself is never shown. The Intake card on the Alerts page also
+  says whether a source allowlist and a body signature are set.
 
 ## Fleet defaults
 

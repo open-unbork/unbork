@@ -127,6 +127,25 @@ cache_ttl_seconds = 15.0
 # that detail away if your series count matters.
 action_key_label = true
 
+# ── Alert webhook ────────────────────────────────────────────
+# POST /api/webhooks/grafana-alerts receives alerts from a Grafana
+# contact point. It refuses everything until webhook_token is set. See
+# docs/ui/alerts.md.
+#[alerts]
+#webhook_token = "a-long-random-string"   # 32+ characters for full auto
+# Only accept requests from these addresses or CIDRs (empty: any). The
+# address is the client's as resolved through server.trusted_proxies, so
+# behind a reverse proxy set that first.
+#allowed_sources = ["10.0.0.0/8"]
+# Require an HMAC-SHA256 of the body, as a Grafana webhook contact point
+# with "HMAC Signature" set sends it. Empty: no signature check.
+#webhook_hmac_secret = ""
+#webhook_hmac_header = "X-Grafana-Alerting-Signature"
+# Set to the contact point's "Timestamp header" to sign "<timestamp>:<body>"
+# and refuse requests older or newer than the skew.
+#webhook_hmac_timestamp_header = ""
+#webhook_hmac_max_skew_seconds = 300
+
 # ── Logging ──────────────────────────────────────────────────
 [logging]
 # Log level: debug, info, warning, error, critical

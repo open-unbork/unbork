@@ -282,6 +282,8 @@ async def alert_intake_status(
         webhook_path="/api/webhooks/grafana-alerts",
         token_set=bool(token),
         token_long_enough_for_full_auto=len(token) >= MIN_WEBHOOK_TOKEN_CHARS,
+        source_allowlist=bool(settings.alerts.allowed_sources),
+        body_signature=bool(settings.alerts.webhook_hmac_secret),
         ai_enabled=bool(int(await get_setting_typed("ai.enabled", db))),
         auto_investigate_enabled=bool(
             int(await get_setting_typed("ai.auto_investigate_enabled", db))

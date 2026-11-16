@@ -1378,6 +1378,10 @@ export interface AlertIntakeStatus {
   /** At least 32 characters: below it a webhook alert runs no action and
    *  no full auto. */
   token_long_enough_for_full_auto: boolean
+  /** `[alerts] allowed_sources` is set: only listed addresses may send. */
+  source_allowlist: boolean
+  /** `[alerts] webhook_hmac_secret` is set: a body signature is required. */
+  body_signature: boolean
   ai_enabled: boolean
   auto_investigate_enabled: boolean
   /** Off: the labdog_ai_automate=true label decides; on: the rules. */

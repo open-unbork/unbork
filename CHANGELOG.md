@@ -8,6 +8,14 @@ The format follows [Keep a Changelog]; unbork follows
 
 ## [Unreleased]
 
+### Security
+
+- The alert webhook can be limited to listed source addresses
+  (`[alerts] allowed_sources`) and can require an HMAC signature over the
+  body (`[alerts] webhook_hmac_secret`, as Grafana's webhook contact point
+  signs). Both are off until set, and the Intake card shows whether each
+  is on.
+
 ### Added
 
 - **The audit log records who started and who cancelled every action
