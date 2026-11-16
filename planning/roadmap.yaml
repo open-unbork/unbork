@@ -183,8 +183,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-k49y9e
     spec: items/C-008-audit-rows-for-action-runs-who-started.md
     notes: "The audit log is the base of three Enterprise items and has a hole exactly where the product does its riskiest work."
   - id: C-047
