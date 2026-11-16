@@ -68,7 +68,10 @@ logger = logging.getLogger(__name__)
 #:      body, ``set_visible_groups_resolver`` / :func:`visible_group_ids`,
 #:      :func:`visible_filter`, :func:`param_scope` for ``?host_id=`` style routes, and
 #:      ``GET /api/users/me/permissions`` for one host or group.
-PLUGIN_API = "1.2"
+#: 1.3  ``app.audit``: ``register_audit_subscriber``, ``AuditEntry`` (audit
+#:      entries delivered after commit, at most once; the id is a catch-up
+#:      cursor).
+PLUGIN_API = "1.3"
 
 
 class Role(StrEnum):

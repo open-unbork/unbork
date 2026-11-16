@@ -18,6 +18,10 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Extension hook for the audit log.** Groundwork for Enterprise audit
+  export; a Community install behaves exactly as before. An extension can
+  subscribe to audit entries, which are handed over after they are
+  committed. Plugin API 1.3.
 - **The audit log records who started and who cancelled every action
   run**, whether from the API, a schedule, Run now or an alert: one
   `action_run.started` entry per run, with its `origin`, and

@@ -384,8 +384,9 @@ core's `upgrade head`, in the roles that migrate. Never put extension
 revisions in core's `alembic_version`: once the extension is uninstalled,
 core would meet a revision it cannot locate and refuse to start.
 
-The contract (1.2) is the permission hooks above plus three directory
-sign-in hooks, none of which Community uses itself:
+The contract (`PLUGIN_API`, whose comment lists each version) is the
+permission hooks above, three directory sign-in hooks and the hooks listed
+after them, none of which Community uses itself:
 
 - `app/auth/external.py`: `register_login_provider_source()` puts buttons
   on the login page through the public `GET /api/auth/providers`
@@ -402,6 +403,13 @@ sign-in hooks, none of which Community uses itself:
   like `/api/auth/jwt/login`. Exact paths only.
 - `users.hashed_password` is nullable: NULL is a directory-only account,
   which password login and `PATCH /api/users/me` refuse.
+- `app/audit` (1.3): `register_audit_subscriber(fn)` hands every
+  `log_action` row to `fn` as a frozen `AuditEntry` after its transaction
+  commits, in the API and in workers, and never a row whose transaction or
+  savepoint rolled back. At most once (a crash between commit and delivery
+  loses it; `AuditEntry.id` is the `audit_log` key, a catch-up cursor).
+  Subscribers are synchronous, must only enqueue, and one that raises is
+  logged and skipped. With none registered `log_action` does no extra work.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise
