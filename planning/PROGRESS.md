@@ -85,3 +85,4 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 
 Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in place of `roadmap/stage-1`). Base: `6017631`. Entry criterion met: stage 0 merged 2026-11-16. Dennis said to start ("Start stage 1 when ready", 2026-11-16).
 - 2026-11-16 C-008 done 63d286b. Audit page checked from its code (generic entity label), not on a running stack.
+- 2026-11-16 C-047 done 2f1b702. BUG-147 deleted.

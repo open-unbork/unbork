@@ -197,8 +197,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-k49y9e
     spec: items/C-047-audit-rows-for-firewall-rule-changes-bug.md
     notes: "Accepted proposal PR-01: the same hole as C-008, in the module where the record matters most."
   - id: C-022
