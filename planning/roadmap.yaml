@@ -267,8 +267,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-016-extension-hook-declare-additional-permissions.md
     notes: "Found while writing specs: an extension route cannot ask for a permission of its own, so maintenance-window overrides cannot be expressed."
   - id: C-048
