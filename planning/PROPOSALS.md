@@ -152,6 +152,65 @@ later and are unranked.
   whether the default slot count or the per-sync cost should change.
   Community, M.
 
+## PR-22 Ask the run gate outside the host's advisory lock
+- **Finding (stage 1 review, medium):** `gate_sync_job` runs inside
+  `_claim_or_defer`'s transaction, which holds `pg_advisory_xact_lock`
+  for the host. A gate that calls out (a change-management API) holds the
+  lock for that call: group actions over many hosts and every
+  `release_host_queue` on those hosts wait on it, and the drift sweep
+  skips them for the tick.
+- **Fix:** ask the gate first, then lock and re-check the host, or commit
+  and release the lock around the gate call. Also consider a timeout per
+  gate call in `check_run`. Community, S. Status: open.
+
+## PR-23 Make a long run-gate hold cheap
+- **Finding (stage 1 review, medium):** each held sync or action run goes
+  back through a full Celery task every time it is due (by default every
+  minute). A freeze holding 300 hosts for 8 hours is about 144k task runs
+  and connections, and held action runs queue on `orchestrator` behind
+  long orchestrations. `retry_held` also loads each due row one by one.
+- **Fix:** ask the gate in `retry_held` before sending, and push
+  `gate_retry_at` forward on a repeated deferral, so a still-held row
+  costs no task; load due rows in one query; tell gate authors to return
+  a real `retry_at`. Community, S. Status: open.
+
+## PR-24 A deferred schedule asks the gate every tick
+- **Finding (stage 1 review, low):** `_gate_schedule` ignores
+  `verdict.retry_at`, so a held schedule asks again every 60 s, inside the
+  serial walk over schedules. With many due schedules and a slow gate a
+  tick can outlast its interval.
+- **Fix:** keep the hold on the schedule (or cache it per tick) and skip
+  the gate until it passes. Community, S. Status: open.
+
+## PR-25 An action run is gated once, before it waits for a host
+- **Finding (stage 1 review, medium):** `gate_action_run` asks when the
+  orchestrator picks the run up. A run that then waits behind a busy host
+  is not asked again, so a run allowed at 21:55 can start at 22:30 inside
+  a freeze that began at 22:00. Syncs are asked when the host is free.
+  Documented in `CLAUDE.md` for now.
+- **Fix:** also ask in the per-host claim (`action_host`, `action_group`)
+  when the run had to wait. Needs care with partial group runs (what a
+  refusal means for members already done). Community, M. Status: open.
+
+## PR-26 Bound the firewall rule reorder
+- **Finding (stage 1 review, low):** `reorder_rules` loads one rule per
+  id, and `RuleReorder.rule_ids` has no upper bound; the new audit row
+  carries the whole list. 500 ids is 500 SELECTs and one ~50 KB row.
+- **Fix:** one `id.in_(rule_ids)` query and a `max_length` on the list
+  (an API change, so it needs a number). Community, S. Status: open.
+
+## PR-27 Small tidy-ups from the stage 1 review
+- **Finding (stage 1 review, low):** cross-module imports of underscore
+  helpers (`host_lock._dispatch_pending_*`,
+  `action_orchestrator._resolve_target_host_ids`,
+  `audit.subscribers._deliver_committed`); the same registry boilerplate
+  in `app/run_gate.py` and `app/audit/subscribers.py`; the
+  `_is_trusted_proxy` / `_get_client_ip` aliases kept in `app/main.py`
+  for one test; four copies of the contract-version test.
+- **Fix:** make the shared helpers public, share one small hook-registry
+  helper, point the test at `app.client_ip`, keep one exact
+  `PLUGIN_API` test. Community, S. Status: open.
+
 ## Other work Dennis asked to add
 
 Added 2026-11-14. These are normal items with `source: user`; they get
