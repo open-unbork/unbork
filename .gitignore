@@ -75,3 +75,6 @@ backend/app/ansible/
 # `plans/` is a branch-scoped scratchpad (see CONTRIBUTING.md). It is
 # committed on work branches and deleted before the PR, so it is not
 # ignored here. `planning/` is the staged roadmap and is tracked on `dev`.
+
+# Redis snapshots left by a local redis-server
+dump.rdb
