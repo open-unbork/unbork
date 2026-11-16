@@ -10,6 +10,11 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **The audit log records who started and who cancelled every action
+  run**, whether from the API, a schedule, Run now or an alert: one
+  `action_run.started` entry per run, with its `origin`, and
+  `action_run.cancelled` when it is cancelled. Parameter names are
+  recorded, never their values.
 - **Extension hooks for rights scoped to hosts and groups.** Groundwork
   for Enterprise RBAC; a Community install behaves exactly as before.
   List routes now ask whether a user may view hosts *anywhere* and show

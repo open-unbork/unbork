@@ -185,6 +185,7 @@ async def dispatch_for(db: AsyncSession, event: Any) -> Any | None:
     cannot pick up a run that has not landed.
     """
     from app.actions.registry import ACTION_REGISTRY
+    from app.actions.run_audit import audit_run_started
     from app.actions.run_target import describe_target
     from app.alerts.models import AlertAction, AlertActionDispatch
     from app.audit.logger import log_action
@@ -260,6 +261,7 @@ async def dispatch_for(db: AsyncSession, event: Any) -> Any | None:
     )
     db.add(run)
     await db.flush()
+    await audit_run_started(db, run, origin="alert", user_id=None)
     dispatch = done("started", run_id=run.id)
     await log_action(
         db,

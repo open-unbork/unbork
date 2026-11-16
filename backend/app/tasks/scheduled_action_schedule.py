@@ -261,6 +261,7 @@ async def _held_by_in_flight_run(db, sa, now: datetime) -> bool:  # noqa: ANN001
 async def _dispatch_scheduled_run(db, sa, action, now: datetime) -> None:  # noqa: ANN001
     """Store a ``queued`` run for the schedule, audit it, commit, and send
     it to the orchestrator."""
+    from app.actions.run_audit import audit_run_started
     from app.actions.run_target import describe_target
     from app.audit.logger import log_action
     from app.models.action_run import ActionRun
@@ -291,6 +292,7 @@ async def _dispatch_scheduled_run(db, sa, action, now: datetime) -> None:  # noq
     await db.flush()
     await db.refresh(run)
     run_id = run.id
+    await audit_run_started(db, run, origin="schedule", user_id=sa.owner_user_id)
 
     await log_action(
         db,

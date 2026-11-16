@@ -105,8 +105,16 @@ scheduled), discovery, assistant commands, and terminal sessions.
 Most entries are a plain verb on a typed object — `create`, `update` or
 `delete` of a `host`, a `host_group`, a `package_rule`, a `scan_config` —
 and the rest name a domain event: `sync_triggered` / `sync_completed` /
-`sync_failed`, `scheduled_action.dispatched`, `gitops.import.firewall`,
-`ai_command`, `session_start` / `session_end`, `trust_host_key`.
+`sync_failed`, `scheduled_action.dispatched`, `action_run.started` /
+`action_run.cancelled`, `gitops.import.firewall`, `ai_command`,
+`session_start` / `session_end`, `trust_host_key`.
+
+Every action run has one `action_run.started` entry, written when the run
+is created, whose `origin` says where it came from (`api`, `run_now`,
+`schedule`, `alert` or `assistant`) and whose user is whoever started it
+(a schedule's owner for a scheduled run, nobody for an alert). It records
+the action, the target and the names of the parameters, never their
+values. Cancelling a run writes `action_run.cancelled`.
 
 Sync events come in pairs: `sync_triggered` (at API entry — records the
 operator's intent and the requested `module_filter`) and `sync_completed` or
