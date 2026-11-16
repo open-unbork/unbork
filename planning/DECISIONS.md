@@ -101,7 +101,7 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
-| 2026-11-16 | D-49: Close the CLA name loophole with option (b): a second job in `cla.yml` (both repositories) fails a pull request from a fork while any commit is linked to no GitHub account as author or committer. `Claude` stays in the allowlist for the maintainer's own branches. The CCLA contact address is still open. | Dennis |
+| 2026-11-16 | D-49: Close the CLA name loophole with option (b): a second job in `cla.yml` (both repositories) fails a pull request from a fork while any commit is linked to no GitHub account as author or committer. `Claude` stays in the allowlist for the maintainer's own branches; the job also fails fork commits attributed to an allowlisted account other than the PR author, since a git email is not proof of identity. The CCLA contact address is still open. | Dennis |
 | 2026-11-15 | D-48: For the CLA check (S-011): the private repository `open-unbork/cla-signatures` exists; the token is the organisation secret `PERSONAL_ACCESS_TOKEN`, scoped to `unbork` and `unbork-playbooks`; the suggested allowlist is accepted (Dennis's own login, the Dependabot and GitHub Actions bots, and the Claude app's bot); the CLA texts live in this repository under `legal/cla/v1/`. | Dennis |
 | 2026-11-15 | D-46: The Community hooks S-015 to S-020 and the Enterprise item that follows the rename stay scheduled items, not proposals. | Dennis (decision card) |
 | 2026-11-15 | D-47: The load-test baseline (C-063) is run through a Remote Control session on Dennis's computer, with his own SSH key to lin-manager-2. Cloud sessions cannot reach that network. | Dennis (decision card) |
