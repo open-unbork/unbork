@@ -73,3 +73,10 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 - 2026-11-15 C-025 done. Every job green on ubuntu-26.04 in the stage PR's CI (run 43751734330), frontend-e2e, packaging-smoke and trivy included. C-061's frontend-test job also green there.
 - 2026-11-15 C-063 done 290c7d1. S2 300 default on tester (10.10.10.164) at de69a7b: done rc=0 ooms=0; bulk sync 18 s, 692 in the window, backlog never cleared (PR-21). planning/reviews/baseline-loadtest.md.
 - 2026-11-16 S-011 D-49 (b): LinkedCommits job in cla.yml here and in unbork-playbooks#26; README, CONTRIBUTING, CHANGELOG updated.
+
+## 2026-11-16 Stage 0 merged
+
+- Dennis approved merging (project chat, 2026-11-16). Merged: unbork #301 (`25b5b1a`), unbork-playbooks #26 (`1e478b2`), unbork-enterprise #8 (`cdbf509`, after rotating the test realm's Keycloak secrets). Stage 0 done; S-011 done (texts approved with the merge).
+- S-012: GitHub detects `dev`'s LICENSE as AGPL-3.0 with the copyright line.
+- S-011: the CLA check does not run in this repository yet. GitHub takes `pull_request_target` and `issue_comment` workflows from the default branch, which is `main`, so `cla.yml` on `dev` starts nothing (#304 got no CLA run; the Actions workflow list shows only CI). It works in unbork-playbooks, whose default branch is `main`. It starts here with the next `dev` to `main` release. Step 7 (co-author) and step 8 (fork) move there, or to a playbooks PR.
+- Still open after merge: S-011 step 8, the fork test (needs Dennis's second account); F-03, a Dependabot PR passing CLAAssistant; Dennis marks `CLAAssistant` and `LinkedCommits` required on `dev` (and `main` in playbooks).
