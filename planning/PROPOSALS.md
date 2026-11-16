@@ -211,6 +211,32 @@ later and are unranked.
   helper, point the test at `app.client_ip`, keep one exact
   `PLUGIN_API` test. Community, S. Status: open.
 
+## PR-28 Audit host create, edit and delete
+- **Finding (stage 1 live check):** `POST /api/hosts` (and the host edit
+  and delete routes) write no audit row; only `trust_host_key` does.
+  Groups, users and SSH keys are audited. An audit subscriber therefore
+  never hears about a new host, which is the stage 1 goal ("every change
+  ... leaves an audit row") left short on the most basic object.
+- **Fix:** `log_action` create/update/delete on `host`, with the
+  connection fields in before/after and no secrets. Community, S.
+  Status: open.
+
+## PR-29 Log a successful plugin load in the Celery processes
+- **Finding (stage 1 live check):** core's "plugin ... loaded" line shows
+  only in the API log. In the worker parent and beat, extensions load from
+  Celery's `import_modules` signal, before logging is configured, so the
+  INFO line is dropped (failures, at ERROR, do show).
+- **Fix:** log the loaded plugins again at `worker_ready` / `beat_init`
+  from `loaded_plugins`, or configure logging before the signal. Community,
+  S. Status: open.
+
+## PR-30 Clear pending_reason when a run starts
+- **Finding (stage 1 live check):** a sync or action run that waited
+  (host busy, or held by a gate) keeps its `pending_reason` after it ran
+  and finished, so a finished row still says "test hold".
+- **Fix:** clear it on claim, or show it only while `pending`. Community,
+  S. Status: open.
+
 ## Other work Dennis asked to add
 
 Added 2026-11-14. These are normal items with `source: user`; they get
