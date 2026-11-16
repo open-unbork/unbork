@@ -24,7 +24,10 @@ name: CLA
 # commits the maintainer's coding assistant makes (noreply@anthropic.com,
 # no GitHub account); claude[bot] is the Claude GitHub app. Because an
 # unlinked author name can be set by anyone, the allowlist is a
-# convenience, not an identity check: review who wrote a fork PR's commits.
+# convenience, not an identity check. The LinkedCommits job below closes
+# that gap for pull requests from forks (D-49): there, every commit must be
+# linked to a GitHub account as author or committer, so a name cannot pass
+# for an allowlisted login.
 # A company's CCLA Schedule A logins are added to `allowlist` here and in
 # unbork-playbooks' copy of this file.
 #
@@ -74,3 +77,36 @@ jobs:
           # legal/cla/README.md and ICLA.md, which quote it.
           custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA
           lock-pullrequest-aftermerge: false
+
+  # D-49: CLA Assistant falls back to the git author name when a commit's
+  # emails are linked to no GitHub account, so a fork could commit as an
+  # allowlisted name. On a fork PR, fail when any commit has neither a
+  # linked author nor a linked committer. Same-repository branches are
+  # the maintainer's and skip this. Reads the PR through the API only;
+  # nothing from the PR is checked out or run, and only commit SHAs are
+  # printed (author names are attacker-chosen text).
+  LinkedCommits:
+    runs-on: ubuntu-26.04
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Every commit is linked to a GitHub account
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # The commits API lists at most 250 commits per pull request.
+          unlinked=$(gh api --paginate "repos/$REPO/pulls/$PR/commits" \
+            --jq '.[] | select(.author == null and .committer == null) | .sha[0:12]')
+          if [ -n "$unlinked" ]; then
+            echo "These commits are linked to no GitHub account, so the CLA check cannot tell who wrote them:"
+            echo "$unlinked"
+            echo "Add the commit email to your GitHub account (Settings > Emails), then re-run this check or push again."
+            echo "See legal/cla/README.md."
+            exit 1
+          fi
+          echo "Every commit is linked to a GitHub account."

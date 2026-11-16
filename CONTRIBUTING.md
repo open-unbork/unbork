@@ -154,7 +154,9 @@ once, by commenting on your first pull request:
 - On your first PR the `CLAAssistant` check fails and a bot comments.
   Read the [individual agreement](legal/cla/v1/ICLA.md), then post the
   sentence the bot quotes. The check turns green, and the signature
-  covers later PRs here and in `unbork-playbooks`.
+  covers later PRs here and in `unbork-playbooks`. The email your
+  commits carry must be linked to your GitHub account: on a PR from a
+  fork, the `LinkedCommits` check fails otherwise.
 - The agreement is a licence, not an assignment: you grant the
   maintainer a licence to use your contribution, and the copyright stays
   yours.

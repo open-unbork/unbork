@@ -24,7 +24,7 @@ later and are unranked.
 | PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | open |
 | PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | open |
 | PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
-| PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | open |
+| PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16 (D-49 option b), done in S-011 |
 | PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | open |
 | PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | open |
 

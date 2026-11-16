@@ -18,7 +18,7 @@ before it was triaged.
 
 | ID | Sev | Area | File | Summary | Outcome |
 |---|---|---|---|---|---|
-| F-01 | medium | security | `.github/workflows/cla.yml` (allowlist) | CLA Assistant falls back to the git author *name* when no commit email is linked to an account, so a fork PR committed as `Claude` or `therealscienta` passes unsigned | deferred as PR-19, decision D-49 |
+| F-01 | medium | security | `.github/workflows/cla.yml` (allowlist) | CLA Assistant falls back to the git author *name* when no commit email is linked to an account, so a fork PR committed as `Claude` or `therealscienta` passes unsigned | deferred as PR-19; Dennis chose D-49 (b) on 2026-11-16, fixed by the `LinkedCommits` job |
 | F-02 | medium | correctness | `cla.yml` (signing via `issue_comment`) | The action re-runs the latest `pull_request_target` run filtered by branch name only, so signing can re-run another fork's PR from a same-named branch | README fallback (push a commit) in `69ea4ee`; live check in the S-011 fork test |
 | F-03 | medium | correctness | `cla.yml` (`PERSONAL_ACCESS_TOKEN`) | Dependabot-triggered runs may not see Actions secrets, which would fail the check on every Dependabot PR | not verified: needs a real Dependabot PR after merge (fix if so: add the token as an org Dependabot secret) |
 | F-04 | medium | performance | `backend/pyproject.toml`, `ci.yml` | `concurrency = greenlet` forces coverage's C tracer: 1.8-2.5x the CPU-bound test time | fixed in `b3cafa1` (sysmon core, same totals) |
@@ -100,8 +100,8 @@ misses lines run inside greenlets; sysmon sees them. No test was removed.
 
 ## Verdict
 
-**Pass.** No critical or high finding is open. Open mediums: F-01
-(PR-19, decision D-49) and F-03 (to check live).
+**Pass.** No critical or high finding is open. Open medium: F-03 (to check live). F-01 was
+fixed after the review once Dennis answered D-49.
 
 # Stage 0 report
 

@@ -72,3 +72,4 @@ Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in p
 - 2026-11-15 C-024 check: the stage PR's build-test-image pushed only `:test-d214e8b` (19:30Z). `:test` moved once more at 19:06Z, from the `dev` push that merged #300 with the old workflow, to `sha256:506dff7b33deaeb4a2c870b63d4ba0dbc8b97d0e1c0909b5fc3b620d750dacc0`; the stage PR's run left it there. That digest is the new reference for after merge.
 - 2026-11-15 C-025 done. Every job green on ubuntu-26.04 in the stage PR's CI (run 43751734330), frontend-e2e, packaging-smoke and trivy included. C-061's frontend-test job also green there.
 - 2026-11-15 C-063 done 290c7d1. S2 300 default on tester (10.10.10.164) at de69a7b: done rc=0 ooms=0; bulk sync 18 s, 692 in the window, backlog never cleared (PR-21). planning/reviews/baseline-loadtest.md.
+- 2026-11-16 S-011 D-49 (b): LinkedCommits job in cla.yml here and in unbork-playbooks#26; README, CONTRIBUTING, CHANGELOG updated.

@@ -72,7 +72,8 @@ The format follows [Keep a Changelog]; LabDog follows
   `:test-<short sha>`; follow `:dev-latest` to track `dev`.
 
 - Contributions now require a signed contributor licence agreement,
-  checked on every pull request. See CONTRIBUTING.md.
+  checked on every pull request. On a pull request from a fork, every
+  commit must also be linked to a GitHub account. See CONTRIBUTING.md.
 
 - `LICENSE` now names the copyright holder (Dennis Tyresson and
   contributors). The licence is unchanged.

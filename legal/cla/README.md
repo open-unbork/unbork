@@ -28,7 +28,10 @@ pull request: the check runs again on the new head.
 Commits are matched to GitHub accounts by their email address. Make sure
 the email your commits carry is
 [added to your GitHub account](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-email-preferences/adding-an-email-address-to-your-github-account),
-or the check cannot tell that the commits are yours.
+or the check cannot tell that the commits are yours. On a pull request
+from a fork, a second check, `LinkedCommits`, fails while any commit is
+linked to no GitHub account (as author or committer). Add the email,
+then re-run the check or push again.
 
 **Companies.** Fill in and sign the CCLA, list the GitHub logins of the
 employees it covers in Schedule A, and send it to the maintainer. Those
