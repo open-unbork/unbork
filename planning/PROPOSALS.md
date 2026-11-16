@@ -17,7 +17,7 @@ later and are unranked.
 | PR-05 | Bring CLAUDE.md up to date | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-051 |
 | PR-06 | A unit-test harness for the frontend | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-061 |
 | PR-07 | Measure coverage in CI and record a load-test baseline | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-062, C-063 |
-| PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | open |
+| PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | accepted 2026-11-16 (D-28), folded into C-016 |
 | PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | open |
 | PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | open |
 | PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | open |
