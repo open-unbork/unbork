@@ -7,7 +7,7 @@ stages:
   - stage: 0
     goal: "Foundations: safety nets and contributor terms"
     base_commit: de69a7bb6f0df0a2e157a58f8dfa2ecba4ccb10a
-    status: review
+    status: done
     items: [C-064, S-012, S-011, C-024, C-025, C-062, C-061, C-063]
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
@@ -99,7 +99,7 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-bs6l27
     spec: items/S-011-contributor-licence-agreement-and-a-cla-check.md
     notes: "D-01 fixed the form: Apache-style ICLA and CCLA, CLA Assistant Lite. Dennis creates the private signatures repository and marks the check required."
