@@ -322,3 +322,40 @@ async def test_the_intake_status_reports_both_locks(regular_user_client, monkeyp
     monkeypatch.setattr(settings.alerts, "webhook_hmac_secret", SECRET)
     data = (await regular_user_client.get("/api/alerts/intake")).json()
     assert (data["source_allowlist"], data["body_signature"]) == (True, True)
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (stage 1)
+# ---------------------------------------------------------------------------
+
+
+async def test_an_ipv4_client_on_a_dual_stack_listener_matches_its_range(db, peer, monkeypatch):
+    monkeypatch.setattr(settings.alerts, "allowed_sources", ["10.0.0.0/8"])
+    resp = await _post(peer("::ffff:10.1.2.3"), json.dumps(_payload()).encode())
+    assert resp.status_code != 403
+
+
+async def test_a_non_ascii_signature_is_a_401_not_a_500(db, peer, monkeypatch):
+    monkeypatch.setattr(settings.alerts, "webhook_hmac_secret", SECRET)
+    body = json.dumps(_payload()).encode()
+    resp = await _post(
+        peer("10.1.2.3"), body, {"X-Grafana-Alerting-Signature": ("é" * 64).encode("latin-1")}
+    )
+    assert resp.status_code == 401
+
+
+async def test_a_non_ascii_digit_timestamp_is_a_401_not_a_500(db, peer, monkeypatch):
+    monkeypatch.setattr(settings.alerts, "webhook_hmac_secret", SECRET)
+    monkeypatch.setattr(
+        settings.alerts, "webhook_hmac_timestamp_header", "X-Grafana-Alerting-Timestamp"
+    )
+    body = json.dumps(_payload()).encode()
+    resp = await _post(
+        peer("10.1.2.3"),
+        body,
+        {
+            "X-Grafana-Alerting-Signature": _sign(body),
+            "X-Grafana-Alerting-Timestamp": "²".encode("latin-1"),
+        },
+    )
+    assert resp.status_code == 401

@@ -283,6 +283,9 @@ def _source_allowed(client_ip: str) -> bool:
         address = ipaddress.ip_address(client_ip)
     except ValueError:
         return False
+    # A dual-stack listener sees IPv4 clients as ::ffff:a.b.c.d.
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
     return any(address in ipaddress.ip_network(entry, strict=False) for entry in allowed)
 
 
@@ -298,13 +301,16 @@ def _signature_valid(request: Request, body: bytes) -> bool:
     signed = body
     if cfg.webhook_hmac_timestamp_header:
         stamp = (request.headers.get(cfg.webhook_hmac_timestamp_header) or "").strip()
-        if not stamp.isdigit():
+        if not (stamp.isascii() and stamp.isdigit()):
             return False
         if abs(time.time() - int(stamp)) > cfg.webhook_hmac_max_skew_seconds:
             return False
         signed = stamp.encode() + b":" + body
     expected = hmac.new(cfg.webhook_hmac_secret.encode(), signed, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature.strip().lower())
+    # Bytes, not str: compare_digest refuses a str with non-ASCII in it,
+    # and a header can carry any latin-1 character.
+    given = signature.strip().lower().encode("latin-1", errors="replace")
+    return hmac.compare_digest(expected.encode(), given)
 
 
 @router.post("/grafana-alerts")
