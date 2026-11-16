@@ -134,4 +134,4 @@ See **[BUGS.md](BUGS.md)** for known issues and **[CONTRIBUTING.md](CONTRIBUTING
 
 **AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
 
-Copyright © 2026 Dennis Tyresson and contributors.
+Copyright © 2026 Dennis Tyresson and contributors. Contributions are accepted under a [contributor licence agreement](legal/cla/README.md).

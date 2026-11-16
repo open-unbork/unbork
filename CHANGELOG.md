@@ -69,6 +69,16 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Changed
 
+- CI no longer publishes a floating `:test` image tag. Test images are
+  `:test-<short sha>`; follow `:dev-latest` to track `dev`.
+
+- Contributions now require a signed contributor licence agreement,
+  checked on every pull request. On a pull request from a fork, every
+  commit must also be linked to a GitHub account. See CONTRIBUTING.md.
+
+- `LICENSE` now names the copyright holder (Dennis Tyresson and
+  contributors). The licence is unchanged.
+
 - **New logo and colours.** The dog is replaced by the mark for the
   coming name, unbork: a timeline with a restore point, and a U that
   turns back to it. It is in the rail, on the sign-in page and in the

@@ -54,3 +54,22 @@ Append-only. Newest entry last.
   seven items are parked; their specs are kept. S-003 and C-044 are
   unchanged in stage 4. The plan now has stages 0 to 10 and 25 parked
   items.
+
+## 2026-11-15 Stage 0 run
+
+Work branch: `claude/project-thread-bs6l27` (the session's assigned branch, in place of `roadmap/stage-0`). Base: `de69a7b` plus #300 (CLA secret name), so merging this branch also merges #300.
+
+- 2026-11-15 C-064 done f31b2c0. Open: whether `main` should carry `planning/` (D-32).
+- 2026-11-15 S-012 done 59904e2. GitHub licence detection to check after merge; unbork-playbooks LICENSE left as is (spec assumption).
+- 2026-11-15 S-011 review cf4811a (+ unbork-playbooks#26). Open: steps 7 and 8 (co-author and fork tests) can only run once cla.yml is on dev, since pull_request_target runs the base branch's workflow; the fork test needs Dennis's second account. Dennis marks CLAAssistant required after the first green run.
+- 2026-11-15 C-024 done 59a11e8. To confirm on the stage PR's CI run: one pushed tag, trivy passes, :test digest unchanged; fork-PR skip checked with the S-011 fork test.
+  (C-024: `unbork/unbork:test` digest before the stage PR: `sha256:e57d503a55a1027c5a08a036f3ed20883be6ec876e42009265d0914df912ce2b`.)
+- 2026-11-15 C-025 in_progress cb2761d..a61cfed. Done once every job is green on 26.04 in the stage PR's CI; release-guard and packaging-smoke must pass there before the next release PR.
+- 2026-11-15 C-062 in_progress 04bc864. Done once the stage PR's CI prints the figure and PLAN.md records it.
+- 2026-11-15 C-061 done 87278f6. frontend-test CI job to confirm on the stage PR.
+- 2026-11-15 stage 0 review: pass, 27 findings (0 critical, 0 high, 9 medium, 18 low); 20 fixed, 2 deferred (PR-19, PR-20), 4 rejected, 1 to verify live. planning/reviews/stage-0.md.
+- 2026-11-15 C-062 done 04bc864, b3cafa1. CI on 320a361 prints "Backend coverage: 83% of statements"; recorded in PLAN.md.
+- 2026-11-15 C-024 check: the stage PR's build-test-image pushed only `:test-d214e8b` (19:30Z). `:test` moved once more at 19:06Z, from the `dev` push that merged #300 with the old workflow, to `sha256:506dff7b33deaeb4a2c870b63d4ba0dbc8b97d0e1c0909b5fc3b620d750dacc0`; the stage PR's run left it there. That digest is the new reference for after merge.
+- 2026-11-15 C-025 done. Every job green on ubuntu-26.04 in the stage PR's CI (run 43751734330), frontend-e2e, packaging-smoke and trivy included. C-061's frontend-test job also green there.
+- 2026-11-15 C-063 done 290c7d1. S2 300 default on tester (10.10.10.164) at de69a7b: done rc=0 ooms=0; bulk sync 18 s, 692 in the window, backlog never cleared (PR-21). planning/reviews/baseline-loadtest.md.
+- 2026-11-16 S-011 D-49 (b): LinkedCommits job in cla.yml here and in unbork-playbooks#26; README, CONTRIBUTING, CHANGELOG updated.

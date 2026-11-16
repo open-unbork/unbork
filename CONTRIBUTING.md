@@ -1,7 +1,8 @@
 # Contributing to unbork
 
-Thanks for the interest. unbork is AGPL-3.0-or-later; contributions
-land under the same license (inbound = outbound).
+Thanks for the interest. unbork is AGPL-3.0-or-later. Contributions are
+accepted under a contributor licence agreement (see
+[Licensing & copyright](#licensing--copyright)).
 
 ## Reporting issues
 
@@ -43,6 +44,7 @@ spin up Postgres via testcontainers, so you need Docker available.
 # Backend — runs in ~40s
 cd backend && source .venv/bin/activate
 pytest tests/ -q
+pytest tests/ -q --cov --cov-report=term   # with coverage (slower)
 
 # Backend lint + format (still in backend/, ruff comes from .[dev]).
 # `ruff format --check` is a separate CI gate from `ruff check`, so a
@@ -52,17 +54,21 @@ pytest tests/ -q
 ruff check .
 ruff format --check .   # --diff shows what it would change
 
-# Frontend type-check + lint
+# Frontend type-check + lint + unit tests (Vitest, no stack needed)
 cd frontend
 npx tsc --noEmit
 npm run lint
+npm test
 
 # Frontend E2E (Playwright) — requires the full stack running
 npx playwright test
 ```
 
 CI runs all of the above on every PR; expect it to fail if you skip
-them locally.
+them locally. The `backend-test` job also prints the backend coverage
+total (`Backend coverage: NN% of statements`) in its log and on the
+run's summary page, and uploads `coverage.xml` as the `backend-coverage`
+artifact.
 
 ## Code style
 
@@ -103,6 +109,9 @@ the decision points and what was considered and rejected.
   link the PR on that item. If it fixes a bug listed in
   [`BUGS.md`](BUGS.md), delete the entry and reference the bug ID in
   the commit.
+- CI publishes a test image for PRs from branches in this repository as
+  `unbork/unbork:test-<short sha>`. There is no floating test tag; use
+  `:dev-latest` to follow `dev`.
 
 ### Working with `plans/` — branch-scoped scratchpad
 
@@ -122,20 +131,44 @@ workflow:
    never carry it.
 5. **Merge.** Reviewers read commits, not plan files.
 
+`planning/` is a different directory and is not covered by this rule.
+It holds the staged roadmap (`PLAN.md`, `roadmap.yaml`, `DECISIONS.md`,
+`PROPOSALS.md`, `PROGRESS.md`, `stages/`, `items/`, `reviews/`), is
+committed on `dev` and is updated by the PRs that carry out a stage.
+
 Where work is tracked:
 
 | File | Purpose |
 |---|---|
 | [Roadmap board](https://github.com/orgs/open-unbork/projects/1) | Direction and open tasks, with priority and status. Research and design notes go in each item. |
 | [`BUGS.md`](BUGS.md) | Open bug registry. Open-only — fixed bugs are deleted, with a commit referencing the bug ID. |
+| `planning/` | Staged execution plan: one spec per item, one file per stage, decisions and progress log. Long-lived, kept on `dev`. |
 | `plans/` (work branches) | Private scratchpad for one piece of in-flight work. Created and deleted within a single branch's lifetime. |
 
 ## Licensing & copyright
 
-You retain copyright in your contributions. By submitting a PR you
-agree your contribution is licensed under AGPL-3.0-or-later — same
-as the rest of the project. We don't use a CLA; GitHub's default
-"inbound = outbound" model applies.
+You keep the copyright in your contributions. Pull requests are
+accepted under a contributor licence agreement (CLA), which you sign
+once, by commenting on your first pull request:
+
+- On your first PR the `CLAAssistant` check fails and a bot comments.
+  Read the [individual agreement](legal/cla/v1/ICLA.md), then post the
+  sentence the bot quotes. The check turns green, and the signature
+  covers later PRs here and in `unbork-playbooks`. The email your
+  commits carry must be linked to your GitHub account: on a PR from a
+  fork, the `LinkedCommits` check fails otherwise.
+- The agreement is a licence, not an assignment: you grant the
+  maintainer a licence to use your contribution, and the copyright stays
+  yours.
+- The maintainer promises that your contribution stays available under
+  AGPL-3.0-or-later (or another OSI-approved licence).
+- The agreement also lets the maintainer license the project under
+  other terms as well as the AGPL.
+- A company that owns its employees' work signs the
+  [corporate agreement](legal/cla/v1/CCLA.md) instead.
+
+See [`legal/cla/`](legal/cla/README.md) for both texts, how to sign, and
+what is recorded when you do.
 
 Per-file AGPL headers are **not** required. The repository-level
 [LICENSE](LICENSE) covers the whole tree. Don't add headers to new
@@ -221,9 +254,9 @@ the human-owned steps it cannot verify:
 - [ ] Roadmap board: items shipped this cycle set to Done, with the PR linked.
 - [ ] `BUGS.md`: bugs fixed this cycle deleted, fixing commit
   references the bug ID.
-- [ ] `plans/` is absent (never ships on `dev` or `main`).
+- [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
-  `frontend-build-check`, `docs-build-check`, `build-test-image`,
+  `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`,
   trivy.
 
 Note: `main` is protected and the `version-check` context is a

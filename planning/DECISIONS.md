@@ -19,6 +19,12 @@ Item: S-011, its fork test only (near the end of the item). A second
 GitHub account that is not on the allowlist, to prove the check on a pull
 request from a fork. Everything else is settled: see D-48 in the log.
 
+### D-49 How to close the CLA allowlist's name loophole (contact address still open)
+Item: S-011. The CCLA README tells a company to send the CCLA "to the
+maintainer" and has no address. Which contact address should it give
+(the same question as D-31's source-offer address)? The loophole half was
+answered 2026-11-16 (see the Log).
+
 ### D-26 A destructive run on a host that cannot be snapshotted
 Item: C-005. Today it proceeds with a log line. Assumed: refuse by
 default, with a setting to get the old behaviour back. This will stop
@@ -95,6 +101,7 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-16 | D-49: Close the CLA name loophole with option (b): a second job in `cla.yml` (both repositories) fails a pull request from a fork while any commit is linked to no GitHub account as author or committer. `Claude` stays in the allowlist for the maintainer's own branches; the job also fails fork commits attributed to an allowlisted account other than the PR author, since a git email is not proof of identity. The CCLA contact address is still open. | Dennis |
 | 2026-11-15 | D-48: For the CLA check (S-011): the private repository `open-unbork/cla-signatures` exists; the token is the organisation secret `PERSONAL_ACCESS_TOKEN`, scoped to `unbork` and `unbork-playbooks`; the suggested allowlist is accepted (Dennis's own login, the Dependabot and GitHub Actions bots, and the Claude app's bot); the CLA texts live in this repository under `legal/cla/v1/`. | Dennis |
 | 2026-11-15 | D-46: The Community hooks S-015 to S-020 and the Enterprise item that follows the rename stay scheduled items, not proposals. | Dennis (decision card) |
 | 2026-11-15 | D-47: The load-test baseline (C-063) is run through a Remote Control session on Dennis's computer, with his own SSH key to lin-manager-2. Cloud sessions cannot reach that network. | Dennis (decision card) |

@@ -14,7 +14,7 @@ unbork is a centralized Linux configuration management tool with a FastAPI backe
 | Task Queue | Celery + Redis (RedBeat scheduler) |
 | Config Mgmt | Ansible (ansible-runner) |
 | SSH | asyncssh (terminal + host connections) |
-| Testing | pytest + testcontainers (backend), Playwright (frontend E2E) |
+| Testing | pytest + testcontainers (backend), Vitest (frontend unit), Playwright (frontend E2E) |
 
 ## Development Setup
 
@@ -39,6 +39,7 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v                                # everything, integration included
 pytest tests/ -v -m "not integration"           # skip the git round-trip tests
+pytest tests/ -q --cov --cov-report=term        # with coverage (as CI measures it)
 ```
 
 Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`LABDOG_SECURITY__SECRET_KEY`, `LABDOG_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
@@ -46,6 +47,16 @@ Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `py
 **Test session architecture**: Each test gets a database session wrapped in a savepoint that rolls back after the test. The `get_db` dependency is overridden to return this test session. Any `session.commit()` in application code translates to savepoint release/create (not actual commit) via `join_transaction_mode="create_savepoint"`.
 
 **Important**: The `auth_setup.py` register endpoint uses `AsyncSessionLocal()` directly (not `get_db`) for its user count check. This is intentional — it avoids asyncpg "another operation in progress" errors when sharing a session with `user_manager.create()`. Tests that need to test registration must mock `AsyncSessionLocal` in `app.api.auth_setup`.
+
+### Frontend unit
+```bash
+cd frontend
+npm test                     # Vitest, no stack needed
+npm run test:watch           # re-run on change
+```
+
+Unit tests are `*.test.ts(x)` next to the code under `lib/`,
+`components/` and `hooks/`; see `frontend/FRONTEND.md`, "Unit tests".
 
 ### Frontend E2E
 ```bash
@@ -441,10 +452,13 @@ scratchpad:
 4. **Delete `plans/` before opening the PR.** `dev` and `main` must
    never carry it.
 
+This rule is about `plans/` only; `planning/` (next section) stays on `dev`.
+
 Where work is tracked: the [roadmap board](https://github.com/orgs/open-unbork/projects/1)
 (direction and open tasks; research and design notes go in each item),
-[`BUGS.md`](BUGS.md) (open bug registry, open-only), `plans/` (private
-in-flight scratchpad on work branches). See
+[`BUGS.md`](BUGS.md) (open bug registry, open-only), `planning/` (the
+staged roadmap, kept on `dev`), `plans/` (private in-flight scratchpad on
+work branches). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full workflow.
 
 ## Staged roadmap (`planning/`)
@@ -476,11 +490,16 @@ and are started by a person, never automatically. Decisions go in
 ## CI/CD
 
 GitHub Actions pipeline (`.github/workflows/ci.yml`):
-- **lint + test + scan**: ruff, bandit, ESLint, pytest,
-  frontend build check, docs build check, gitleaks, pip-audit, npm
-  audit — runs on PRs to `dev` and `workflow_dispatch`
-- **build-test-image**: pushes a `:test-<sha>` Docker image and feeds
-  trivy — runs on PRs to `dev` and `workflow_dispatch`
+- **lint + test + scan**: ruff, bandit, ESLint, pytest (prints the
+  backend coverage total and uploads `coverage.xml`), Vitest
+  (`frontend-test`), frontend build check, docs build check, gitleaks,
+  pip-audit, npm audit — runs on PRs to `dev` and `workflow_dispatch`
+- **build-test-image**: pushes a `:test-<sha>` Docker image (there is no
+  floating `:test`; `:dev-latest` follows `dev`) and feeds trivy — runs
+  on same-repository PRs to `dev`, pushes to `dev` and
+  `workflow_dispatch`
+- **CLA** (`.github/workflows/cla.yml`): the `CLAAssistant` check on
+  every PR; see `legal/cla/`
 - **build-image**: publishes `:latest` and `:<sha>` to Docker Hub —
   runs on push to `main` (PR-from-dev merges only; direct pushes are
   blocked by branch protection)

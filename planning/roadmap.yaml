@@ -6,8 +6,8 @@
 stages:
   - stage: 0
     goal: "Foundations: safety nets and contributor terms"
-    base_commit: null
-    status: todo
+    base_commit: de69a7bb6f0df0a2e157a58f8dfa2ecba4ccb10a
+    status: review
     items: [C-064, S-012, S-011, C-024, C-025, C-062, C-061, C-063]
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
@@ -71,8 +71,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-064-make-planning-a-named-exception-to-the.md
     notes: "D-17: without it the release checklist and the image build treat the plan as a mistake."
   - id: S-012
@@ -85,8 +85,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/S-012-copyright-holder-line-in-license.md
     notes: "D-07: Dennis personally. One line."
   - id: S-011
@@ -99,8 +99,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-bs6l27
     spec: items/S-011-contributor-licence-agreement-and-a-cla-check.md
     notes: "D-01 fixed the form: Apache-style ICLA and CCLA, CLA Assistant Lite. Dennis creates the private signatures repository and marks the check required."
   - id: C-024
@@ -113,8 +113,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-024-ci-stop-every-pr-moving-the-floating.md
     notes: "Stage branches will open many PRs; a moving tag makes test deploys unreliable."
   - id: C-025
@@ -127,8 +127,8 @@ items:
     depends_on: []
     autonomy: A
     effort: M
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-025-ci-ubuntu-26-04-runners-and-the.md
     notes: "Toolchain drift is cheapest to fix before a run of feature stages."
   - id: C-062
@@ -141,8 +141,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-062-measure-backend-coverage-in-ci.md
     notes: "Accepted proposal PR-07: gives every stage review a number to compare."
   - id: C-061
@@ -155,8 +155,8 @@ items:
     depends_on: []
     autonomy: A
     effort: M
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-061-a-unit-test-harness-for-the-frontend.md
     notes: "Accepted proposal PR-06: stage reviews cannot reproduce a frontend bug with a failing test without one."
   - id: C-063
@@ -169,8 +169,8 @@ items:
     depends_on: []
     autonomy: A
     effort: M
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-bs6l27
     spec: items/C-063-record-a-load-test-baseline.md
     notes: "Accepted proposal PR-07: the only performance measure the project has."
   - id: C-008

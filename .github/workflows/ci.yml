@@ -56,7 +56,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       && github.base_ref == 'main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,7 +99,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -122,7 +122,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -142,7 +142,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -157,8 +157,29 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
-
   # ---- TEST -------------------------------------------------------------
+
+  frontend-test:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci --prefer-offline
+      - name: npm test (Vitest unit tests)
+        working-directory: frontend
+        run: npm test
 
   backend-test:
     if: >-
@@ -167,7 +188,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -222,7 +243,31 @@ jobs:
           uv pip install --system --no-deps .
       - name: pytest
         working-directory: backend
-        run: python -m pytest tests/ -v
+        # sysmon (PEP 669) watches the whole interpreter, so lines run inside
+        # SQLAlchemy's greenlets are counted without concurrency=greenlet,
+        # which would force the much slower C tracer. Same totals, measured.
+        env:
+          COVERAGE_CORE: sysmon
+        run: python -m pytest tests/ -v --cov --cov-report=term:skip-covered --cov-report=xml:coverage.xml
+      # Printed on every PR (also from forks: it needs no permissions) so
+      # each stage review has a figure to compare. No fail_under: this is
+      # a measurement, not a gate.
+      - name: Coverage summary
+        if: always()
+        working-directory: backend
+        run: |
+          if [ -f .coverage ]; then
+            total=$(python -m coverage report --format=total)
+            echo "Backend coverage: ${total}% of statements" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Backend coverage: not measured (pytest did not run)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 14
 
   frontend-build-check:
     if: >-
@@ -231,7 +276,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -267,7 +312,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -380,7 +425,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -402,7 +447,7 @@ jobs:
   #                   (tag-release-image, after the release job, adds
   #                   :X.Y.Z, :X.Y and :X to that same image)
   # build-dev-image — push to dev           → :dev-latest + :dev-<short_sha>
-  # build-test-image — PRs (unless labelled no-test-image) + workflow_dispatch (non-main) → :test + :test-<short_sha>
+  # build-test-image — same-repository PRs (unless labelled no-test-image) + push to dev + workflow_dispatch (non-main) → :test-<short_sha>
   # All three log into Docker Hub using DOCKER_HUB_PAT.
   # The username is extracted from the first segment of DOCKER_HUB_REPO.
 
@@ -410,7 +455,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive Docker Hub username from DOCKER_HUB_REPO
@@ -443,19 +488,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # A PR labelled `no-test-image` builds no image. :test floats, and an
-  # install that follows it would pick up a work-in-progress branch (a
-  # plan, an experiment) at its next pull. Add the label *before* pushing;
-  # the lint and test jobs still run.
+  # Test images are published as :test-<short sha> only; there is no
+  # floating :test tag (an install following one picked up whatever PR
+  # built last). Follow :dev-latest to track dev. A PR labelled
+  # `no-test-image` builds no image, which only saves a build: add the
+  # label before pushing; the lint and test jobs still run. PRs from forks
+  # build no image either, because DOCKER_HUB_PAT is not available to them.
   build-test-image:
     if: >-
       (github.event_name == 'pull_request'
+       && github.event.pull_request.head.repo.full_name == github.repository
        && !contains(github.event.pull_request.labels.*.name, 'no-test-image')) ||
       (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     outputs:
       image_ref: ${{ steps.meta.outputs.image_ref }}
@@ -486,7 +534,6 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ vars.DOCKER_HUB_REPO }}:test
             ${{ vars.DOCKER_HUB_REPO }}:test-${{ steps.meta.outputs.short_sha }}
           build-args: |
             GIT_SHA=${{ github.sha }}
@@ -498,7 +545,7 @@ jobs:
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -539,7 +586,7 @@ jobs:
     # follows immediately after. A manual dispatch on dev also publishes,
     # so the docs can be fixed between releases (e.g. after the repo
     # rename moved the Pages address). The next push to main overwrites it.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: >-
       ((github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main')
@@ -575,7 +622,7 @@ jobs:
       && github.ref == 'refs/heads/main')
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
     needs: [pages-build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       pages: write
       id-token: write
@@ -597,7 +644,7 @@ jobs:
   # a hard gate: `release-artifacts` needs it, so a broken install path
   # blocks the release. See packaging/tests/ for the harness and assertions.
   packaging-smoke:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -706,7 +753,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
@@ -800,7 +847,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write # push the auto-tag and create the release
       id-token: write # sign the provenance attestation
@@ -947,7 +994,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1021,7 +1068,7 @@ jobs:
       always() &&
       needs.build-test-image.result == 'success'
     needs: [build-test-image]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       # Check out so the scanner can read .trivyignore. Without this the
       # ignore file is absent from the runner workspace and silently has no
@@ -1051,7 +1098,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1079,7 +1126,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -1115,7 +1162,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

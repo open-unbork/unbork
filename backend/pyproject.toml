@@ -99,6 +99,14 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = ["integration: marks tests as integration tests (deselect with '-m not integration')"]
 
+[tool.coverage.run]
+source = ["app"]
+concurrency = ["thread"]
+omit = ["app/_build_info.py"]
+
+[tool.coverage.report]
+skip_empty = true
+
 [tool.setuptools]
 packages = ["app"]
 

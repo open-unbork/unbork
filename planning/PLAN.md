@@ -91,7 +91,7 @@ alert remediation, verify), `auth/` (roles, permissions, plugin contract),
 | Check | Command (from the directory shown) | Baseline 2026-11-14 |
 |---|---|---|
 | Backend tests | `backend/`: `pytest tests/ -q` (Postgres through testcontainers, or `DATABASE_URL=postgresql+asyncpg://...` as in CI) | 4,721 passed, 2 failed, 5 skipped in 8 min 14 s with coverage on (CONTRIBUTING.md quotes about 40 s for an older suite). Both failures are the environment: see notes |
-| Backend coverage | `backend/`: `pytest tests/ -q --cov=app --cov-report=term` | 76% of statements (30,478 statements, 7,301 missed) |
+| Backend coverage | `backend/`: `pytest tests/ -q --cov=app --cov-report=term` | 76% of statements (30,478 statements, 7,301 missed). CI from stage 0 (C-062): **83%** of 30,486 statements on `320a361`, 2026-11-15 (the `backend-test` job prints it on every PR; the rise is mostly sysmon seeing greenlet lines the default tracer missed) |
 | Backend lint | `backend/`: `ruff check .` and `ruff format --check .` | 0 findings; 715 files formatted |
 | Backend SAST | `backend/`: `bandit -q -r app -b bandit-baseline.json` | no new findings against the baseline |
 | Frontend types | `frontend/`: `npx tsc --noEmit` | clean |
@@ -115,7 +115,8 @@ Notes:
 - CI is one workflow, `.github/workflows/ci.yml`: lint, bandit, pytest,
   frontend build, docs build, gitleaks, pip-audit, npm audit, trivy on PRs
   to `dev`; image, packages, tag and docs site on push to `main`.
-  Coverage is not measured in CI.
+  Coverage is measured in CI since stage 0 (C-062): `backend-test`
+  prints "Backend coverage: NN% of statements".
 - Release: bump `VERSION` and `CHANGELOG.md` on `dev`, open a
   `dev` to `main` PR with the `release.md` template, merge. See
   CONTRIBUTING.md, "Release process".
@@ -127,8 +128,11 @@ Notes:
   hosts, scenarios S1 to S5, `measure_live.sql`), whose last results are
   in PR #270. It needs Docker, so it was not run here; under the project's
   testing rules it belongs on local Docker on lin-manager-2. Stage 0
-  should record one `./run_one.sh S2 300 default` run as the number later
-  stages compare against (see proposal PR-07).
+  recorded one `./run_one.sh S2 300 default` run as the number later
+  stages compare against: [reviews/baseline-loadtest.md](reviews/baseline-loadtest.md)
+  (2026-11-15, `de69a7b`, on `tester`: bulk sync 18 s average, 692 in the
+  hour, median wait 18 min, backlog never cleared; unbork 1.3 GB, 12
+  Postgres connections).
   Hot paths to watch: the per-host sync orchestrator
   (`app/tasks/host_sync_orchestrator.py`), the host lock claim
   (`app/tasks/host_lock.py`), drift sweeps (`app/tasks/drift_sweep.py`),

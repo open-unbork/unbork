@@ -23,5 +23,6 @@ frontend/out
 **/__pycache__
 **/*.pyc
 
-# Plans, local-only state
+# Plans (branch scratch) and the staged roadmap: never part of an image
 plans/
+planning/
