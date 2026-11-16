@@ -66,6 +66,13 @@ def _app():
     return celery_app
 
 
+def _forget_default_modules(app) -> None:
+    """The loader caches the modules it imports (``default_modules`` is a
+    cached property, read just after ``import_modules`` is sent); drop the
+    cache so a changed ``include`` is what gets imported."""
+    app.loader.__dict__.pop("default_modules", None)
+
+
 def _refresh_routes(app) -> None:
     """Make a route change take effect. ``flush_routes`` rebuilds the route
     table, but the router built from the old one is cached on ``amqp``."""
@@ -98,6 +105,7 @@ def register_task_module(module: str, *, queue: str = "default") -> None:
     if module not in include:
         include.append(module)
         app.conf.include = include
+        _forget_default_modules(app)
     routes = app.conf.task_routes
     routes[f"{module}.*"] = {"queue": queue}
     _refresh_routes(app)
@@ -138,6 +146,7 @@ def reset_extension_tasks() -> None:
     app = _app()
     if _task_modules:
         app.conf.include = [m for m in app.conf.include if m not in _task_modules]
+        _forget_default_modules(app)
         routes = app.conf.task_routes
         for module in _task_modules:
             routes.pop(f"{module}.*", None)

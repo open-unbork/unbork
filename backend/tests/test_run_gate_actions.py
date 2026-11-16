@@ -221,3 +221,71 @@ async def test_a_held_run_survives_the_action_sweeper(db, gate):
     run = await _fresh(db, run_id)
     assert run.status == "pending"
     assert run.gate_retry_at is not None
+
+
+@pytest.mark.parametrize("verdict", [refuse("no"), defer("later")])
+async def test_a_gated_run_hands_its_host_to_the_next_op(db, gate, verdict):
+    """The host queue may have sent this run as the host's next op; if the
+    gate stops it, the op behind it must still be started."""
+    from app.models.sync_job import SyncJob
+    from app.tasks.action_orchestrator import _run_action_async
+
+    host_id = (await create_host(db)).id
+    run_id = await _run(db, host_id=host_id)
+    job = SyncJob(host_id=host_id, status="pending", module_type="firewall")
+    db.add(job)
+    await db.flush()
+    await db.commit()
+    job_id = job.id
+    gate.verdict = verdict
+
+    sent: list[int] = []
+    rec = MagicMock(side_effect=lambda **kw: sent.append(kw["job_id"]))
+    with patch("app.tasks.host_sync_orchestrator.run_host_sync.delay", new=rec):
+        await _run_action_async(run_id)
+
+    assert sent == [job_id]
+
+
+async def test_a_refused_run_is_audited(db, gate):
+    from app.models.audit_log import AuditLog
+    from app.tasks.action_orchestrator import _run_action_async
+
+    host_id = (await create_host(db)).id
+    run_id = await _run(db, host_id=host_id)
+    gate.verdict = refuse("change freeze")
+    await _run_action_async(run_id)
+
+    rows = (
+        (
+            await db.execute(
+                select(AuditLog).where(
+                    AuditLog.action == "action_run.gate_refused", AuditLog.entity_id == run_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [r.after_state["reason"] for r in rows] == ["change freeze"]
+
+
+async def test_a_cancel_that_got_there_first_wins(db, gate):
+    """The gate is asked without a row lock; its verdict is written only
+    if the run is still queued."""
+    from app.tasks.run_gate_points import gate_action_run
+
+    host_id = (await create_host(db)).id
+    run_id = await _run(db, host_id=host_id)
+
+    async def cancelling_gate(db_, request):
+        await db_.execute(
+            update(ActionRun).where(ActionRun.id == run_id).values(status="cancelled")
+        )
+        await db_.commit()  # stands in for the cancel's own transaction
+        return refuse("no")
+
+    reset_run_gate()
+    register_run_gate(cancelling_gate)
+    assert await gate_action_run(run_id) is False
+    assert (await _fresh(db, run_id)).status == "cancelled"

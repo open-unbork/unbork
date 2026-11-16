@@ -135,7 +135,9 @@ async def gate_mutation(
     change the assistant may make. Returns ``decision`` itself unless the
     gate says otherwise.
 
-    Asked only when :func:`decide` allowed a ``mutating`` call. A refusal
+    Asked only when :func:`decide` allowed a ``mutating`` call; a call
+    parked for a person's approval is asked when it is approved and about
+    to run (``app.ai.approvals.execute_approved``). A refusal
     becomes a refused call carrying the gate's reason. A deferral parks a
     full-auto session for a human, as an approval would, and is a plain
     refusal at any other level (an approval session already asked one).

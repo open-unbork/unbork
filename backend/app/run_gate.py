@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
 from sqlalchemy import event, inspect
@@ -54,6 +54,9 @@ Outcome = Literal["allow", "refuse", "defer"]
 
 #: How long a deferred sync or action run is held when the gate names no time.
 DEFAULT_HOLD_SECONDS = 60
+#: The shortest hold, whatever ``retry_at`` the gate gives: a hold that has
+#: already passed would make the row a queue candidate again at once.
+MIN_HOLD_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -190,13 +193,17 @@ async def check_run(db: AsyncSession, request: RunRequest) -> Verdict:
 
 
 def hold_until(verdict: Verdict) -> datetime:
-    """When a deferred sync or action run is sent again."""
-    from datetime import UTC, timedelta
-
-    if verdict.retry_at is not None:
-        retry_at = verdict.retry_at
-        return retry_at if retry_at.tzinfo else retry_at.replace(tzinfo=UTC)
-    return datetime.now(UTC) + timedelta(seconds=DEFAULT_HOLD_SECONDS)
+    """When a deferred sync or action run is sent again: the gate's
+    ``retry_at`` (naive means UTC), else a minute from now, and never
+    sooner than ``MIN_HOLD_SECONDS`` from now."""
+    now = datetime.now(UTC)
+    floor = now + timedelta(seconds=MIN_HOLD_SECONDS)
+    if verdict.retry_at is None:
+        return now + timedelta(seconds=DEFAULT_HOLD_SECONDS)
+    retry_at = verdict.retry_at
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=UTC)
+    return max(retry_at, floor)
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +257,7 @@ def _changed_to_terminal(obj: Any, terminal: frozenset[str], is_new: bool) -> bo
     return current not in before
 
 
-def _sync_event(obj: Any) -> Any:
+def _sync_event(obj: Any) -> Callable[[], RunEnded | None]:
     def build() -> RunEnded | None:
         state = inspect(obj)
         loaded = state.dict
@@ -271,7 +278,7 @@ def _sync_event(obj: Any) -> Any:
     return build
 
 
-def _action_event(obj: Any) -> Any:
+def _action_event(obj: Any) -> Callable[[], RunEnded | None]:
     def build() -> RunEnded | None:
         state = inspect(obj)
         loaded = state.dict

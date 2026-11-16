@@ -116,6 +116,31 @@ async def test_a_refusal_fails_the_job_and_starts_the_next(db, gate, sent):
     assert job.completed_at is not None
     assert sent == [next_id]
 
+    from app.models.audit_log import AuditLog
+
+    (row,) = (
+        (await db.execute(select(AuditLog).where(AuditLog.action == "sync_job.gate_refused")))
+        .scalars()
+        .all()
+    )
+    assert row.entity_id == job_id
+    assert row.after_state["reason"] == "change freeze"
+
+
+async def test_a_gate_that_says_retry_now_still_holds_the_job(db, gate, sent):
+    """Two deferred jobs on one host must not hand the host to each other
+    in a loop: a hold is at least MIN_HOLD_SECONDS by the database clock."""
+    host_id = (await create_host(db)).id
+    first = await _job(db, host_id, module_type="firewall")
+    second = await _job(db, host_id, module_type="service")
+    gate.verdict = defer("not now", datetime.now(UTC) - timedelta(minutes=5))
+
+    assert await _claim(db, first, host_id) is False
+    assert sent == [second]
+    assert await _claim(db, second, host_id) is False
+    # The first is still held, so the host went to nothing.
+    assert sent == [second]
+
 
 async def test_a_deferral_holds_the_job_without_blocking_the_host(db, gate, sent):
     host_id = (await create_host(db)).id

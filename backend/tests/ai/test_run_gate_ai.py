@@ -169,3 +169,50 @@ async def test_the_loop_parks_a_held_full_auto_change(db, ai_provider, make_sess
         .all()
     )
     assert len(approvals) == 1
+
+
+async def test_an_approved_call_is_asked_when_it_runs(db, make_session, gate):
+    """A person's approval does not lift a freeze: the parked call is put
+    to the gate when it is about to run, and a hold is a refusal there."""
+    from app.ai import approvals
+    from tests.ai.test_approvals import _host, _parked_session, _ssh_runs
+
+    host = await _host(db)
+    session, approval = await _parked_session(db, make_session, host)
+    approval.status = "approved"
+    ran: list = []
+
+    async def fake_run(ctx, args):  # pragma: no cover - must not run
+        ran.append(args)
+
+    gate.verdict = defer("change freeze")
+    with _ssh_runs(fake_run):
+        result = await approvals.execute_approved(db, session, approval)
+
+    assert ran == []
+    assert result.ok is False
+    assert result.content.startswith("Refused: change freeze.")
+    (request,) = gate.asked
+    assert (request.kind, request.ai_session_id) == ("ai_fix", session.id)
+    record = (
+        await db.execute(select(AIToolCall).where(AIToolCall.approval_id == approval.id))
+    ).scalar_one()
+    assert record.status == "blocked"
+
+
+async def test_an_approved_call_runs_when_the_gate_allows(db, make_session, gate):
+    from app.ai import approvals
+    from app.ai.tools import ToolResult
+    from tests.ai.test_approvals import _host, _parked_session, _ssh_runs
+
+    host = await _host(db)
+    session, approval = await _parked_session(db, make_session, host)
+    approval.status = "approved"
+
+    async def fake_run(ctx, args):
+        return ToolResult("exit status: 0", ok=True, target_host_id=args["host_id"])
+
+    with _ssh_runs(fake_run):
+        result = await approvals.execute_approved(db, session, approval)
+    assert result.ok is True
+    assert len(gate.asked) == 1
