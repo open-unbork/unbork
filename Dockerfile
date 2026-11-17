@@ -15,8 +15,20 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci --silent
 COPY frontend/ .
+# The npm packages the pages ship, with their licences, for the notices
+# file the final stage writes (S-010). Read from node_modules, so it lists
+# exactly what this build installed.
+RUN node scripts/licences.mjs > /tmp/frontend-licences.json
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# WITH_ASSISTANT=0 builds an image without the AI assistant (C-026): its
+# two pages are not built, the Agent SDK is not installed, and the server
+# runs with [assistant] enabled = false. Nothing else imports from these
+# directories.
+ARG WITH_ASSISTANT=1
+RUN if [ "$WITH_ASSISTANT" = "0" ]; then \
+        rm -rf "app/(dashboard)/assistant" "app/(dashboard)/ai-providers"; \
+    fi \
+    && npm run build
 # Output: /app/out/
 
 # ── Stage 2: Build Python backend + install deps ──────────────────────
@@ -31,12 +43,18 @@ COPY VERSION .
 #
 # --extra agent pulls the Claude Agent SDK, which is what drives an
 # agentic session against a Claude *subscription* rather than metered API
-# credit. It is optional in pyproject because its wheel is
-# platform-specific and carries a ~130 MB Claude Code binary that has no
-# business in the .deb/.rpm artefacts — but the container image is
-# exactly where it belongs.
-RUN uv export --frozen --no-emit-project --extra agent --format requirements-txt -o /tmp/req.txt \
-    && uv pip install --no-cache-dir --system -r /tmp/req.txt
+# credit. Its Python code stays in the image (MIT). The Claude Code program
+# its wheel carries does not: it is deleted here, before any layer of the
+# final image can hold it, and downloaded on first use instead (S-009,
+# app/ai/claude_code.py). The pin that download is checked against is
+# written from uv.lock by scripts/claude_code_pin.py.
+COPY backend/scripts/claude_code_pin.py /tmp/claude_code_pin.py
+ARG WITH_ASSISTANT=1
+RUN extra="--extra agent"; [ "$WITH_ASSISTANT" = "0" ] && extra=""; \
+    uv export --frozen --no-emit-project $extra --format requirements-txt -o /tmp/req.txt \
+    && uv pip install --no-cache-dir --system -r /tmp/req.txt \
+    && rm -rf /usr/local/lib/python3.12/site-packages/claude_agent_sdk/_bundled \
+    && python /tmp/claude_code_pin.py --lock uv.lock --out /tmp/claude_code_pin.json
 
 # ── Stage 3: Runtime ──────────────────────────────────────────────────
 FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
@@ -69,9 +87,9 @@ RUN echo "apt security refresh @ ${BUILD_DATE}" \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -u 1000 labdog \
-    && mkdir -p /var/lib/labdog/packs /var/lib/labdog/claude-cli \
-    && chown -R labdog:labdog /var/lib/labdog
+RUN useradd -m -u 1000 unbork \
+    && mkdir -p /var/lib/unbork/packs /var/lib/unbork/claude-cli /var/lib/unbork/claude-code \
+    && chown -R unbork:unbork /var/lib/unbork
 
 # Python packages from builder
 COPY --from=backend-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
@@ -82,58 +100,62 @@ COPY --from=backend-builder /usr/local/bin /usr/local/bin
 # .trivyignore for a binary that's never actually invoked at runtime.
 RUN rm -f /usr/local/bin/uv /usr/local/bin/uvx
 
-# Claude Code CLI for the `claude_cli` AI provider.
-#
-# The image used to fetch this separately from Anthropic's apt repo. It no
-# longer does: the Claude Agent SDK installed above ships its own copy at
-# a version it was built against and pins in _cli_version.py, and the SDK
-# prefers that bundled binary over anything on PATH. Fetching a second one
-# would put two ~130 MB binaries in the image and reintroduce exactly the
-# drift the SDK removes — the apt copy floats while the SDK's is pinned,
-# so the two backends could end up on different Claude Code versions.
-#
-# A symlink lets the single-shot `claude_cli` provider keep resolving
-# `claude` from PATH with no code change, while both backends stay on one
-# binary that uv.lock pins transitively.
-#
-# unbork points the CLI at /var/lib/labdog/claude-cli via
-# CLAUDE_CONFIG_DIR rather than letting it use $HOME, so a stored login
-# can never shadow the token configured in the UI — see
-# app/ai/providers/claude_cli.py and app/ai/agent_sdk/environment.py.
-#
-# Placed *after* the backend-builder COPY, which lands its whole
-# /usr/local/bin here: COPY merges rather than replaces, so creating this
-# earlier would survive only for as long as that stage never ships a file
-# by this name.
-RUN set -eu; \
-    bundled="$(python -c 'import claude_agent_sdk,pathlib,sys; sys.stdout.write(str(pathlib.Path(claude_agent_sdk.__file__).parent/"_bundled"/"claude"))')"; \
-    test -x "$bundled" || { echo "Agent SDK shipped no bundled claude at $bundled" >&2; exit 1; }; \
-    ln -sf "$bundled" /usr/local/bin/claude; \
-    /usr/local/bin/claude --version
+# No Claude Code program in the image: a worker downloads the pinned build
+# into /var/lib/unbork/claude-code the first time a provider needs it
+# (S-009). CI fails the build if a `claude` binary reaches this image.
 
 # Backend source (app + alembic). Action packs are not part of the image:
-# they are synced from git at runtime (the seeded labdog-playbooks pack).
-COPY --chown=labdog:labdog backend/app/ app/
-COPY --chown=labdog:labdog backend/alembic/ alembic/
-COPY --chown=labdog:labdog backend/alembic.ini alembic.ini
+# they are synced from git at runtime (the seeded unbork-playbooks pack).
+COPY --chown=unbork:unbork backend/app/ app/
+# The pin as the lock says it, in case the committed copy lags.
+COPY --from=backend-builder --chown=unbork:unbork /tmp/claude_code_pin.json app/ai/claude_code_pin.json
+# Without the assistant the server must not load it either (C-026). A
+# marker rather than ENV UNBORK_ASSISTANT__ENABLED: an environment
+# variable would outrank the operator's config file in every image.
+ARG WITH_ASSISTANT=1
+RUN if [ "$WITH_ASSISTANT" = "0" ]; then touch app/_built_without_assistant; fi
+COPY --chown=unbork:unbork backend/alembic/ alembic/
+COPY --chown=unbork:unbork backend/alembic.ini alembic.ini
 # The image runs from source with deps installed via --no-emit-project, so the
-# labdog-backend .dist-info is absent and importlib.metadata can't report the
+# unbork-backend .dist-info is absent and importlib.metadata can't report the
 # version. Ship the VERSION file at the app root so /api/version (and thus the
 # healthcheck) resolves it — see app/api/version.py:_resolve_version().
-COPY --chown=labdog:labdog VERSION VERSION
+COPY --chown=unbork:unbork VERSION VERSION
 
 # Frontend static files
-COPY --from=frontend-builder --chown=labdog:labdog /app/out/ /usr/lib/labdog/frontend/out/
+COPY --from=frontend-builder --chown=unbork:unbork /app/out/ /usr/lib/unbork/frontend/out/
+
+# Licence, third-party notices and the source offer (S-010), in
+# /usr/share/doc/unbork as Debian does it. The notices are written from
+# what this image actually holds: its Python packages, the npm packages
+# the pages ship, and its Debian packages. The build fails on a Python or
+# npm component whose licence is unknown or not compatible with
+# AGPL-3.0-or-later (packaging/licence-overrides.toml for reviewed
+# exceptions).
+COPY --from=frontend-builder /tmp/frontend-licences.json /tmp/frontend-licences.json
+COPY backend/scripts/third_party_notices.py /tmp/third_party_notices.py
+COPY packaging/licence-overrides.toml /tmp/licence-overrides.toml
+COPY LICENSE SOURCE-OFFER.md /usr/share/doc/unbork/
+RUN python /tmp/third_party_notices.py \
+        --frontend /tmp/frontend-licences.json \
+        --dpkg-status /var/lib/dpkg/status \
+        --overrides /tmp/licence-overrides.toml \
+        --out /usr/share/doc/unbork/THIRD-PARTY-NOTICES \
+    && rm /tmp/frontend-licences.json /tmp/third_party_notices.py /tmp/licence-overrides.toml
 
 # Build metadata. CI passes both via --build-arg in the build-image and
 # build-test-image jobs; a local `docker build` without them yields empty
 # values and /api/version reports a "dev build".
 ARG GIT_SHA=""
 ARG BUILD_DATE=""
-ENV LABDOG_COMMIT_SHA=$GIT_SHA \
-    LABDOG_BUILD_DATE=$BUILD_DATE
+ENV UNBORK_COMMIT_SHA=$GIT_SHA \
+    UNBORK_BUILD_DATE=$BUILD_DATE
+LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.source="https://github.com/open-unbork/unbork" \
+      org.opencontainers.image.revision=$GIT_SHA \
+      org.opencontainers.image.documentation="https://github.com/open-unbork/unbork/tree/main/docs"
 
-USER labdog
+USER unbork
 EXPOSE 8000
 
 # Lets container orchestrators (Docker, k8s, compose) detect a stuck
@@ -148,7 +170,7 @@ EXPOSE 8000
 # component in its body.
 # app.healthcheck does exactly that for the default "all" and the "api"
 # role, and the matching check for the split worker / beat roles
-# (LABDOG_ROLE), which serve no HTTP.
+# (UNBORK_ROLE), which serve no HTTP.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -m app.healthcheck || exit 1
 

@@ -72,9 +72,9 @@ def own_names(host: Host) -> list[str]:
 
     ``reported_hostname`` is read from the host by facts collection. A
     host added before that column existed, or whose facts have not been
-    collected yet, falls back to its LabDog name, which is usually the
+    collected yet, falls back to its unbork name, which is usually the
     same — and a wrong guess here costs one extra name on the loopback
-    address. Nothing, when the name is not a valid hostname: a LabDog
+    address. Nothing, when the name is not a valid hostname: an unbork
     name may be anything.
     """
     name = host.reported_hostname or host.hostname
@@ -128,7 +128,7 @@ async def get_effective_hosts_entries(
     own name is added on 127.0.1.1 unless an entry already places it (see
     ``_own_name_entry``).
 
-    Empty when no entry applies to the host. LabDog then does not manage
+    Empty when no entry applies to the host. unbork then does not manage
     the host's ``/etc/hosts`` at all: a sync leaves the file alone and
     drift has nothing to compare. Writing the system entries on their own
     replaced a working file with two loopback lines (BUG-115). Every
@@ -220,7 +220,7 @@ def render_hosts_file(entries: list[EffectiveHostsEntryResponse]) -> str:
     first. Order is not cosmetic here — the file is read top to bottom
     and the first line matching a name wins.
     """
-    lines = ["# Managed by LabDog — do not edit manually"]
+    lines = ["# Managed by unbork — do not edit manually"]
 
     for entry in entries:
         parts = [entry.ip_address, entry.hostname]

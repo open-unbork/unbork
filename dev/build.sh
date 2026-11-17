@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}/.."
 
 TAG="latest"
-IMAGE="labdog"
+IMAGE="unbork"
 
 echo "=== unbork Local Build ==="
 echo ""
@@ -18,7 +18,7 @@ fi
 
 # Build AIO image
 echo ""
-echo "--- Building labdog ---"
+echo "--- Building unbork ---"
 docker build \
   --tag "${IMAGE}:${TAG}" \
   --file "${ROOT_DIR}/Dockerfile" \

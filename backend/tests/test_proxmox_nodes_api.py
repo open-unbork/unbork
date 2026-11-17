@@ -46,7 +46,7 @@ def _body(**overrides) -> dict:
     body = {
         "name": f"pve-{uuid.uuid4().hex[:8]}",
         "api_url": "https://pve.example.com:8006",
-        "token_id": "root@pam!labdog",
+        "token_id": "root@pam!unbork",
         "token_secret": "secret-token-value",
         "verify_ssl": True,
     }

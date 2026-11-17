@@ -32,7 +32,7 @@ sleep 5
 ts=$(date -u +%FT%TZ)
 if ! env ${FAKEHOST_DOCKER:+DOCKER_HOST=$FAKEHOST_DOCKER} python3 seed.py "$n" >"$out/seed.log" 2>&1; then
     echo "$out: seed failed: $(tail -1 "$out/seed.log" | cut -c1-300)"
-    stack logs --no-color >"$out/labdog.log" 2>&1
+    stack logs --no-color >"$out/unbork.log" 2>&1
     exit 1
 fi
 ./sample.sh "$out/samples.csv" 10 & spid=$!
@@ -41,7 +41,7 @@ rc=$?
 if [ $rc -ne 0 ]; then kill "$spid"; echo "$out: scenario failed: $(tail -1 "$out/scenario.err" | cut -c1-300)"; exit 1; fi
 # Let in-flight work finish so stuck rows really are stuck (max 15 min).
 for _ in $(seq 90); do
-    busy=$(docker exec labdog-loadtest-postgres-1 psql -U labdog -d labdog -At -c \
+    busy=$(docker exec unbork-loadtest-postgres-1 psql -U unbork -d unbork -At -c \
       "select (select count(*) from sync_jobs where status in ('pending','running'))+(select count(*) from action_runs where status in ('pending','running'))")
     [ "${busy:-1}" = 0 ] && break
     sleep 10
@@ -54,9 +54,9 @@ f=lambda t:d.datetime.fromtimestamp(t,d.timezone.utc).isoformat()
 print(f"FROM={f(m['window_start'])}\nTO={f(m['window_end'])}")
 PY
 . "$out/window.env"
-docker exec -i labdog-loadtest-postgres-1 psql -U labdog -d labdog -v from="$FROM" -v to="$TO" -f - <measure_live.sql >"$out/measure.txt" 2>&1
-docker exec labdog-loadtest-postgres-1 psql -U labdog -d labdog -At -F, -c \
+docker exec -i unbork-loadtest-postgres-1 psql -U unbork -d unbork -v from="$FROM" -v to="$TO" -f - <measure_live.sql >"$out/measure.txt" 2>&1
+docker exec unbork-loadtest-postgres-1 psql -U unbork -d unbork -At -F, -c \
   "copy (select * from drift_samples where checked_at >= '$ts') to stdout with csv header" >"$out/drift_samples.csv"
-stack logs --no-color 2>&1 | grep -E 'succeeded in|ERROR|CRITICAL|Traceback|Timeout|WorkerLost' | gzip >"$out/labdog-log.gz"
+stack logs --no-color 2>&1 | grep -E 'succeeded in|ERROR|CRITICAL|Traceback|Timeout|WorkerLost' | gzip >"$out/unbork-log.gz"
 echo "$out: done rc=$rc disk_free=$(df -m --output=avail / | tail -1)MiB ooms=$(fhd inspect --format '{{.State.OOMKilled}}' $(fhd ps -aq --filter label=com.docker.compose.service=fakehost) | grep -c true)"
 teardown

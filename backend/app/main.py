@@ -17,14 +17,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from starlette.responses import FileResponse, RedirectResponse
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.api._repo_scan import router as repo_scan_router
 from app.api.action_packs import router as action_packs_router
 from app.api.action_resolutions import router as action_resolutions_router
+from app.api.actions import assistant_router as actions_assistant_router
 from app.api.actions import router as actions_router
 from app.api.admin_users import router as admin_users_router
 from app.api.ai import router as ai_router
+from app.api.alerts import assistant_router as alerts_assistant_router
 from app.api.alerts import router as alerts_router
 from app.api.audit import router as audit_router
 from app.api.auth_setup import me_router
@@ -74,6 +76,7 @@ from app.auth.schemas import UserRead, UserUpdate
 from app.auth.users import auth_backend, fastapi_users
 from app.client_ip import get_client_ip, is_trusted_proxy
 from app.config import settings
+from app.features import assistant_enabled
 from app.middleware.csrf import CSRFMiddleware
 from app.plugins import load_plugins
 
@@ -317,7 +320,7 @@ _CSP_TAIL = (
 
 #: The fallback ``script-src`` for responses that carry no nonce.
 #:
-#: Every HTML document LabDog serves goes through ``spa_fallback``, which
+#: Every HTML document unbork serves goes through ``spa_fallback``, which
 #: stamps a nonce and sends its own header, so in practice this applies to
 #: JSON and to redirects — responses with no scripts to govern. It stays
 #: strict rather than permissive precisely so that a future code path which
@@ -619,7 +622,7 @@ def create_app() -> FastAPI:
 def _new_fastapi_app() -> FastAPI:
     # SEC-34: the interactive docs enumerate every route and schema and
     # are served unauthenticated. Off by default; `server.expose_docs`
-    # turns them back on where that is wanted (dev/labdog.toml does).
+    # turns them back on where that is wanted (dev/unbork.toml does).
     _docs = settings.server.expose_docs
     return FastAPI(
         title="unbork",
@@ -756,7 +759,13 @@ def _include_api_routers(app: FastAPI) -> None:
     app.include_router(proxmox_nodes_router, prefix="/api")
     app.include_router(proxmox_discovery_router, prefix="/api")
     app.include_router(grafana_router, prefix="/api")
-    app.include_router(ai_router, prefix="/api")
+    # Left out entirely when the assistant is (C-026): no /api/ai route
+    # exists, not even one that refuses.
+    if assistant_enabled():
+        app.include_router(ai_router, prefix="/api")
+        # Its routes on other prefixes: investigating an alert or a run.
+        app.include_router(alerts_assistant_router, prefix="/api")
+        app.include_router(actions_assistant_router, prefix="/api")
     app.include_router(alerts_router, prefix="/api")
     app.include_router(notifications_router, prefix="/api")
     app.include_router(metrics_status_router, prefix="/api")
@@ -926,7 +935,13 @@ def _add_spa_fallback(app: FastAPI) -> None:
 
         @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa_fallback(full_path: str):
-            """Serve static files; fall back to index.html for SPA routes."""
+            """Serve static files; fall back to index.html for SPA routes.
+
+            Not for ``/api/``: an API path no router has (a removed one,
+            such as the assistant's, or a typo) answers a JSON 404, not
+            the page shell with 200."""
+            if full_path == "api" or full_path.startswith("api/"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             file_path = static_dir / full_path
             if full_path and not file_path.resolve().is_relative_to(static_dir.resolve()):
                 return _serve(index_html)
@@ -1232,10 +1247,10 @@ def _resolve_dynamic_route(static_dir: Path, full_path: str) -> tuple[Path, tupl
 def _resolve_static_dir() -> Path | None:
     """Return the frontend static directory, or None if not available.
 
-    Skipped when LABDOG_DEV_MODE=1 (set by dev.sh) so the Next.js dev
+    Skipped when UNBORK_DEV_MODE=1 (set by dev.sh) so the Next.js dev
     server on :3000 is used instead of a stale static export.
     """
-    if os.environ.get("LABDOG_DEV_MODE"):
+    if os.environ.get("UNBORK_DEV_MODE"):
         return None
     configured = settings.server.static_dir
     if configured:
@@ -1250,7 +1265,7 @@ def _resolve_static_dir() -> Path | None:
         return dev_path
 
     # Auto-detect: production packaged install
-    prod_path = Path("/usr/lib/labdog/frontend/out")
+    prod_path = Path("/usr/lib/unbork/frontend/out")
     if prod_path.is_dir() and (prod_path / "index.html").is_file():
         return prod_path
 

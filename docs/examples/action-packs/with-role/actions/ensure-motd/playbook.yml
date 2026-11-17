@@ -8,4 +8,4 @@
       ansible.builtin.include_role:
         name: pack-motd
       vars:
-        banner_text: "{{ banner | default('Managed by LabDog') }}"
+        banner_text: "{{ banner | default('Managed by unbork') }}"

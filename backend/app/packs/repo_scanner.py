@@ -61,7 +61,7 @@ class DetectedGitopsFile:
 
     ``group_name`` is the value of the ``group:`` top-level key,
     extracted best-effort even when the file fails strict schema
-    validation. Errors from ``LabDogGroupYAML.model_validate`` land in
+    validation. Errors from ``UnborkGroupYAML.model_validate`` land in
     ``errors``; the wizard surfaces them inline.
     """
 
@@ -292,10 +292,10 @@ def _build_gitops_finding(root: Path, path: Path) -> DetectedGitopsFile | None:
     # Best-effort full schema validation. Failure is non-fatal — the
     # finding is still emitted with the extracted group_name so the
     # operator sees what's there and what's wrong with it.
-    from app.gitops.schema import LabDogGroupYAML
+    from app.gitops.schema import UnborkGroupYAML
 
     try:
-        LabDogGroupYAML.model_validate(raw)
+        UnborkGroupYAML.model_validate(raw)
     except Exception as exc:
         errors.append(ScanError(file=rel, message=f"gitops schema validation failed: {exc}"))
 

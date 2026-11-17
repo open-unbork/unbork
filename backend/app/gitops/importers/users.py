@@ -34,7 +34,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import LabDogGroupYAML, LinuxGroupYAML, LinuxUserYAML
+from app.gitops.schema import LinuxGroupYAML, LinuxUserYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.user_mgmt.models import LinuxGroup, LinuxUser, UserState
 from app.user_mgmt.schemas import LinuxGroupCreate, LinuxUserCreate
@@ -233,7 +233,7 @@ def _yaml_user_state(e: LinuxUserYAML) -> dict:
 
 async def import_users(
     group: HostGroup,
-    parsed: LabDogGroupYAML,
+    parsed: UnborkGroupYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:
@@ -255,7 +255,7 @@ async def import_users(
 
     Args:
         group: The target ``HostGroup`` ORM instance.
-        parsed: Validated ``LabDogGroupYAML`` from the current commit.
+        parsed: Validated ``UnborkGroupYAML`` from the current commit.
         commit_sha: Full commit SHA string (for audit trail).
         db: Active async database session.
 
@@ -311,7 +311,7 @@ async def import_users(
 
         # Cross-reference check: warn when supplementary_groups references a
         # group not present in YAML or in the current DB.  This is a warning
-        # only — the group may pre-exist on the host outside LabDog's control.
+        # only — the group may pre-exist on the host outside unbork's control.
         for sg_name in entry.supplementary_groups:
             if sg_name not in yaml_group_names and sg_name not in existing_db_group_names:
                 logger.warning(

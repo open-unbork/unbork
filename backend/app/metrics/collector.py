@@ -152,16 +152,16 @@ def _broker_families(broker: broker_probe.BrokerSnapshot) -> list[MetricFamily]:
     """
     families = [
         gauge(
-            "labdog_broker_reachable",
+            "unbork_broker_reachable",
             "1 if the Celery broker answered within its timeout, 0 otherwise. "
-            "When 0, labdog_broker_queue_depth is absent rather than zero.",
+            "When 0, unbork_broker_queue_depth is absent rather than zero.",
             [((), 1.0 if broker.reachable else 0.0)],
         )
     ]
     if broker.depths is not None:
         families.append(
             gauge(
-                "labdog_broker_queue_depth",
+                "unbork_broker_queue_depth",
                 "Tasks waiting in each Celery queue. Waiting only — a task a "
                 "worker has already picked up is not in the queue. Absent when "
                 "the broker is unreachable.",
@@ -179,7 +179,7 @@ def _build_info_families() -> list[MetricFamily]:
 
     return [
         gauge(
-            "labdog_build_info",
+            "unbork_build_info",
             "Always 1; labels carry the running build's identity.",
             [
                 (
@@ -203,27 +203,27 @@ def _host_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[MetricF
     hosts_by_backend = simple.grouped("hosts_firewall_backend")
     families = [
         gauge(
-            "labdog_hosts",
+            "unbork_hosts",
             "Number of hosts, by sync status.",
             hosts_status_series,
         ),
         gauge(
-            "labdog_hosts_firewall_backend",
+            "unbork_hosts_firewall_backend",
             "Number of hosts, by firewall backend (observed values only).",
             [(_labels(("backend", v)), float(c)) for v, c in sorted(hosts_by_backend.items())],
         ),
         gauge(
-            "labdog_hosts_drift_check_enabled",
+            "unbork_hosts_drift_check_enabled",
             "Number of hosts with drift checking enabled.",
             [((), float(simple.single("hosts_drift_check_enabled")))],
         ),
         gauge(
-            "labdog_hosts_never_synced",
+            "unbork_hosts_never_synced",
             "Number of hosts that have never completed a sync.",
             [((), float(simple.single("hosts_never_synced")))],
         ),
         gauge(
-            "labdog_hosts_never_drift_checked",
+            "unbork_hosts_never_drift_checked",
             "Number of hosts that have never had a drift check.",
             [((), float(simple.single("hosts_never_drift_checked")))],
         ),
@@ -231,7 +231,7 @@ def _host_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[MetricF
     if max_ages.host_last_sync_age_seconds is not None:
         families.append(
             gauge(
-                "labdog_host_last_sync_age_seconds_max",
+                "unbork_host_last_sync_age_seconds_max",
                 "Seconds since the most recently synced host last synced.",
                 [((), float(max_ages.host_last_sync_age_seconds))],
             )
@@ -239,7 +239,7 @@ def _host_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[MetricF
     if max_ages.host_last_drift_check_age_seconds is not None:
         families.append(
             gauge(
-                "labdog_host_last_drift_check_age_seconds_max",
+                "unbork_host_last_drift_check_age_seconds_max",
                 "Seconds since the most recently drift-checked host was last checked.",
                 [((), float(max_ages.host_last_drift_check_age_seconds))],
             )
@@ -250,7 +250,7 @@ def _host_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[MetricF
 def _host_module_families(host_module_counts: list[tuple[str, str, int]]) -> list[MetricFamily]:
     return [
         gauge(
-            "labdog_host_modules",
+            "unbork_host_modules",
             "Number of per-host module status rows, by module and sync status "
             "(both observed values — free text, not enums).",
             [
@@ -264,7 +264,7 @@ def _host_module_families(host_module_counts: list[tuple[str, str, int]]) -> lis
 def _rule_families(rule_counts: list[tuple[str, int]]) -> list[MetricFamily]:
     return [
         gauge(
-            "labdog_module_rules",
+            "unbork_module_rules",
             "Number of desired-state rule rows (host- + group-scoped), by module.",
             [(_labels(("module", module)), float(count)) for module, count in sorted(rule_counts)],
         )
@@ -275,12 +275,12 @@ def _group_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[Metric
     groups_gitops = simple.grouped("groups_gitops")
     families = [
         gauge(
-            "labdog_groups",
+            "unbork_groups",
             "Total number of host groups.",
             [((), float(simple.single("groups")))],
         ),
         gauge(
-            "labdog_groups_gitops",
+            "unbork_groups_gitops",
             "Number of groups, by GitOps status.",
             [
                 (_labels(("status", v)), float(groups_gitops.get(v, 0)))
@@ -291,7 +291,7 @@ def _group_families(simple: _SimpleCounts, max_ages: agg.MaxAges) -> list[Metric
     if max_ages.group_gitops_last_import_age_seconds is not None:
         families.append(
             gauge(
-                "labdog_group_gitops_last_import_age_seconds_max",
+                "unbork_group_gitops_last_import_age_seconds_max",
                 "Seconds since the most recently GitOps-imported group last imported.",
                 [((), float(max_ages.group_gitops_last_import_age_seconds))],
             )
@@ -310,7 +310,7 @@ def _ca_cert_families(ca_cert_expiries: list[tuple[str, str, datetime]]) -> list
     """
     return [
         gauge(
-            "labdog_ca_cert_not_after_timestamp_seconds",
+            "unbork_ca_cert_not_after_timestamp_seconds",
             "CA certificate expiry (notAfter), as a Unix timestamp.",
             [
                 (_labels(("name", name)), not_after.timestamp())
@@ -325,17 +325,17 @@ def _scan_families(simple: _SimpleCounts) -> list[MetricFamily]:
     scan_config_last_run = simple.grouped("scan_config_last_run")
     return [
         gauge(
-            "labdog_scan_pending_hosts",
+            "unbork_scan_pending_hosts",
             "Number of discovered hosts awaiting review (not yet added).",
             [((), float(simple.single("scan_pending_hosts")))],
         ),
         gauge(
-            "labdog_scan_configs",
+            "unbork_scan_configs",
             "Number of scan configs, by enabled state.",
             [(_labels(("state", v)), float(c)) for v, c in sorted(scan_configs.items())],
         ),
         gauge(
-            "labdog_scan_config_last_run",
+            "unbork_scan_config_last_run",
             "Number of scan configs, by last-run status ('never' if the config has not run yet).",
             [(_labels(("status", v)), float(c)) for v, c in sorted(scan_config_last_run.items())],
         ),
@@ -346,12 +346,12 @@ def _user_families(simple: _SimpleCounts) -> list[MetricFamily]:
     users_by_state = simple.grouped("users")
     return [
         gauge(
-            "labdog_users",
+            "unbork_users",
             "Number of user accounts, by active state.",
             [(_labels(("state", v)), float(c)) for v, c in sorted(users_by_state.items())],
         ),
         gauge(
-            "labdog_superusers",
+            "unbork_superusers",
             "Number of superuser accounts.",
             [((), float(simple.single("superusers")))],
         ),
@@ -364,7 +364,7 @@ def _integration_families(simple: _SimpleCounts) -> list[MetricFamily]:
     grafana_instances = simple.grouped("grafana_instances")
     return [
         gauge(
-            "labdog_git_repositories",
+            "unbork_git_repositories",
             "Number of configured git repositories, by auth type.",
             [
                 (_labels(("auth_type", v)), float(git_repos.get(v, 0)))
@@ -372,12 +372,12 @@ def _integration_families(simple: _SimpleCounts) -> list[MetricFamily]:
             ],
         ),
         gauge(
-            "labdog_grafana_instances",
+            "unbork_grafana_instances",
             "Number of registered Grafana-stack instances, by kind.",
             [(_labels(("kind", v)), float(c)) for v, c in sorted(grafana_instances.items())],
         ),
         gauge(
-            "labdog_vm_mappings",
+            "unbork_vm_mappings",
             "Number of hosts mapped to a Proxmox VM identity.",
             [((), float(simple.single("vm_mappings")))],
         ),
@@ -403,25 +403,25 @@ def _sync_job_families(
                 sync_jobs_inflight_series.append((labels, float(count)))
     return [
         counter(
-            "labdog_sync_jobs_total",
+            "unbork_sync_jobs_total",
             "Total SyncJob rows ever created, by terminal/non-terminal status and module. "
             "All-time (no time predicate) — resets only on host deletion (CASCADE), "
             "future retention, or a DB restore.",
             sync_jobs_total_series,
         ),
         gauge(
-            "labdog_sync_jobs_inflight",
+            "unbork_sync_jobs_inflight",
             "Current SyncJob queue depth, by status and module.",
             sync_jobs_inflight_series,
         ),
         gauge(
-            "labdog_stale_sync_jobs",
+            "unbork_stale_sync_jobs",
             f"SyncJob rows stuck in 'running' for more than "
             f"{STALE_THRESHOLD_MINUTES} minutes (about to be swept).",
             [((), float(stale_ops.stale_sync_jobs))],
         ),
         gauge(
-            "labdog_hosts_queue_blocked",
+            "unbork_hosts_queue_blocked",
             "Distinct hosts currently blocked behind another in-flight "
             "sync/action on the same host.",
             [((), float(stale_ops.hosts_queue_blocked))],
@@ -444,7 +444,7 @@ def _drift_families(
         )
     return [
         counter(
-            "labdog_drift_checks_total",
+            "unbork_drift_checks_total",
             "Total drift checks ever performed, by module and result. All-time — "
             "resets only on host deletion (CASCADE), future retention, or a DB restore.",
             [
@@ -453,9 +453,9 @@ def _drift_families(
             ],
         ),
         counter(
-            "labdog_drift_changes_total",
+            "unbork_drift_changes_total",
             "Total drift changes ever observed, by module and kind (add/remove/"
-            "policy_change). All-time — same reset conditions as labdog_drift_checks_total.",
+            "policy_change). All-time — same reset conditions as unbork_drift_checks_total.",
             drift_changes_series,
         ),
     ]
@@ -473,7 +473,7 @@ def _action_run_families(
     )
     return [
         counter(
-            "labdog_action_runs_total",
+            "unbork_action_runs_total",
             "Total ActionRun rows ever created, by status"
             + (
                 ", and action_key (settings.metrics.action_key_label=true)"
@@ -485,7 +485,7 @@ def _action_run_families(
             action_runs_total_series,
         ),
         gauge(
-            "labdog_action_runs_inflight",
+            "unbork_action_runs_inflight",
             "Current ActionRun queue depth, by status (queued/pending/running).",
             [
                 (_labels(("status", status)), float(count))
@@ -493,7 +493,7 @@ def _action_run_families(
             ],
         ),
         counter(
-            "labdog_action_runs_scheduled_total",
+            "unbork_action_runs_scheduled_total",
             "Total ActionRun rows dispatched via a ScheduledAction, by origin "
             "('cron' = the 60s scheduler tick, 'manual' = POST run-now).",
             [
@@ -502,7 +502,7 @@ def _action_run_families(
             ],
         ),
         counter(
-            "labdog_action_host_runs_total",
+            "unbork_action_host_runs_total",
             "Total ActionHostRun rows ever created, by status. All-time — resets "
             "only on host deletion (CASCADE), future retention, or a DB restore.",
             [
@@ -511,9 +511,9 @@ def _action_run_families(
             ],
         ),
         counter(
-            "labdog_action_host_runs_nonzero_exit_total",
+            "unbork_action_host_runs_nonzero_exit_total",
             "Total ActionHostRun rows that finished with a nonzero exit code. "
-            "All-time — same reset conditions as labdog_action_host_runs_total.",
+            "All-time — same reset conditions as unbork_action_host_runs_total.",
             [((), float(simple.single("action_host_runs_nonzero_exit_total")))],
         ),
     ]
@@ -523,7 +523,7 @@ def _action_run_series(
     action_run_counts: list[tuple[str, str, int]],
     include_action_key: bool,
 ) -> tuple[list[tuple[Labels, float]], dict[str, int]]:
-    """Return the ``labdog_action_runs_total`` series and the in-flight count per status.
+    """Return the ``unbork_action_runs_total`` series and the in-flight count per status.
 
     The series is labelled by action key and status when
     ``include_action_key`` is set, and collapsed to status alone otherwise.
@@ -556,7 +556,7 @@ def _scheduling_and_pack_families(
 ) -> list[MetricFamily]:
     families = [
         gauge(
-            "labdog_scheduled_actions",
+            "unbork_scheduled_actions",
             "Number of ScheduledAction rows, by target kind and enabled state.",
             [
                 (_labels(("target_kind", tk), ("state", state)), float(count))
@@ -564,7 +564,7 @@ def _scheduling_and_pack_families(
             ],
         ),
         gauge(
-            "labdog_scheduled_actions_orphaned",
+            "unbork_scheduled_actions_orphaned",
             "Enabled ScheduledAction rows whose action_key has no "
             "action_registry_snapshot row (the pack that provided it was "
             "removed or disabled).",
@@ -574,7 +574,7 @@ def _scheduling_and_pack_families(
     if max_ages.scheduled_action_last_dispatch_age_seconds is not None:
         families.append(
             gauge(
-                "labdog_scheduled_action_last_dispatch_age_seconds_max",
+                "unbork_scheduled_action_last_dispatch_age_seconds_max",
                 "Seconds since the most recently dispatched enabled schedule last dispatched.",
                 [((), float(max_ages.scheduled_action_last_dispatch_age_seconds))],
             )
@@ -582,7 +582,7 @@ def _scheduling_and_pack_families(
     action_packs = simple.grouped("action_packs")
     families.append(
         gauge(
-            "labdog_action_packs",
+            "unbork_action_packs",
             "Number of action packs, by last-sync status ('never' if never synced).",
             [(_labels(("sync_status", v)), float(c)) for v, c in sorted(action_packs.items())],
         )
@@ -590,14 +590,14 @@ def _scheduling_and_pack_families(
     if max_ages.action_pack_last_sync_age_seconds is not None:
         families.append(
             gauge(
-                "labdog_action_pack_last_sync_age_seconds_max",
+                "unbork_action_pack_last_sync_age_seconds_max",
                 "Seconds since the most recently synced action pack last synced.",
                 [((), float(max_ages.action_pack_last_sync_age_seconds))],
             )
         )
     families.append(
         gauge(
-            "labdog_action_registry_keys",
+            "unbork_action_registry_keys",
             "Number of action keys with a resolved winner in the action registry.",
             [((), float(simple.single("action_registry_keys")))],
         )
@@ -605,7 +605,7 @@ def _scheduling_and_pack_families(
     if max_ages.action_registry_computed_at_timestamp_seconds is not None:
         families.append(
             gauge(
-                "labdog_action_registry_computed_timestamp_seconds",
+                "unbork_action_registry_computed_timestamp_seconds",
                 "Unix timestamp of the most recent action-registry rebuild.",
                 [((), float(max_ages.action_registry_computed_at_timestamp_seconds))],
             )
@@ -613,7 +613,7 @@ def _scheduling_and_pack_families(
     action_resolutions = simple.grouped("action_resolutions")
     families.append(
         gauge(
-            "labdog_action_resolutions",
+            "unbork_action_resolutions",
             "Number of action-key resolutions, by origin "
             "('user' = operator-picked, 'frozen' = auto-pinned on fresh conflict).",
             [(_labels(("origin", v)), float(c)) for v, c in sorted(action_resolutions.items())],
@@ -628,7 +628,7 @@ def _histogram_families(
 ) -> list[MetricFamily]:
     return [
         histogram(
-            "labdog_sync_job_duration_seconds",
+            "unbork_sync_job_duration_seconds",
             "SyncJob wall-clock duration (completed_at - started_at), for jobs "
             "with both timestamps set and completed_at >= started_at.",
             bounds=_BUCKETS_SYNC,
@@ -642,10 +642,10 @@ def _histogram_families(
             ],
         ),
         histogram(
-            "labdog_drift_check_duration_seconds",
+            "unbork_drift_check_duration_seconds",
             "Drift-check wall-clock duration, by module. duration_ms is nullable "
             "and NULL rows are excluded entirely, so _count is NOT the drift-check "
-            "count for that module — use labdog_drift_checks_total for that.",
+            "count for that module — use unbork_drift_checks_total for that.",
             bounds=_BUCKETS_DRIFT,
             series=[
                 (_labels(("module", module)), hist.bucket_counts, hist.total_count, hist.total_sum)
@@ -705,18 +705,18 @@ def with_meta(snapshot: Snapshot) -> list[MetricFamily]:
     return [
         *snapshot.families,
         gauge(
-            "labdog_metrics_scrape_duration_seconds",
+            "unbork_metrics_scrape_duration_seconds",
             "Wall-clock duration of the most recent underlying metrics collection "
             "(not this HTTP request — cached responses don't re-collect).",
             [((), float(snapshot.collect_duration_seconds))],
         ),
         gauge(
-            "labdog_metrics_cache_age_seconds",
+            "unbork_metrics_cache_age_seconds",
             "Seconds since the cached metrics snapshot was collected.",
             [((), cache_age)],
         ),
         counter(
-            "labdog_metrics_scrape_errors_total",
+            "unbork_metrics_scrape_errors_total",
             "Total failed metrics collection attempts. The one process-local "
             "counter in this exporter — every other counter is DB-derived and "
             "therefore identical across workers.",

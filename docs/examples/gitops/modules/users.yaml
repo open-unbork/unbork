@@ -1,4 +1,4 @@
-# Managed by LabDog -- Linux users + groups reference
+# Managed by unbork -- Linux users + groups reference
 #
 # Users and groups live together in one YAML file under TWO sections:
 #   users:         list of Linux user accounts
@@ -65,7 +65,7 @@ linux_groups:
 #   state                enum     -- present | absent.  Default: present.
 #   comment              string?  -- optional; GECOS field on the host.
 #   sudo_rule            string?  -- optional.  Dropped into
-#                                   /etc/sudoers.d/labdog-<username>.
+#                                   /etc/sudoers.d/unbork-<username>.
 #                                   Shell metacharacters ` $ ( ) ; | & < >
 #                                   rejected at parse time.
 #   authorized_keys      list[str] -- default [].  Each key must start with a

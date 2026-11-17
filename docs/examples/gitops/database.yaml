@@ -1,4 +1,4 @@
-# Managed by LabDog
+# Managed by unbork
 #
 # Full example for a PostgreSQL database-tier group.  Counterpoint to
 # web-servers.yaml -- different firewall posture, different packages,

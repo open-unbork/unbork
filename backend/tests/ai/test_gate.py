@@ -33,7 +33,7 @@ class TestArgumentsDecideNotTheCeiling:
     """``run_ssh_command`` is declared ``mutating`` because it can be.
 
     Gating on that alone would refuse ``journalctl`` in a read-only
-    session — which is every session LabDog runs by default — making the
+    session — which is every session unbork runs by default — making the
     tool useless for the thing it mostly does.
     """
 
@@ -118,13 +118,13 @@ class TestTheSessionToolsetIsEnforced:
         assert d.allowed is False
 
     def test_an_mcp_qualified_name_is_not_silently_accepted(self, permitted) -> None:
-        """The gate takes LabDog's own names; the SDK runner unqualifies
+        """The gate takes unbork's own names; the SDK runner unqualifies
         before calling. Getting that wrong must fail closed — a gate that
         quietly accepted both forms would hide the mistake until someone
         renamed the MCP server.
         """
         d = decide(
-            "mcp__labdog__run_ssh_command",
+            "mcp__unbork__run_ssh_command",
             ssh(READ),
             permitted=permitted,
             autonomy_level="full_auto",

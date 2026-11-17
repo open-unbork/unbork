@@ -2,7 +2,7 @@
 
 Snapshots created by the workflow follow the naming convention::
 
-    labdog-{run_id}-{unix_timestamp}
+    unbork-{run_id}-{unix_timestamp}
 
 A snapshot is considered orphaned when one of:
 
@@ -23,7 +23,7 @@ snapshot was kept on purpose (``auto_rollback: false``, or a rollback that
 failed) is one an operator may still want to restore by hand, and a sweep
 that removed it the next hour would take that away.
 
-AI sessions' snapshots (``labdog-ai-<session>-<ts>``) are never touched
+AI sessions' snapshots (``unbork-ai-<session>-<ts>``) are never touched
 here. Their number is a session id, not a run id, and they have their own
 retention window and sweep (:mod:`app.tasks.ai_snapshots`).
 """
@@ -44,9 +44,9 @@ from app.workflows.steps.cleanup import delete_snapshot
 
 logger = logging.getLogger(__name__)
 
-_SNAPSHOT_PREFIX = "labdog-"
+_SNAPSHOT_PREFIX = "unbork-"
 # AI sessions' snapshots share the prefix but not the meaning of the number.
-_AI_SNAPSHOT_PREFIX = "labdog-ai-"
+_AI_SNAPSHOT_PREFIX = "unbork-ai-"
 # ActionHostRun status strings that indicate the snapshot is still in use.
 _ACTIVE_STATUSES = ("queued", "running")
 # ActionRun status strings that indicate the run has reached a final state.
@@ -54,10 +54,10 @@ _TERMINAL_RUN_STATUSES = ("succeeded", "failed", "partial", "cancelled")
 
 
 def _parse_snapshot_name(snapshot_name: str) -> tuple[int, datetime] | None:
-    """Extract the run_id and timestamp embedded in a labdog snapshot name.
+    """Extract the run_id and timestamp embedded in an unbork snapshot name.
 
     Returns ``(run_id, created_at)`` or ``None`` when the name does not
-    match the ``labdog-{run_id}-{unix_ts}`` shape.
+    match the ``unbork-{run_id}-{unix_ts}`` shape.
     """
     parts = snapshot_name.split("-")
     if len(parts) < 3:
@@ -76,11 +76,11 @@ async def find_orphaned_snapshots(
     *,
     grace_for_finished_runs: bool = False,
 ) -> list[dict]:
-    """Discover labdog snapshots that are no longer associated with an active run.
+    """Discover unbork snapshots that are no longer associated with an active run.
 
     Walks every configured Proxmox node, enumerates QEMU VMs **and** LXC
     containers on each PVE node, and inspects their snapshots. A snapshot
-    whose name starts with ``labdog-`` is flagged as orphaned when:
+    whose name starts with ``unbork-`` is flagged as orphaned when:
 
     1. No ``ActionHostRun`` with status ``queued``/``running`` references it,
        AND
@@ -89,7 +89,7 @@ async def find_orphaned_snapshots(
        ``max_age_hours`` (safety net for unknown-origin snapshots). With
        ``grace_for_finished_runs`` every snapshot must be that old.
 
-    ``labdog-ai-`` snapshots are skipped: see the module docstring.
+    ``unbork-ai-`` snapshots are skipped: see the module docstring.
 
     Returns a list of dicts with keys ``pve_node``, ``vmid``,
     ``vm_type`` (``"qemu"`` or ``"lxc"``), ``snapshot_name``, ``age_hours``,
@@ -231,7 +231,7 @@ async def find_orphaned_snapshots(
 async def cleanup_orphaned_snapshots(
     db: AsyncSession, *, grace_for_finished_runs: bool = False
 ) -> dict:
-    """Delete all orphaned labdog snapshots across every configured Proxmox node.
+    """Delete all orphaned unbork snapshots across every configured Proxmox node.
 
     The maximum age threshold is read from ``workflow.snapshot_max_age_hours``
     and is only applied to snapshots whose ``run_id`` does not match a known

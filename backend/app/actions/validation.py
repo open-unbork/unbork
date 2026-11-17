@@ -27,7 +27,7 @@ from app.actions.types import ActionDefinition, ActionParameter
 #: Ansible does not mark extra-vars ``!unsafe``. The moment a playbook
 #: templates one — a ``msg:``, a ``when:``, a ``template:`` src — a value
 #: like ``{{ lookup('pipe', 'curl … | sh') }}`` is evaluated **on the
-#: Ansible controller**, which is the LabDog host itself, as the labdog
+#: Ansible controller**, which is the unbork host itself, as the unbork
 #: user. Not on the target. That is the case SECURITY.md names as serious,
 #: and it was reachable from an ordinary ``POST /api/actions/runs`` body.
 #:

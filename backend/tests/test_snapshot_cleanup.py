@@ -1,4 +1,4 @@
-"""Removing LabDog's snapshots: the delete itself, and the hourly reaper.
+"""Removing unbork's snapshots: the delete itself, and the hourly reaper.
 
 BUG-168: right after a rollback, Proxmox's qmeventd holds the guest's
 config lock for about 30 s, and a delete sent then failed on the lock
@@ -9,7 +9,7 @@ BUG-169: the action paths left a failed host's snapshot "for the periodic
 cleanup task to reap", and no periodic task existed. ``snapshot_reaper``
 is that task; it gives a finished run's snapshot the age grace too, so a
 snapshot kept for a person to restore by hand is not gone the next hour,
-and it leaves the AI sessions' ``labdog-ai-`` snapshots alone.
+and it leaves the AI sessions' ``unbork-ai-`` snapshots alone.
 """
 
 from __future__ import annotations
@@ -76,9 +76,9 @@ class TestDeleteSnapshot:
     async def test_a_lock_held_after_a_rollback_is_waited_out(self, clock) -> None:
         client = _Client([QMEVENTD_LOCK, QMEVENTD_LOCK, QMEVENTD_LOCK])
 
-        result = await delete_snapshot(client, "pve", 208, "labdog-411-1")
+        result = await delete_snapshot(client, "pve", 208, "unbork-411-1")
 
-        assert result == {"deleted": True, "snapshot_name": "labdog-411-1"}
+        assert result == {"deleted": True, "snapshot_name": "unbork-411-1"}
         assert client.deletes == 4
         assert clock.sleeps == [5, 10, 20]
 
@@ -86,7 +86,7 @@ class TestDeleteSnapshot:
         client = _Client([QMEVENTD_LOCK] * 100)
 
         with pytest.raises(ProxmoxError, match="can't lock file"):
-            await delete_snapshot(client, "pve", 208, "labdog-411-1", lock_wait_seconds=60)
+            await delete_snapshot(client, "pve", 208, "unbork-411-1", lock_wait_seconds=60)
 
         assert sum(clock.sleeps) == 60
 
@@ -94,14 +94,14 @@ class TestDeleteSnapshot:
         client = _Client([ProxmoxError("Task failed: permission denied")])
 
         with pytest.raises(ProxmoxError, match="permission denied"):
-            await delete_snapshot(client, "pve", 208, "labdog-411-1")
+            await delete_snapshot(client, "pve", 208, "unbork-411-1")
 
         assert client.deletes == 1
         assert clock.sleeps == []
 
     def test_a_missing_snapshot_is_told_from_a_missing_guest(self) -> None:
         assert is_missing_snapshot_error(
-            ProxmoxError("Task failed: snapshot 'labdog-ai-42-1762500000' does not exist")
+            ProxmoxError("Task failed: snapshot 'unbork-ai-42-1762500000' does not exist")
         )
         assert is_missing_snapshot_error(
             ProxmoxError('{"data":null,"message":"snapshot \'x\' does not exist\\n"}', 500)
@@ -160,7 +160,7 @@ async def _node(db) -> None:
         ProxmoxNode(
             name=f"pve-{uuid.uuid4().hex[:6]}",
             api_url="https://pve.test:8006",
-            token_id="labdog@pve!ci",
+            token_id="unbork@pve!ci",
             encrypted_token_secret=encrypt_ssh_key("secret", get_master_key()),
             verify_ssl=False,
         )
@@ -189,7 +189,7 @@ class TestTheReaper:
     async def test_the_manual_cleanup_removes_a_finished_runs_snapshot_now(self, db, pve):
         await _node(db)
         run_id = await _finished_run(db)
-        fresh = f"labdog-{run_id}-{int(time.time())}"
+        fresh = f"unbork-{run_id}-{int(time.time())}"
         pve.on_vm = [fresh]
 
         result = await snapshot_cleanup.cleanup_orphaned_snapshots(db)
@@ -200,8 +200,8 @@ class TestTheReaper:
     async def test_the_sweep_gives_a_finished_runs_snapshot_the_max_age(self, db, pve):
         await _node(db)
         run_id = await _finished_run(db)
-        fresh = f"labdog-{run_id}-{int(time.time())}"
-        old = f"labdog-{run_id}-{int(time.time()) - 25 * 3600}"
+        fresh = f"unbork-{run_id}-{int(time.time())}"
+        old = f"unbork-{run_id}-{int(time.time()) - 25 * 3600}"
         pve.on_vm = [fresh, old]
 
         result = await snapshot_cleanup.cleanup_orphaned_snapshots(db, grace_for_finished_runs=True)
@@ -210,11 +210,11 @@ class TestTheReaper:
         assert _deleted(pve) == [old]
 
     async def test_ai_snapshots_are_left_to_their_own_sweep(self, db, pve):
-        """Their number is a session id: 'labdog-ai-<n>-…' named a finished
+        """Their number is a session id: 'unbork-ai-<n>-…' named a finished
         run whenever run <n> had finished, and was deleted on the spot."""
         await _node(db)
         run_id = await _finished_run(db)
-        ai = f"labdog-ai-{run_id}-{int(time.time()) - 30 * 24 * 3600}"
+        ai = f"unbork-ai-{run_id}-{int(time.time()) - 30 * 24 * 3600}"
         pve.on_vm = [ai, "before-upgrade"]
 
         result = await snapshot_cleanup.cleanup_orphaned_snapshots(db)
@@ -234,8 +234,8 @@ class TestTheReaper:
         monkeypatch.setattr("app.db.task_session", _session)
         await _node(db)
         run_id = await _finished_run(db)
-        old = f"labdog-{run_id}-{int(time.time()) - 25 * 3600}"
-        fresh = f"labdog-{run_id}-{int(time.time())}"
+        old = f"unbork-{run_id}-{int(time.time()) - 25 * 3600}"
+        fresh = f"unbork-{run_id}-{int(time.time())}"
         pve.on_vm = [old, fresh]
 
         result = await _reap_orphaned_snapshots()

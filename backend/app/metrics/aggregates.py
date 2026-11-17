@@ -385,7 +385,7 @@ async def get_sync_job_aggregates(db: AsyncSession) -> SyncJobAggregates:
     is the sum over the groups.
 
     Counts are ALL-TIME, no time filter. They serve both
-    ``labdog_sync_jobs_total`` (every row) and ``labdog_sync_jobs_inflight``
+    ``unbork_sync_jobs_total`` (every row) and ``unbork_sync_jobs_inflight``
     (the collector filters to pending/running) — ``SyncJob`` rows are
     mutated in place as a job progresses rather than appended per
     transition, so "count of rows currently status='running'" *is* the
@@ -471,14 +471,14 @@ async def get_drift_aggregates(db: AsyncSession) -> DriftAggregates:
     what keeps a *counter* monotonic across a retention run — without it,
     every prune reads to Prometheus as a process restart.
 
-    - ``counts`` feeds ``labdog_drift_checks_total``.
-    - ``change_sums`` feeds ``labdog_drift_changes_total`` (the collector
+    - ``counts`` feeds ``unbork_drift_checks_total``.
+    - ``change_sums`` feeds ``unbork_drift_changes_total`` (the collector
       unpivots each row into three ``kind`` series). Rollup rows are keyed
       on ``(module_type, status)``, one grain finer, so they are summed
       across statuses.
     - ``duration`` is in seconds. ``duration_ms`` is nullable and rows
       without it are left out of the histogram (they still count toward
-      ``labdog_drift_checks_total``; see the histogram's HELP text, since
+      ``unbork_drift_checks_total``; see the histogram's HELP text, since
       it means ``..._count`` is NOT the drift-check count). A module with
       no timed row has no histogram. A rollup row whose stored
       ``duration_bounds`` no longer match ``_BUCKETS_DRIFT`` contributes
@@ -605,9 +605,9 @@ async def get_drift_change_sums(db: AsyncSession) -> list[tuple[str, int, int, i
 
 async def get_action_run_counts(db: AsyncSession) -> list[tuple[str, str, int]]:
     """Return ``(action_key, status, count)`` — ALL-TIME. Feeds both
-    ``labdog_action_runs_total`` and (summed across action_key by the
+    ``unbork_action_runs_total`` and (summed across action_key by the
     collector, for statuses queued/pending/running)
-    ``labdog_action_runs_inflight``."""
+    ``unbork_action_runs_inflight``."""
     stmt = select(
         ActionRun.action_key,
         ActionRun.status,
@@ -623,7 +623,7 @@ async def get_action_run_origin_counts(db: AsyncSession) -> list[tuple[str, int]
     ``triggered_by_user_id IS NULL`` (the unified scheduler's tick — see
     ``app.tasks.scheduled_action_schedule``) or ``"manual"`` when it's set
     (``POST /api/scheduled-actions/{id}/run-now``, which stamps the calling
-    user). Feeds ``labdog_action_runs_scheduled_total``."""
+    user). Feeds ``unbork_action_runs_scheduled_total``."""
     origin_expr = case((ActionRun.triggered_by_user_id.is_(None), "cron"), else_="manual")
     stmt = (
         select(origin_expr.label("origin"), func.count().label("value"))
@@ -636,7 +636,7 @@ async def get_action_run_origin_counts(db: AsyncSession) -> list[tuple[str, int]
 
 async def get_action_host_run_counts(db: AsyncSession) -> list[tuple[str, int]]:
     """Return ``(status, count)`` from ``action_host_runs`` — ALL-TIME.
-    Feeds ``labdog_action_host_runs_total``. The nonzero-exit counter is
+    Feeds ``unbork_action_host_runs_total``. The nonzero-exit counter is
     folded into ``get_simple_counts`` (a single unrelated predicate, not a
     grouping).
 

@@ -205,7 +205,7 @@ async def add_discovered_hosts(
             ssh_port=body.ssh_port,
             ssh_user=ssh_user,
             ssh_key_id=body.ssh_key_id,
-            labdog_source_ip=source_ip,
+            unbork_source_ip=source_ip,
             ssh_host_key_entry=ssh_host_key_entry,
         )
         db.add(host)

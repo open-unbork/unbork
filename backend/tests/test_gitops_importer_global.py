@@ -1,7 +1,7 @@
 """Tests for the GitOps global-YAML importer (drift + discovery).
 
 Phase 2 covers the genuinely global state that doesn't fit the per-group
-``LabDogGroupYAML`` shape: the ``drift.check_interval_minutes`` setting
+``UnborkGroupYAML`` shape: the ``drift.check_interval_minutes`` setting
 and the ``ScanConfig`` rows. These tests exercise both module handlers
 through ``import_global_from_yaml`` against a real Postgres.
 """

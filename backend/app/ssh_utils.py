@@ -468,7 +468,7 @@ async def get_source_ip(conn: "BoundedConnection | asyncssh.SSHClientConnection"
     """Determine what IP the remote host sees us connecting from.
 
     Uses SSH_CLIENT env var on the remote side, which is authoritative
-    even when labdog runs inside a Docker container (NAT/bridge).
+    even when unbork runs inside a Docker container (NAT/bridge).
     Falls back to the local socket address if SSH_CLIENT is unavailable.
     """
     try:

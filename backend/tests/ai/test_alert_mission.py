@@ -113,7 +113,7 @@ def test_a_naive_start_time_is_taken_as_utc():
 def test_render_falls_back_when_a_stored_template_has_gone_bad():
     """A template saved against an older release must not strand an alert.
 
-    Save-time validation cannot protect a template from a *later* LabDog
+    Save-time validation cannot protect a template from a *later* unbork
     dropping a field it names. Starting the investigation with generic
     wording beats not starting it.
     """

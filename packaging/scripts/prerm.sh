@@ -14,6 +14,6 @@ case "$1" in
 esac
 
 if [ "$STOP" -eq 1 ] && command -v systemctl > /dev/null 2>&1; then
-    systemctl stop labdog.service 2>/dev/null || true
-    systemctl disable labdog.service 2>/dev/null || true
+    systemctl stop unbork.service 2>/dev/null || true
+    systemctl disable unbork.service 2>/dev/null || true
 fi

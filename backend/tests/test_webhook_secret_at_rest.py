@@ -6,7 +6,7 @@ return — it's for webhook validation, not a credential". It is exactly a
 credential: the HMAC key ``app/api/webhooks.py`` compares every inbound
 push signature against. Anyone who could read it — any authenticated
 user through the API, anyone with a database dump — could forge a push
-and make LabDog import configuration from a commit of their choosing.
+and make unbork import configuration from a commit of their choosing.
 
 It was also the only secret in the codebase outside an ``encrypted_*``
 column, which is what let the exception go unnoticed.

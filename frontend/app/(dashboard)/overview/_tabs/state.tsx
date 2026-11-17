@@ -174,7 +174,7 @@ export function StateTab({
               {metrics.error ? (
                 <div className={muted}>{metrics.error}</div>
               ) : hot.length === 0 ? (
-                <div className={muted}>Mimir has no series with a labdog_host_id label yet.</div>
+                <div className={muted}>Mimir has no series with an unbork_host_id label yet.</div>
               ) : (
                 <div className="flex flex-col gap-2.5 p-[11px]">
                   {hot.map((r) => (

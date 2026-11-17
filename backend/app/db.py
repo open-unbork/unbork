@@ -62,7 +62,7 @@ async def release_connection(session: AsyncSession) -> None:
 #: The engine ``task_session()`` takes its sessions from inside
 #: :func:`with_task_engine`, with the event loop it belongs to.
 _task_engine: ContextVar[tuple[AsyncEngine, asyncio.AbstractEventLoop] | None] = ContextVar(
-    "labdog_task_engine", default=None
+    "unbork_task_engine", default=None
 )
 
 

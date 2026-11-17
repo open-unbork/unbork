@@ -90,7 +90,7 @@ def _mapped_envelope() -> _Envelope:
         pve_node="pve1",
         vmid=500,
         vm_type="qemu",
-        snapshot_name="labdog-1-123",
+        snapshot_name="unbork-1-123",
     )
 
 
@@ -159,7 +159,7 @@ class TestPhasesEAndFRouteOnOutcome:
 
     async def test_failure_with_a_snapshot_rolls_back(self, calls):
         await _phase_ef_rollback_or_cleanup(_ctx(), _spec(), _mapped_envelope(), success=False)
-        assert calls["rollback"] == ["labdog-1-123"]
+        assert calls["rollback"] == ["unbork-1-123"]
         assert calls["delete"] == []
 
     async def test_success_with_a_snapshot_deletes_it(self, calls):
@@ -185,7 +185,7 @@ class TestPhasesEAndFRouteOnOutcome:
 
     async def test_a_snapshot_with_no_client_is_not_acted_on(self, calls):
         """snapshot_name set but the Proxmox client gone — nothing can be called."""
-        env = _Envelope(pve_node="pve1", vmid=500, snapshot_name="labdog-1-123")
+        env = _Envelope(pve_node="pve1", vmid=500, snapshot_name="unbork-1-123")
         await _phase_ef_rollback_or_cleanup(_ctx(), _spec(), env, success=True)
         assert calls["delete"] == []
 

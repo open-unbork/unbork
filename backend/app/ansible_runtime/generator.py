@@ -6,24 +6,24 @@ from app.rules.renderers.nftables import render_nftables_config
 # ---------------------------------------------------------------------------
 # Inactive-backend teardown
 #
-# On a dual-stack host (both nft and iptables installed) LabDog manages exactly
-# one backend, but a LabDog ruleset can linger in the other one — left over from
+# On a dual-stack host (both nft and iptables installed) unbork manages exactly
+# one backend, but an unbork ruleset can linger in the other one — left over from
 # a backend switch, or from a manual edit. Collection only ever reads the active
 # backend, so the stale copy is invisible in the UI yet may still filter
-# traffic. Every firewall sync therefore removes LabDog's footprint from the
+# traffic. Every firewall sync therefore removes unbork's footprint from the
 # *inactive* backend so there is a single source of truth.
 #
-# Both teardowns are strictly scoped to LabDog's own footprint and are safe to
+# Both teardowns are strictly scoped to unbork's own footprint and are safe to
 # run unconditionally: they self-guard on the tool being installed and only act
-# when the LabDog marker is present. They never touch the base INPUT/OUTPUT
-# chains or any table LabDog doesn't own, so Docker/kube-proxy/firewalld rules
+# when the unbork marker is present. They never touch the base INPUT/OUTPUT
+# chains or any table unbork doesn't own, so Docker/kube-proxy/firewalld rules
 # are left intact.
 # ---------------------------------------------------------------------------
 
 
 #: Ansible fact the firewall plays register their scratch directory under.
-#: Referenced as ``{{ labdog_fw_tmp.path }}`` throughout both playbooks.
-_WORKDIR_VAR = "labdog_fw_tmp"
+#: Referenced as ``{{ unbork_fw_tmp.path }}`` throughout both playbooks.
+_WORKDIR_VAR = "unbork_fw_tmp"
 
 #: Jinja expression for that directory, as written into the shell
 #: fragments below. Kept short so the command strings stay readable.
@@ -42,7 +42,7 @@ def _workdir_task() -> dict:
     or which process id gets signalled.
 
     ``fs.protected_regular`` blunts the write side on modern kernels. It
-    does nothing about the read side, and it is a kernel setting LabDog
+    does nothing about the read side, and it is a kernel setting unbork
     does not control on hosts it manages.
 
     ``ansible.builtin.tempfile`` gives a 0700 directory owned by root
@@ -53,7 +53,7 @@ def _workdir_task() -> dict:
         "name": "Create private working directory for firewall rollback state",
         "ansible.builtin.tempfile": {
             "state": "directory",
-            "prefix": "labdog-fw-",
+            "prefix": "unbork-fw-",
         },
         "register": _WORKDIR_VAR,
     }
@@ -78,26 +78,26 @@ def _cleanup_workdir_task() -> dict:
 
 
 def _iptables_teardown_task() -> dict:
-    """Task removing stale LabDog iptables chains (run when nftables is active).
+    """Task removing stale unbork iptables chains (run when nftables is active).
 
     Drops the ``INPUT``/``OUTPUT`` jumps and flush/deletes the dedicated
-    ``LABDOG-INPUT``/``LABDOG-OUTPUT`` chains for both IPv4 and IPv6, then
-    re-persists so the chains don't reappear at boot. Only LabDog's own chains
+    ``UNBORK-INPUT``/``UNBORK-OUTPUT`` chains for both IPv4 and IPv6, then
+    re-persists so the chains don't reappear at boot. Only unbork's own chains
     are touched — the base chains and other tools' rules are left alone.
     """
     script = r"""
 for t in "$(command -v iptables || echo /usr/sbin/iptables)" \
          "$(command -v ip6tables || echo /usr/sbin/ip6tables)"; do
     [ -x "$t" ] || command -v "$t" >/dev/null 2>&1 || continue
-    if "$t" -S LABDOG-INPUT >/dev/null 2>&1; then
-        while "$t" -D INPUT -j LABDOG-INPUT 2>/dev/null; do :; done
-        "$t" -F LABDOG-INPUT 2>/dev/null || true
-        "$t" -X LABDOG-INPUT 2>/dev/null || true
+    if "$t" -S UNBORK-INPUT >/dev/null 2>&1; then
+        while "$t" -D INPUT -j UNBORK-INPUT 2>/dev/null; do :; done
+        "$t" -F UNBORK-INPUT 2>/dev/null || true
+        "$t" -X UNBORK-INPUT 2>/dev/null || true
     fi
-    if "$t" -S LABDOG-OUTPUT >/dev/null 2>&1; then
-        while "$t" -D OUTPUT -j LABDOG-OUTPUT 2>/dev/null; do :; done
-        "$t" -F LABDOG-OUTPUT 2>/dev/null || true
-        "$t" -X LABDOG-OUTPUT 2>/dev/null || true
+    if "$t" -S UNBORK-OUTPUT >/dev/null 2>&1; then
+        while "$t" -D OUTPUT -j UNBORK-OUTPUT 2>/dev/null; do :; done
+        "$t" -F UNBORK-OUTPUT 2>/dev/null || true
+        "$t" -X UNBORK-OUTPUT 2>/dev/null || true
     fi
 done
 # Persist the cleaned state so the stale chains stay gone across reboots.
@@ -106,37 +106,37 @@ if command -v netfilter-persistent >/dev/null 2>&1; then
 fi
 """
     return {
-        "name": "Remove stale LabDog iptables rules (nftables is the active backend)",
+        "name": "Remove stale unbork iptables rules (nftables is the active backend)",
         "ansible.builtin.shell": {"cmd": script.strip() + "\n"},
         "ignore_errors": True,
     }
 
 
 def _nftables_teardown_task() -> dict:
-    """Task removing a stale LabDog nftables table (run when iptables is active).
+    """Task removing a stale unbork nftables table (run when iptables is active).
 
-    Deletes ``table inet filter`` only when it carries the LabDog marker, so an
+    Deletes ``table inet filter`` only when it carries the unbork marker, so an
     operator's own ``inet filter`` table is never touched, and neutralises
-    ``/etc/nftables.conf`` if LabDog wrote it so the table doesn't return at
-    boot. LabDog owns the whole table (its renderer does delete+recreate), so
+    ``/etc/nftables.conf`` if unbork wrote it so the table doesn't return at
+    boot. unbork owns the whole table (its renderer does delete+recreate), so
     deleting it is the correct teardown.
     """
     script = r"""
 n="$(command -v nft || echo /usr/sbin/nft)"
 { [ -x "$n" ] || command -v nft >/dev/null 2>&1; } || exit 0
-if "$n" list table inet filter 2>/dev/null | grep -q "Managed by LabDog"; then
+if "$n" list table inet filter 2>/dev/null | grep -q "Managed by unbork"; then
     "$n" delete table inet filter 2>/dev/null || true
 fi
-# If LabDog wrote the boot config, replace it with a harmless no-op so the
+# If unbork wrote the boot config, replace it with a harmless no-op so the
 # table isn't recreated on the next boot. A file with no ruleset directives
 # does not flush anything, so other nftables tables are unaffected.
-if [ -f /etc/nftables.conf ] && grep -q "Managed by LabDog" /etc/nftables.conf; then
-    printf '#!/usr/sbin/nft -f\n# Managed by LabDog: nftables backend inactive on this host.\n' \
+if [ -f /etc/nftables.conf ] && grep -q "Managed by unbork" /etc/nftables.conf; then
+    printf '#!/usr/sbin/nft -f\n# Managed by unbork: nftables backend inactive on this host.\n' \
         > /etc/nftables.conf
 fi
 """
     return {
-        "name": "Remove stale LabDog nftables table (iptables is the active backend)",
+        "name": "Remove stale unbork nftables table (iptables is the active backend)",
         "ansible.builtin.shell": {"cmd": script.strip() + "\n"},
         "ignore_errors": True,
     }
@@ -156,7 +156,7 @@ def generate_nftables_playbook(
     3. Write and validate new config
     4. Apply atomically with nft -f
     5. If we're still connected (SSH survived), cancel the revert
-    6. Remove any stale LabDog iptables footprint (dual-stack teardown)
+    6. Remove any stale unbork iptables footprint (dual-stack teardown)
     7. Enable nftables service on boot
 
     If applying the new rules kills SSH, the scheduled revert fires
@@ -217,7 +217,7 @@ def generate_nftables_playbook(
                 "fi"
             ),
         },
-        # nftables is now the active backend; strip any stale LabDog iptables
+        # nftables is now the active backend; strip any stale unbork iptables
         # footprint so it can't shadow this ruleset or confuse collection.
         _iptables_teardown_task(),
         {
@@ -255,7 +255,7 @@ def generate_iptables_playbook(
     3. Write new IPv4 and IPv6 rules files
     4. Apply with iptables-restore / ip6tables-restore
     5. If we're still connected (SSH survived), cancel the revert
-    6. Remove any stale LabDog nftables footprint (dual-stack teardown)
+    6. Remove any stale unbork nftables footprint (dual-stack teardown)
     7. Install iptables-persistent for boot persistence
     8. Save rules for persistence
 
@@ -319,31 +319,31 @@ def generate_iptables_playbook(
             "ansible.builtin.shell": "ip6tables-restore --noflush < /etc/ip6tables.rules",
         },
         {
-            "name": "Ensure INPUT jumps to LABDOG-INPUT",
+            "name": "Ensure INPUT jumps to UNBORK-INPUT",
             "ansible.builtin.shell": (
-                "iptables -C INPUT -j LABDOG-INPUT 2>/dev/null || "
-                "iptables -I INPUT 1 -j LABDOG-INPUT"
+                "iptables -C INPUT -j UNBORK-INPUT 2>/dev/null || "
+                "iptables -I INPUT 1 -j UNBORK-INPUT"
             ),
         },
         {
-            "name": "Ensure OUTPUT jumps to LABDOG-OUTPUT",
+            "name": "Ensure OUTPUT jumps to UNBORK-OUTPUT",
             "ansible.builtin.shell": (
-                "iptables -C OUTPUT -j LABDOG-OUTPUT 2>/dev/null || "
-                "iptables -I OUTPUT 1 -j LABDOG-OUTPUT"
+                "iptables -C OUTPUT -j UNBORK-OUTPUT 2>/dev/null || "
+                "iptables -I OUTPUT 1 -j UNBORK-OUTPUT"
             ),
         },
         {
-            "name": "Ensure INPUT jumps to LABDOG-INPUT (IPv6)",
+            "name": "Ensure INPUT jumps to UNBORK-INPUT (IPv6)",
             "ansible.builtin.shell": (
-                "ip6tables -C INPUT -j LABDOG-INPUT 2>/dev/null || "
-                "ip6tables -I INPUT 1 -j LABDOG-INPUT"
+                "ip6tables -C INPUT -j UNBORK-INPUT 2>/dev/null || "
+                "ip6tables -I INPUT 1 -j UNBORK-INPUT"
             ),
         },
         {
-            "name": "Ensure OUTPUT jumps to LABDOG-OUTPUT (IPv6)",
+            "name": "Ensure OUTPUT jumps to UNBORK-OUTPUT (IPv6)",
             "ansible.builtin.shell": (
-                "ip6tables -C OUTPUT -j LABDOG-OUTPUT 2>/dev/null || "
-                "ip6tables -I OUTPUT 1 -j LABDOG-OUTPUT"
+                "ip6tables -C OUTPUT -j UNBORK-OUTPUT 2>/dev/null || "
+                "ip6tables -I OUTPUT 1 -j UNBORK-OUTPUT"
             ),
         },
         {
@@ -355,7 +355,7 @@ def generate_iptables_playbook(
                 "fi"
             ),
         },
-        # iptables is now the active backend; strip any stale LabDog nftables
+        # iptables is now the active backend; strip any stale unbork nftables
         # table so it can't shadow this ruleset or confuse collection.
         _nftables_teardown_task(),
         # BUG-163: this was two package installs with ignore_errors on every
@@ -370,7 +370,7 @@ def generate_iptables_playbook(
                 " elif command -v apt-get >/dev/null 2>&1; then echo missing;"
                 " else echo unsupported; fi"
             ),
-            "register": "labdog_netfilter_persistent",
+            "register": "unbork_netfilter_persistent",
             "changed_when": False,
             "check_mode": False,
         },
@@ -380,7 +380,7 @@ def generate_iptables_playbook(
                 "name": "iptables-persistent",
                 "state": "present",
             },
-            "when": "labdog_netfilter_persistent.stdout == 'missing'",
+            "when": "unbork_netfilter_persistent.stdout == 'missing'",
             "ignore_errors": True,
         },
         {

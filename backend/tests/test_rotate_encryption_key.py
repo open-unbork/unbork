@@ -52,7 +52,7 @@ async def _insert_proxmox_node(db: AsyncSession, key_a: bytes) -> tuple[int, str
     row = ProxmoxNode(
         name="rotate-test-pve",
         api_url="https://pve.example.com:8006",
-        token_id="root@pam!labdog",
+        token_id="root@pam!unbork",
         encrypted_token_secret=encrypt_ssh_key(secret, key_a),
     )
     db.add(row)

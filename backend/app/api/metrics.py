@@ -82,5 +82,5 @@ async def get_metrics_status(
         cache_ttl_seconds=settings.metrics.cache_ttl_seconds,
         authenticated=False,
         toml_snippet="[metrics]\nenabled = true\n",
-        env_snippet="LABDOG_METRICS__ENABLED=true",
+        env_snippet="UNBORK_METRICS__ENABLED=true",
     )

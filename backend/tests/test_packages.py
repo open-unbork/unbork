@@ -274,10 +274,10 @@ class TestPackageGenerator:
         ]
         present = next(t for t in tasks if isinstance(t["ansible.builtin.package"]["name"], list))
         assert present["ignore_errors"] is True
-        assert present["register"] == "labdog_packages_present"
+        assert present["register"] == "unbork_packages_present"
         fallback = [t for t in tasks if "when" in t]
         assert [t["ansible.builtin.package"]["name"] for t in fallback] == ["curl", "nginx=1.24.0"]
-        assert {t["when"] for t in fallback} == {"labdog_packages_present is failed"}
+        assert {t["when"] for t in fallback} == {"unbork_packages_present is failed"}
 
     def test_only_the_facts_the_play_reads_are_gathered(self):
         result = generate_package_playbook(

@@ -79,7 +79,7 @@ export function ActionRunDetail({ runId }: { runId: number }) {
   const [selectedHostRunId, setSelectedHostRunId] = useState<number | null>(null)
   const [pinToBottom, setPinToBottom] = useState(true)
   const [hostPage, setHostPage] = useState(0)
-  const [hostsPref, setHostsPref] = useLocalPref("labdog.run-hosts", { pageSize: 10 })
+  const [hostsPref, setHostsPref] = useLocalPref("unbork.run-hosts", { pageSize: 10 })
   const [query, setQuery] = useState("")
   const [current, setCurrent] = useState(0)
   const outputRef = useRef<HTMLPreElement>(null)

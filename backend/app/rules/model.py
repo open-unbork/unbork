@@ -84,7 +84,7 @@ class FirewallRuleSpec:
         with the resolved CIDR and must be **excluded**: a rule that referenced
         a host and a literal-CIDR rule that resolve to the same address are the
         same rule. The on-host state parsed back over SSH only ever carries the
-        CIDR (it has no way to know a labdog host FK), so keying on the FK here
+        CIDR (it has no way to know an unbork host FK), so keying on the FK here
         would spuriously diff every host-ref rule as a remove + re-add.
         """
         return (

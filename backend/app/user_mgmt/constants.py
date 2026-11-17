@@ -83,7 +83,7 @@ PROTECTED_GROUPS: frozenset[str] = frozenset(
 #     ALL=(ALL) NOPASSWD: /bin/true\nsomeone ALL=(ALL) NOPASSWD: ALL
 #
 # wrote a *two-line* drop-in granting passwordless root to an account
-# LabDog does not manage. ``visudo -cf`` accepts it: it is perfectly valid
+# unbork does not manage. ``visudo -cf`` accepts it: it is perfectly valid
 # sudoers syntax, which is exactly why the validate step never caught it
 # (SEC-25).
 #

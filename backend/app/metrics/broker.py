@@ -12,7 +12,7 @@ reported as unreachable rather than waited for.
 depth gauges are *omitted* — not zero-filled. A zero would read as "the
 queues are empty", which is the opposite of what is known, and would
 silence exactly the alert an operator wants ("work is piling up") at
-exactly the moment it should fire. ``labdog_broker_reachable`` carries the
+exactly the moment it should fire. ``unbork_broker_reachable`` carries the
 "we could not tell" signal on its own, and a rule that cares about depth
 should join on it or use ``absent()``.
 
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 #: Celery API, which is why it is stated here rather than assumed: a task
 #: published to queue ``q`` is ``LPUSH``ed onto a list literally called
 #: ``q``. If the broker transport ever changes, this module is what breaks
-#: and ``labdog_broker_reachable`` is what says so.
+#: and ``unbork_broker_reachable`` is what says so.
 QUEUES: tuple[str, ...] = CeleryManager.QUEUES
 
 

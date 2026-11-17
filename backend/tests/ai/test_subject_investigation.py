@@ -93,7 +93,7 @@ class TestResource:
         assert session.investigates_action_run_id is None
         assert session.title == f"Root filesystem (/) on {host.hostname}"
         assert "87.0% used (87.0 GiB of 100.0 GiB)" in session.mission
-        assert f'labdog_host_id="{host.id}"' in session.mission
+        assert f'unbork_host_id="{host.id}"' in session.mission
         assert "du -xh" in session.mission
         sent.assert_called_once_with(
             "app.tasks.ai_task.run_chat_session", kwargs={"session_id": session.id}

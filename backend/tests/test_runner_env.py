@@ -1,4 +1,4 @@
-"""SEC-46: ansible-playbook must not inherit LabDog's secrets."""
+"""SEC-46: ansible-playbook must not inherit unbork's secrets."""
 
 import json
 import os
@@ -9,8 +9,8 @@ from app.ansible_runtime.runner import run_ansible, scrub_child_env
 def test_scrub_keeps_what_the_run_needs():
     inherited = {
         "PATH": "/usr/bin",
-        "LABDOG_SECURITY__SECRET_KEY": "s",
-        "LABDOG_DATABASE__URL": "postgresql://x",
+        "UNBORK_SECURITY__SECRET_KEY": "s",
+        "UNBORK_DATABASE__URL": "postgresql://x",
         "SOME_OTHER_SECRET": "y",
         "ANSIBLE_CONFIG": "/etc/ansible.cfg",
     }
@@ -24,14 +24,14 @@ def test_scrub_keeps_what_the_run_needs():
     }
 
 
-def test_a_real_playbook_sees_no_labdog_variables(tmp_path, monkeypatch):
-    monkeypatch.setenv("LABDOG_SECURITY__ENCRYPTION_KEY", "do-not-leak")
+def test_a_real_playbook_sees_no_unbork_variables(tmp_path, monkeypatch):
+    monkeypatch.setenv("UNBORK_SECURITY__ENCRYPTION_KEY", "do-not-leak")
     out_file = tmp_path / "env.json"
     playbook = (
         "- hosts: all\n  gather_facts: false\n  tasks:\n"
         "    - ansible.builtin.copy:\n"
         f"        dest: {out_file}\n"
-        "        content: \"{{ lookup('ansible.builtin.env', 'LABDOG_SECURITY__ENCRYPTION_KEY',"
+        "        content: \"{{ lookup('ansible.builtin.env', 'UNBORK_SECURITY__ENCRYPTION_KEY',"
         " default='absent') | to_json }}\"\n"
     )
     inventory = json.dumps({"all": {"hosts": {"localhost": {"ansible_connection": "local"}}}})
@@ -40,7 +40,7 @@ def test_a_real_playbook_sees_no_labdog_variables(tmp_path, monkeypatch):
     )
     assert runner.status == "successful", runner.stdout.read()
     assert json.loads(out_file.read_text()) == "absent"
-    assert os.environ["LABDOG_SECURITY__ENCRYPTION_KEY"] == "do-not-leak"
+    assert os.environ["UNBORK_SECURITY__ENCRYPTION_KEY"] == "do-not-leak"
     artifacts = list((tmp_path / "run" / "artifacts").rglob("command"))
     assert artifacts and "do-not-leak" not in artifacts[0].read_text()
 
@@ -82,7 +82,7 @@ def test_a_run_prints_nothing_but_keeps_its_output(tmp_path, capfd):
     events: list[dict] = []
     playbook = (
         "- hosts: all\n  gather_facts: false\n  tasks:\n"
-        "    - ansible.builtin.debug:\n        msg: labdog-bug-176\n"
+        "    - ansible.builtin.debug:\n        msg: unbork-bug-176\n"
     )
     inventory = json.dumps({"all": {"hosts": {"localhost": {"ansible_connection": "local"}}}})
     runner = run_ansible(
@@ -94,6 +94,6 @@ def test_a_run_prints_nothing_but_keeps_its_output(tmp_path, capfd):
 
     assert runner.status == "successful"
     out, _ = capfd.readouterr()
-    assert "labdog-bug-176" not in out
-    assert "labdog-bug-176" in runner.stdout.read()
-    assert any("labdog-bug-176" in (e.get("stdout") or "") for e in events)
+    assert "unbork-bug-176" not in out
+    assert "unbork-bug-176" in runner.stdout.read()
+    assert any("unbork-bug-176" in (e.get("stdout") or "") for e in events)

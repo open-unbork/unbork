@@ -89,7 +89,7 @@ def check_all_package_drift():
 
 package_drift_task = check_all_package_drift
 
-DRIFT_SCHEDULE_KEY = "labdog:package:drift"
+DRIFT_SCHEDULE_KEY = "unbork:package:drift"
 
 
 def _register_package_drift_schedule():

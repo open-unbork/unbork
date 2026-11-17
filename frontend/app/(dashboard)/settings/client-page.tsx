@@ -9,6 +9,7 @@ import { shortAgo } from "@/lib/fleet"
 import type { AIProvider, AIUsageSummary, AlertIntakeStatus, EmailSettings, GitRepository, GrafanaInstance, MetricsStatus, ProxmoxNode, SSHKey } from "@/lib/types"
 import { MetricsScrapeCard } from "@/components/metrics-scrape-card"
 import { settingsSections } from "@/lib/extensions"
+import { useFeatures } from "@/lib/features"
 import { Dot, PageHead, Panel, Tabs, type Tone } from "@/components/ld"
 
 import { SettingsEditor } from "./settings-editor"
@@ -38,7 +39,9 @@ export default function SettingsPage() {
   const setSection = (s: string) => router.push(s === "integrations" ? "/settings" : `/settings?section=${s}`)
   // Sections an extension (Enterprise) adds; Community has none.
   const extra = settingsSections.filter((x) => !x.permission || can(user, x.permission))
-  const tabs = [...SECTIONS, ...extra.map((x) => ({ k: x.key, label: x.label }))]
+  // No AI section on a server without the assistant (C-026).
+  const { assistant } = useFeatures()
+  const tabs = [...SECTIONS.filter((x) => assistant || x.k !== "ai"), ...extra.map((x) => ({ k: x.key, label: x.label }))]
   const ExtraSection = extra.find((x) => x.key === section)?.Component
 
   return (
@@ -49,7 +52,7 @@ export default function SettingsPage() {
       <div className="scroll flex-1 p-3.5">
         {ExtraSection && <ExtraSection />}
         {section === "integrations" && <Integrations />}
-        {section === "ai" && (
+        {section === "ai" && assistant && (
           <div className="flex flex-col gap-3">
             <Panel title="providers" meta="who answers the assistant">
               <ProvidersRow />
@@ -105,6 +108,7 @@ function Card({ name, state, status, detail, meta, href, action, more }: { name:
 
 function Integrations() {
   const { user } = useAuth()
+  const { assistant } = useFeatures()
   const q = { retry: false }
   // AI providers need ai.use, which a viewer lacks.
   const ai = { ...q, enabled: can(user, "ai.use") }
@@ -148,14 +152,16 @@ function Integrations() {
         href="/git-repos"
         action="Configure…"
       />
-      <Card
-        name="AI providers"
-        state={enabledProviders.length ? "ok" : "idle"}
-        detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
-        meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
-        href="/ai-providers"
-        action="Configure…"
-      />
+      {assistant && (
+        <Card
+          name="AI providers"
+          state={enabledProviders.length ? "ok" : "idle"}
+          detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
+          meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
+          href="/ai-providers"
+          action="Configure…"
+        />
+      )}
       <Card
         name="Email"
         state={email?.ready ? "ok" : email?.enabled ? "warn" : "idle"}
@@ -178,7 +184,7 @@ function Integrations() {
 }
 
 /**
- * Grafana alerts coming in. The webhook token is in labdog.toml, not a
+ * Grafana alerts coming in. The webhook token is in unbork.toml, not a
  * setting, so this card is the one place the UI says that an intake which
  * is on is refusing every webhook for want of one. Git push webhooks are
  * on the Git remotes card, per repository.
@@ -188,7 +194,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   if (!s.intake_enabled) return { state: "idle", status: "off", detail: "intake off", meta: "turn on alerts.intake_enabled to record Grafana alerts" }
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   const last = [s.last_webhook_alert_at, s.last_poll_alert_at].filter((t): t is string => !!t).sort().at(-1)
-  // With the rules off, any alert Grafana labels labdog_ai_automate=true
+  // With the rules off, any alert Grafana labels unbork_ai_automate=true
   // may act, so a short token always costs something; with them on, only
   // when the list has rules. Actions on the list need the token too.
   const fullAutoPossible = !s.full_auto_rules_enabled || s.full_auto_rules > 0
@@ -196,7 +202,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   const meta = [
     last ? `last alert ${shortAgo(last)} ago` : "no alert received yet",
     s.poll_minutes > 0 && `polls Alertmanager every ${s.poll_minutes} min`,
-    !s.token_set && "set [alerts] webhook_token in labdog.toml",
+    !s.token_set && "set [alerts] webhook_token in unbork.toml",
     weak && (s.allowed_actions > 0 ? "token under 32 characters: no actions, no full auto" : "token under 32 characters: no full auto"),
   ].filter(Boolean).join(" · ")
   return {

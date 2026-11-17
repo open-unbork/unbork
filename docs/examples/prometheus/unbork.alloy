@@ -5,7 +5,7 @@
 // scraping unbork itself is usually just this one extra block.
 //
 // unbork's /metrics endpoint is DISABLED by default. Enable it first in
-// /etc/labdog/labdog.toml (then restart unbork):
+// /etc/unbork/unbork.toml (then restart unbork):
 //
 //     [metrics]
 //     enabled = true
@@ -16,12 +16,12 @@
 // The exposition format is standard Prometheus text, so any compatible
 // scraper works if you don't run Alloy -- point it at the same URL.
 
-prometheus.scrape "labdog" {
+prometheus.scrape "unbork" {
   targets = [
-    { __address__ = "labdog.example.com" },
+    { __address__ = "unbork.example.com" },
   ]
 
-  job_name = "labdog"
+  job_name = "unbork"
   scheme   = "https"
 
   // unbork aggregates from PostgreSQL on each scrape and caches the result
@@ -53,13 +53,13 @@ prometheus.scrape "labdog" {
 
 // --- If /metrics is behind basic auth at your reverse proxy -----------------
 //
-// prometheus.scrape "labdog" {
-//   targets    = [{ __address__ = "labdog.example.com" }]
+// prometheus.scrape "unbork" {
+//   targets    = [{ __address__ = "unbork.example.com" }]
 //   scheme     = "https"
 //   forward_to = [prometheus.remote_write.default.receiver]
 //
 //   basic_auth {
 //     username      = "prometheus"
-//     password_file = "/etc/alloy/labdog-password"
+//     password_file = "/etc/alloy/unbork-password"
 //   }
 // }

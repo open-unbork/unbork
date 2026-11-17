@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
   const [palette, setPalette] = useState(false)
   // Expanded or icon-only rail: a viewer convenience, remembered per browser.
-  const [railPref, setRailPref] = useLocalPref("labdog.rail", { expanded: false })
+  const [railPref, setRailPref] = useLocalPref("unbork.rail", { expanded: false })
   const railExpanded = railPref.expanded
   const toggleRail = useCallback(() => setRailPref({ expanded: !railExpanded }), [setRailPref, railExpanded])
   const railW = railExpanded ? RAIL_W_EXPANDED : RAIL_W

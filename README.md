@@ -19,7 +19,7 @@ Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more 
 
 ```bash
 docker run -d --name unbork -p 8000:8000 \
-  -v unbork-data:/var/lib/labdog \
+  -v unbork-data:/var/lib/unbork \
   unbork/unbork:latest
 ```
 
@@ -70,10 +70,10 @@ parser, bounded by a host allowlist, redacted, and written to the audit log.
   the model went looking for.
 - **Alert-driven actions, investigation and fixes** — point a Grafana
   contact point at unbork and let the alert rule's labels say what
-  happens. `labdog_action` runs an action you have allowed on the alert's
-  host, no AI needed. `labdog_ai` has the assistant investigate, within
+  happens. `unbork_action` runs an action you have allowed on the alert's
+  host, no AI needed. `unbork_ai` has the assistant investigate, within
   budget; it only looks unless you allow more, and can ask for approval
-  for each change. `labdog_ai_automate`, or rules naming alerts, hosts and
+  for each change. `unbork_ai_automate`, or rules naming alerts, hosts and
   groups, lets it fix the host unattended. Every unattended fix is
   snapshotted first and checked afterwards, and one that made the host
   worse is rolled back.
@@ -133,5 +133,7 @@ See **[BUGS.md](BUGS.md)** for known issues and **[CONTRIBUTING.md](CONTRIBUTING
 ## 📜 License
 
 **AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+
+Images and packages list every third-party component they ship, with its licence, in `/usr/share/doc/unbork/THIRD-PARTY-NOTICES`, and say where to get each one's source in [SOURCE-OFFER.md](SOURCE-OFFER.md).
 
 Copyright © 2026 Dennis Tyresson and contributors. Contributions are accepted under a [contributor licence agreement](legal/cla/README.md).

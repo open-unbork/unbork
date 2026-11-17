@@ -321,7 +321,7 @@ async def grafana_alerts_webhook(
     """Receive alerts from a Grafana contact point.
 
     Records every alert in the payload and returns immediately. Deciding
-    what each one sets off — the action its labdog_action label names,
+    what each one sets off — the action its unbork_action label names,
     an AI investigation, or nothing — happens in a Celery
     task, per alert — Grafana retries a webhook that does not answer
     quickly, and doing policy work inline would turn a slow provider into
@@ -365,7 +365,7 @@ async def grafana_alerts_webhook(
 
     alerts = from_grafana_webhook(payload)
     if not alerts:
-        # A payload LabDog could not parse into a single usable alert is
+        # A payload unbork could not parse into a single usable alert is
         # worth saying out loud — silently accepting it would look like
         # working while nothing was recorded.
         logger.info("grafana-alerts: payload contained no usable alerts")

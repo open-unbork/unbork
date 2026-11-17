@@ -70,7 +70,7 @@ async def get_stuck_operations(db: AsyncSession, now: datetime | None = None) ->
     """Syncs and action runs still running past ``STALE_THRESHOLD_MINUTES``.
 
     The threshold is the sync sweeper's, the same one behind the exporter's
-    ``labdog_sync_jobs_stale``. A long action may simply be slow — a
+    ``unbork_sync_jobs_stale``. A long action may simply be slow — a
     kubeadm upgrade can take longer — so each item also says how much is
     queued behind it: that is what turns slow into a problem.
     """
@@ -155,7 +155,7 @@ async def get_stuck_operations(db: AsyncSession, now: datetime | None = None) ->
 
 async def get_module_status_counts(db: AsyncSession) -> list[ModuleStatusCount]:
     """Hosts per (module, sync status) — the exporter's
-    ``labdog_host_module_status`` rows, as JSON."""
+    ``unbork_host_module_status`` rows, as JSON."""
     return [
         ModuleStatusCount(module_type=m, sync_status=s, count=n)
         for m, s, n in await get_host_module_counts(db)

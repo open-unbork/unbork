@@ -19,7 +19,7 @@ from app.auth.permissions import require
 from app.db import get_db
 from app.models.user import User
 from app.notifications import email as smtp
-from app.notifications.events import EVENT_KEYS, EVENT_TYPES
+from app.notifications.events import EVENT_KEYS, offered_event_types
 from app.notifications.models import (
     SMTP_SETTINGS_ID,
     Notification,
@@ -195,7 +195,8 @@ async def send_test_email(
 @router.get("/events", response_model=list[EventTypeResponse])
 async def list_event_types(_: User = Depends(require("hosts.view"))):
     return [
-        EventTypeResponse(key=e.key, label=e.label, description=e.description) for e in EVENT_TYPES
+        EventTypeResponse(key=e.key, label=e.label, description=e.description)
+        for e in offered_event_types()
     ]
 
 

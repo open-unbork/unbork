@@ -30,7 +30,7 @@ DELETE_LOCK_WAIT_SECONDS = 120
 #: Pauses between attempts while locked; the last one repeats.
 DELETE_LOCK_BACKOFF_SECONDS = (5, 10, 20, 30)
 
-#: ``snapshot 'labdog-ai-42-1762500000' does not exist``, from the qemu and
+#: ``snapshot 'unbork-ai-42-1762500000' does not exist``, from the qemu and
 #: lxc snapshot code alike. Matched on the snapshot wording only: a
 #: missing *guest* (``Configuration file ... does not exist``) can mean the
 #: mapping points at the wrong node while the snapshot is still there.

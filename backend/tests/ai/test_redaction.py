@@ -22,7 +22,7 @@ SECRETS = [
     ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "ghp_abcdefghijklmnop"),
     ("sk-ant-api03-abcdefghijklmnopqrstuvwxyz", "sk-ant-api03-abcdef"),
     ("AKIAIOSFODNN7EXAMPLE", "AKIAIOSFODNN7EXAMPLE"),
-    ("postgres://user:hunter2@db:5432/labdog", "hunter2"),
+    ("postgres://user:hunter2@db:5432/unbork", "hunter2"),
     (
         "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghij",
         "eyJhbGciOiJIUzI1NiJ9",

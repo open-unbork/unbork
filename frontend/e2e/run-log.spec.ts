@@ -42,7 +42,7 @@ test.describe("Run log", () => {
     const danger = await resolved(page, "--danger")
     expect(await colour(log.locator('[data-kind="fatal"]').first())).toBe(danger)
     expect(await colour(log.locator('[data-kind="error"]').first())).toBe(danger)
-    expect(await colour(log.locator('[data-kind="labdog-failed"]').first())).toBe(danger)
+    expect(await colour(log.locator('[data-kind="unbork-failed"]').first())).toBe(danger)
     expect(await colour(log.locator('[data-kind="changed"]').first())).toBe(await resolved(page, "--warn"))
     expect(await colour(log.locator('[data-kind="ok"]').first())).toBe(await resolved(page, "--ok"))
     // The second recap (the verify playbook's) has failed=1.
@@ -71,13 +71,13 @@ test.describe("Run log", () => {
     const log = page.getByTestId("run-log")
     await page.getByRole("button", { name: "first of 3 failures ↓" }).click()
     await expect(page.getByLabel("pin to bottom")).not.toBeChecked()
-    expect(await inView(log, log.locator('[data-kind="labdog-failed"]').first())).toBe(true)
+    expect(await inView(log, log.locator('[data-kind="unbork-failed"]').first())).toBe(true)
   })
 
   test("search counts matches and steps through them", async ({ page }) => {
     const log = page.getByTestId("run-log")
     const box = page.getByLabel("Search the log")
-    await box.fill("LABDOG-242")
+    await box.fill("UNBORK-242")
     const count = page.getByTestId("search-count")
     await expect(count).toHaveText("1/3")
     await expect(log.locator("mark")).toHaveCount(3)

@@ -8,7 +8,7 @@ Two things are checked:
 1. The files parse. A truncated or hand-edited Grafana dashboard export is
    silently broken until someone tries to import it; ``json.loads`` catches
    that in CI instead.
-2. Every ``labdog_*`` metric referenced by the dashboard or the alert rules
+2. Every ``unbork_*`` metric referenced by the dashboard or the alert rules
    actually appears in the exporter source. This is the link that stops the
    examples rotting: rename a metric in ``app/metrics/collector.py`` and the
    dashboard panel referencing the old name fails here rather than rendering
@@ -32,15 +32,15 @@ _COLLECTOR = Path(__file__).resolve().parents[1] / "app" / "metrics" / "collecto
 #: samples, but only the family name appears in the collector source.
 _HISTOGRAM_SUFFIXES = ("_bucket", "_sum", "_count")
 
-#: ``labdog_*`` names that legitimately appear in the examples without being
+#: ``unbork_*`` names that legitimately appear in the examples without being
 #: emitted by this exporter.
 _NOT_EXPORTER_METRICS = frozenset(
     {
         # Stamped on node_exporter series by the Alloy install action — part of
         # the *inbound* Mimir integration, not this exporter. See
         # docs/ui/metrics.md.
-        "labdog_host_id",
-        "labdog_hostname",
+        "unbork_host_id",
+        "unbork_hostname",
     }
 )
 
@@ -72,8 +72,8 @@ def test_alloy_scrape_example_present():
     Not parseable as YAML/JSON (Alloy has its own syntax), so this is a
     presence-and-shape check rather than a real parse.
     """
-    alloy = (_EXAMPLES / "labdog.alloy").read_text()
-    assert 'prometheus.scrape "labdog"' in alloy
+    alloy = (_EXAMPLES / "unbork.alloy").read_text()
+    assert 'prometheus.scrape "unbork"' in alloy
     assert "/metrics" in alloy
     assert "forward_to" in alloy, "a scrape block with no forward_to collects nothing"
     assert alloy.count("{") == alloy.count("}"), "unbalanced braces"
@@ -81,8 +81,8 @@ def test_alloy_scrape_example_present():
 
 def test_dashboard_has_expected_identity():
     """The uid is what "update in place" reimports key off."""
-    dashboard = json.loads((_EXAMPLES / "labdog-overview.json").read_text())
-    assert dashboard["uid"] == "labdog-overview"
+    dashboard = json.loads((_EXAMPLES / "unbork-overview.json").read_text())
+    assert dashboard["uid"] == "unbork-overview"
     assert dashboard["title"]
     assert dashboard["panels"], "dashboard has no panels"
     # Import prompts for a datasource, so the input must be declared.
@@ -90,7 +90,7 @@ def test_dashboard_has_expected_identity():
 
 
 def test_alert_rules_are_well_formed():
-    rules_doc = yaml.safe_load((_EXAMPLES / "labdog-alerts.yml").read_text())
+    rules_doc = yaml.safe_load((_EXAMPLES / "unbork-alerts.yml").read_text())
     groups = rules_doc["groups"]
     assert groups, "no rule groups"
 
@@ -107,7 +107,7 @@ def test_alert_rules_are_well_formed():
 
 
 def _referenced_metric_names(text: str) -> set[str]:
-    names = set(re.findall(r"\blabdog_[a-z0-9_]+\b", text))
+    names = set(re.findall(r"\bunbork_[a-z0-9_]+\b", text))
     resolved: set[str] = set()
     for name in names:
         for suffix in _HISTOGRAM_SUFFIXES:
@@ -119,17 +119,17 @@ def _referenced_metric_names(text: str) -> set[str]:
 
 
 @pytest.mark.parametrize(
-    "filename", ["labdog-overview.json", "labdog-alerts.yml"], ids=["dashboard", "alerts"]
+    "filename", ["unbork-overview.json", "unbork-alerts.yml"], ids=["dashboard", "alerts"]
 )
 def test_referenced_metrics_exist_in_exporter(filename: str):
-    """Every labdog_* metric the examples use must exist in the exporter.
+    """Every unbork_* metric the examples use must exist in the exporter.
 
     Catches the drift that otherwise shows up as a silent "No data" panel or an
     alert that can never fire.
     """
     source = _COLLECTOR.read_text()
     referenced = _referenced_metric_names((_EXAMPLES / filename).read_text())
-    assert referenced, f"{filename} references no labdog metrics — regex likely broke"
+    assert referenced, f"{filename} references no unbork metrics — regex likely broke"
 
     missing = sorted(name for name in referenced if name not in source)
     assert not missing, (

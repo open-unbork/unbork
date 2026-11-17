@@ -9,6 +9,7 @@ from app.auth.schemas import MeRead, ScopedPermissions, UserCreate, UserRead
 from app.auth.users import UserManager, current_active_user, get_user_manager
 from app.config import settings
 from app.db import AsyncSessionLocal
+from app.features import shown_permissions
 from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -79,14 +80,14 @@ async def refresh_csrf_token(
 ):
     """Re-issue the CSRF double-submit cookie for an existing session.
 
-    Called by the frontend on mount when the labdog_csrf cookie is absent
+    Called by the frontend on mount when the unbork_csrf cookie is absent
     (e.g. sessions that predate the CSRF feature). GET is intentional —
     the CSRF middleware only guards mutating methods, so this works without
     a pre-existing token.
     """
     token = secrets.token_urlsafe(settings.security.csrf_token_bytes)
     response.set_cookie(
-        "labdog_csrf",
+        "unbork_csrf",
         token,
         max_age=settings.security.session_lifetime_seconds,
         path="/",
@@ -109,8 +110,10 @@ async def read_me(user: User = Depends(current_active_user)):
     data = UserRead.model_validate(user).model_dump()
     return MeRead(
         **data,
-        permissions=sorted(await permissions_for(user)),
-        permissions_anywhere=sorted(await permissions_for(user, BoundScope.of(ANYWHERE))),
+        permissions=shown_permissions(await permissions_for(user)),
+        permissions_anywhere=shown_permissions(
+            await permissions_for(user, BoundScope.of(ANYWHERE))
+        ),
     )
 
 
@@ -135,4 +138,4 @@ async def read_my_permissions(
     else:
         scope = GLOBAL
     perms = await permissions_for(user, BoundScope.of(scope))
-    return ScopedPermissions(scope=scope.kind, id=scope.id, permissions=sorted(perms))
+    return ScopedPermissions(scope=scope.kind, id=scope.id, permissions=shown_permissions(perms))

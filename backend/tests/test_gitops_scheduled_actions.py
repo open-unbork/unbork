@@ -11,15 +11,15 @@ import pytest
 from sqlalchemy import select
 
 from app.gitops.importers.scheduled_actions import import_scheduled_actions
-from app.gitops.schema import LabDogGroupYAML
+from app.gitops.schema import UnborkGroupYAML
 from app.models.scheduled_action import ScheduledAction
 from tests.conftest import create_group
 
 pytestmark = pytest.mark.integration
 
 
-def _yaml(scheduled_actions: list | None = None) -> LabDogGroupYAML:
-    return LabDogGroupYAML(group="g", scheduled_actions=scheduled_actions)
+def _yaml(scheduled_actions: list | None = None) -> UnborkGroupYAML:
+    return UnborkGroupYAML(group="g", scheduled_actions=scheduled_actions)
 
 
 async def test_section_absent_leaves_db_untouched(db):
@@ -173,7 +173,7 @@ async def test_host_only_action_rejected_for_group(db, monkeypatch):
         name="Host-Only Fixture",
         description="",
         icon="ArrowUpFromLine",
-        playbook_path=Path("/tmp/labdog-test-host-only.yml"),
+        playbook_path=Path("/tmp/unbork-test-host-only.yml"),
         version="1.0",
         estimated_duration="1 min",
         destructive=False,
@@ -181,7 +181,7 @@ async def test_host_only_action_rejected_for_group(db, monkeypatch):
         supports_host=True,
         supports_fleet=False,
     )
-    Path("/tmp/labdog-test-host-only.yml").touch()
+    Path("/tmp/unbork-test-host-only.yml").touch()
     monkeypatch.setitem(ACTION_REGISTRY, "host-only-fixture", fake)
 
     group = await create_group(db, name="gg")

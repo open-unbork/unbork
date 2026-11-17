@@ -299,7 +299,7 @@ class TestSnapshotPrecondition:
         node = ProxmoxNode(
             name=f"pve-{uuid.uuid4().hex[:6]}",
             api_url="https://pve.test:8006",
-            token_id="labdog@pve!ci",
+            token_id="unbork@pve!ci",
             encrypted_token_secret=encrypt_ssh_key("secret", get_master_key()),
             verify_ssl=False,
         )

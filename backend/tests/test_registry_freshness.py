@@ -4,7 +4,7 @@ Celery forks its pool before the worker's boot rebuild, and a pool
 process imports the registry module itself, so its registry held only
 what shipped in the image (then the bundled pack, now the built-ins). It
 rebuilt only when a lookup missed, and two lookups never rebuilt at all.
-On lin-manager the ``labdog-private`` compose schedule went out 16
+On lin-manager the ``unbork-private`` compose schedule went out 16
 minutes, 18 minutes and two hours late on three of five nights, each
 after a restart. Nothing told a worker about a pin or a pack sync made
 through the API either.

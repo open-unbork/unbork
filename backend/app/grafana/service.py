@@ -253,7 +253,7 @@ async def build_metrics_extra_vars(
 
     Returns ``(destination_vars, identity_vars)``:
 
-    * ``identity_vars``: ``labdog_host_id`` / ``labdog_hostname``, always
+    * ``identity_vars``: ``unbork_host_id`` / ``unbork_hostname``, always
       set so the agent stamps queryable labels. These should override any
       operator input (identity is unbork-owned).
     * ``destination_vars``: for each of Mimir and Loki, the URL, tenant and
@@ -266,7 +266,7 @@ async def build_metrics_extra_vars(
     with that URL (its tenant and TLS settings travel with it; an
     unregistered URL gets none); else the host's resolved destination.
     """
-    identity_vars = {"labdog_host_id": str(host_id), "labdog_hostname": hostname}
+    identity_vars = {"unbork_host_id": str(host_id), "unbork_hostname": hostname}
     out: dict[str, Any] = {}
     if not metrics_backend:
         return out, identity_vars

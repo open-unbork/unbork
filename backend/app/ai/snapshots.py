@@ -21,7 +21,7 @@ Proxmox problem — an unreachable node, a bad token, a full datastore —
 and running a change into it converts an approval the operator gave under
 one set of assumptions into a riskier change than the one they agreed to.
 
-Snapshots taken here are named ``labdog-ai-<session>-<ts>`` rather than
+Snapshots taken here are named ``unbork-ai-<session>-<ts>`` rather than
 sharing the action-run prefix. The two have different lifetimes — an
 action deletes its own snapshot as soon as its verify step passes, while
 an agent's is kept for a retention window precisely so a human can undo
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 #: Distinguishes an agent's snapshot from an action run's. Also what the
 #: retention sweep matches on, so a change to it strands existing
 #: snapshots rather than deleting the wrong ones.
-AI_SNAPSHOT_PREFIX = "labdog-ai"
+AI_SNAPSHOT_PREFIX = "unbork-ai"
 
 
 class SnapshotFailed(Exception):

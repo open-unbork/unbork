@@ -16,8 +16,8 @@ stages:
     items: [C-008, C-047, C-022, S-001, S-002, S-015, S-016]
   - stage: 2
     goal: "The rename, and a clean image"
-    base_commit: null
-    status: todo
+    base_commit: 2e961d7
+    status: review
     items: [C-048, C-049, C-050, C-051, S-008, S-014, S-017, S-009, C-026, S-010]
   - stage: 3
     goal: "Release unbork 2.0.0"
@@ -281,8 +281,8 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/C-048-rename-configuration-and-environment-with-the-old.md
     notes: "D-02 and accepted proposal PR-02: the first release is the cheapest moment to rename."
   - id: C-049
@@ -295,8 +295,8 @@ items:
     depends_on: [C-048]
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/C-049-rename-paths-packages-and-service-names-migrated.md
     notes: "D-02: data and config paths and unit names move, and an upgrade must carry an install across."
   - id: C-050
@@ -309,8 +309,8 @@ items:
     depends_on: [C-048]
     autonomy: B
     effort: L
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/C-050-rename-on-host-markers-alert-labels-metrics.md
     notes: "D-02: host checks must recognise both names and the first sync removes the old chains and files; a mistake here touches every managed host, so it is tested on hosts named test first."
   - id: C-051
@@ -323,8 +323,8 @@ items:
     depends_on: [C-048, C-049, C-050]
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-1sra3u
     spec: items/C-051-rename-readme-docs-site-claude-md-and.md
     notes: "Accepted proposals PR-02 and PR-05: what a new user and a new session read first."
   - id: S-008
@@ -337,8 +337,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-1sra3u
     spec: items/S-008-rename-the-claude-code-provider-labels.md
     notes: "Two labels; cheap to fix before the first release under the new name."
   - id: S-014
@@ -351,8 +351,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/S-014-remove-the-subscription-token-field-from-ai.md
     notes: "D-04: Community keeps only the operator's own Claude Code sign-in."
   - id: S-017
@@ -365,8 +365,8 @@ items:
     depends_on: [S-014]
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/S-017-extension-hook-restrict-which-ai-provider-types.md
     notes: "Found while writing specs: decision D-04 needs an extension to refuse provider types, and Community has no seam for it."
   - id: S-009
@@ -379,8 +379,8 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/S-009-stop-bundling-the-claude-code-binary-in.md
     notes: "D-04: installed on first use instead of shipped in the image."
   - id: C-026
@@ -393,8 +393,8 @@ items:
     depends_on: [S-009]
     autonomy: B
     effort: L
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-1sra3u
     spec: items/C-026-make-the-ai-assistant-removable-from-a.md
     notes: "Promised for Community, and the clean way to deliver S-009."
   - id: S-010
@@ -407,10 +407,10 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: blocked
+    branch: claude/project-thread-1sra3u
     spec: items/S-010-third-party-notices-and-a-source-offer.md
-    notes: "Licence hygiene for a public image; best done with the first release."
+    notes: "Licence hygiene for a public image; best done with the first release. Code done in stage 2 (24ae507); blocked on D-31, the source offer's contact address and wording. GitHub issues are the interim channel."
   - id: S-007
     title: "Say in the README which parts are AGPL and which are commercial"
     edition: shared

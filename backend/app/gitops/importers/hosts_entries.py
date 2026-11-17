@@ -21,7 +21,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import HostsEntryYAML, LabDogGroupYAML
+from app.gitops.schema import HostsEntryYAML, UnborkGroupYAML
 from app.hosts_mgmt.models import HostsEntry
 from app.hosts_mgmt.schemas import HostsEntryCreate
 from app.models.host import Host
@@ -113,7 +113,7 @@ def _yaml_state(e: HostsEntryYAML) -> dict:
 
 async def import_hosts_entries(
     group: HostGroup,
-    parsed: LabDogGroupYAML,
+    parsed: UnborkGroupYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:
@@ -135,7 +135,7 @@ async def import_hosts_entries(
 
     Args:
         group: The target ``HostGroup`` ORM instance.
-        parsed: Validated ``LabDogGroupYAML`` from the current commit.
+        parsed: Validated ``UnborkGroupYAML`` from the current commit.
         commit_sha: Full commit SHA string (for audit trail).
         db: Active async database session.
 

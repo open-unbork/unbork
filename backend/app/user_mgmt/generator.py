@@ -99,14 +99,14 @@ def _authorized_key_tasks(users: list) -> list[dict]:
 
         # Operator data stays out of the Jinja expressions: the username
         # reaches them only as a task variable.
-        task_vars = {"labdog_key_user": username}
-        passwd = "ansible_facts.getent_passwd[labdog_key_user]"  # nosec B105 - a fact path
+        task_vars = {"unbork_key_user": username}
+        passwd = "ansible_facts.getent_passwd[unbork_key_user]"  # nosec B105 - a fact path
         home = Template("{{ " + passwd + "[4] }}")
         # The user's primary gid, as ssh-keygen, ssh-copy-id and the old
         # ansible.posix.authorized_key leave them. Without it the play's
         # become put both paths in group root (BUG-173).
         gid = Template("{{ " + passwd + "[2] }}")
-        exists = "labdog_key_user in ansible_facts.getent_passwd"
+        exists = "unbork_key_user in ansible_facts.getent_passwd"
         if not tasks:
             tasks.append(
                 {
@@ -215,7 +215,7 @@ def generate_user_playbook(
     tasks.extend(_group_tasks(groups_absent))
 
     return {
-        "name": "LabDog Linux User Management",
+        "name": "unbork Linux User Management",
         "hosts": host_ip,
         "become": True,
         "gather_facts": False,

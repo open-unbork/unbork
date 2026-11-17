@@ -39,13 +39,13 @@ describe("parseAnsibleLog", () => {
 
   it("classifies structure and results", () => {
     expect(kindOf("=== Ansible output ===")).toBe("section")
-    expect(kindOf("[preflight] host reachable")).toBe("labdog")
+    expect(kindOf("[preflight] host reachable")).toBe("unbork")
     expect(kindOf("TASK [apt upgrade] *************************************************************")).toBe("task")
     expect(kindOf("ok: [web1]")).toBe("ok")
     expect(kindOf("changed: [web1]")).toBe("changed")
     expect(kindOf('failed: [web1] (item=nginx) => {"msg": "boom"}')).toBe("failed")
     expect(kindOf("...ignoring")).toBe("ignored")
-    expect(kindOf("[cleanup] status=failed")).toBe("labdog-failed")
+    expect(kindOf("[cleanup] status=failed")).toBe("unbork-failed")
   })
 
   it("reads 'fatal: ... UNREACHABLE!' as fatal and folds its JSON block into it", () => {
@@ -69,6 +69,6 @@ describe("parseAnsibleLog", () => {
 
   it("counts each failure once in FAILURE_KINDS", () => {
     const stops = lines.filter((l) => !l.cont && FAILURE_KINDS.has(l.kind)).map((l) => l.kind)
-    expect(stops).toEqual(["fatal", "failed", "error", "labdog-failed"])
+    expect(stops).toEqual(["fatal", "failed", "error", "unbork-failed"])
   })
 })

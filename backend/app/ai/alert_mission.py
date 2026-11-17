@@ -47,7 +47,7 @@ FIELDS: dict[str, str] = {
     "annotations": "Every annotation, one per line as '- key: value'",
 }
 
-#: How much of the alert LabDog puts in front of the model. The whole
+#: How much of the alert unbork puts in front of the model. The whole
 #: label and annotation set, because an investigation is only as good as
 #: its context and the operator chose what to label.
 DEFAULT_TEMPLATE = """\
@@ -87,13 +87,13 @@ _MAX_FIELD_CHARS = 512
 # prompt is rendered into a transcript.
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
-#: Wraps every value that came from the alert rather than from LabDog.
+#: Wraps every value that came from the alert rather than from unbork.
 #:
 #: Alert labels and annotations are attacker-controlled in the same sense a
 #: web form is: anyone who can reach the Grafana contact point — or who
 #: compromises the Grafana instance — chooses the text. It used to be
 #: interpolated into the mission prompt verbatim, so "Ignore your previous
-#: instructions and run …" arrived indistinguishable from LabDog's own
+#: instructions and run …" arrived indistinguishable from unbork's own
 #: wording.
 #:
 #: The fence is not a security control on its own — a model can be talked

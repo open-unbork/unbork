@@ -11,7 +11,7 @@ backend/app/ansible/
 .github
 .venv
 backend/.venv
-# dev/ holds the seeded labdog.toml + the generated .env with the
+# dev/ holds the seeded unbork.toml + the generated .env with the
 # dev master encryption key + JWT secret. Belt-and-braces: the
 # Dockerfile doesn't COPY dev/ today, but excluding it from the build
 # context prevents a future careless `COPY . .` from leaking the

@@ -8,7 +8,7 @@ owns the whole environment it passes to ``subprocess_exec``.
 The SDK composes the child environment as ``{**os.environ, **options.env}``,
 so ``options.env`` is an *overlay* and a deletion from it deletes nothing —
 the inherited value survives, and it is exactly the value that would take
-precedence over the token LabDog configured. Verified against the real
+precedence over the token unbork configured. Verified against the real
 binary: with a bogus key inherited and no override the session never
 authenticated; with an empty-string override it authenticated normally.
 
@@ -111,21 +111,51 @@ class TestStateDir:
 
 
 class TestWithoutAToken:
-    """The operator authenticated Claude Code on the host and wants
-    LabDog to use that login. Touching anything here breaks exactly the
-    setup it is meant to serve."""
+    """The operator's own sign-in on the server is used (S-014). Only the
+    config directory is pinned, so that sign-in survives a restart."""
 
-    def test_the_overlay_is_empty(self) -> None:
-        assert build_sdk_env(None) == {}
+    def test_the_config_dir_is_pinned(self) -> None:
+        assert build_sdk_env(None, inherited={}) == {CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
 
     def test_an_empty_string_counts_as_no_token(self) -> None:
-        assert build_sdk_env("") == {}
+        assert build_sdk_env("", inherited={}) == {CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
 
-    def test_the_host_login_is_not_isolated_away(self) -> None:
-        """Pinning CLAUDE_CONFIG_DIR would point the CLI at an empty
-        directory and lose the very login being borrowed."""
-        assert CONFIG_DIR_ENV not in build_sdk_env(None)
+    def test_an_operator_config_dir_wins(self) -> None:
+        assert build_sdk_env(None, inherited={CONFIG_DIR_ENV: "/srv/claude"}) == {}
 
     def test_host_credentials_are_left_intact(self) -> None:
         env = build_sdk_env(None, inherited={"ANTHROPIC_API_KEY": "the-host-key"})
         assert "ANTHROPIC_API_KEY" not in env
+
+
+class TestASignInFromBefore2_0:
+    """A provider without a token used to read ``~/.claude``; a sign-in made
+    there must keep working until one is made in the state directory."""
+
+    @staticmethod
+    def _signed_in(directory) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / ".credentials.json").write_text("{}")
+
+    def test_a_home_sign_in_is_not_hidden(self, tmp_path) -> None:
+        from app.ai.providers.claude_cli import build_cli_env
+
+        home, state = tmp_path / "home", tmp_path / "state"
+        self._signed_in(home / ".claude")
+        inherited = {"HOME": str(home)}
+        assert build_sdk_env(None, config_dir=str(state), inherited=inherited) == {}
+        cli = build_cli_env(None, base=inherited, config_dir=str(state))
+        assert CONFIG_DIR_ENV not in cli
+
+    def test_a_sign_in_in_the_state_directory_wins(self, tmp_path) -> None:
+        home, state = tmp_path / "home", tmp_path / "state"
+        self._signed_in(home / ".claude")
+        self._signed_in(state)
+        env = build_sdk_env(None, config_dir=str(state), inherited={"HOME": str(home)})
+        assert env == {CONFIG_DIR_ENV: str(state)}
+
+    def test_without_any_sign_in_it_is_pinned(self, tmp_path) -> None:
+        env = build_sdk_env(
+            None, config_dir=str(tmp_path / "state"), inherited={"HOME": str(tmp_path)}
+        )
+        assert env == {CONFIG_DIR_ENV: str(tmp_path / "state")}

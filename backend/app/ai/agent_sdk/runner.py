@@ -83,7 +83,7 @@ logger = logging.getLogger(__name__)
 
 #: Where the CLI keeps its own session files. ``resume`` reads them, so a
 #: deployment that wants to park a session across a container restart has
-#: to persist this path — it is under LabDog's state root for that reason,
+#: to persist this path — it is under unbork's state root for that reason,
 #: and the shipped compose in ``docs/production-deploy.md`` mounts it.
 #:
 #: ``ClaudeAgentOptions.session_store`` would let this live in Postgres
@@ -93,6 +93,15 @@ logger = logging.getLogger(__name__)
 #: package installs get the persistence for free because this is a real
 #: directory on disk. Worth revisiting only if the volume proves fragile.
 SESSION_STATE_DIR = DEFAULT_CONFIG_DIR
+
+
+def _program_path() -> str | None:
+    """The Claude Code program to run, or ``None`` to let the SDK look."""
+    from app.ai.claude_code import binary_path
+
+    found = binary_path()
+    return str(found) if found is not None else None
+
 
 #: How the CLI's ``rate_limit_type`` values read in a sentence. An
 #: unrecognised value is used verbatim rather than dropped: a window this
@@ -536,7 +545,7 @@ class AgentSDKRunner:
             if name == "run_ssh_command":
                 self.session.command_count += 1
                 # Commands against managed hosts belong in the same audit
-                # trail as any other change LabDog makes to them.
+                # trail as any other change unbork makes to them.
                 await log_action(
                     self.db,
                     action="ai_command",
@@ -625,21 +634,25 @@ class AgentSDKRunner:
         # MCP server with nothing in it invites the model to go looking
         # for what it should have.
         servers = (
-            {"labdog": build_tool_server(self._handlers, self._execute_tool)}
+            {"unbork": build_tool_server(self._handlers, self._execute_tool)}
             if with_tools and self._handlers
             else {}
         )
         resume = (self.session.resume_state or {}).get("sdk_session_id")
 
         return ClaudeAgentOptions(
+            # build_runner() made sure there is a program (S-009). Left
+            # unset, the SDK would look for a bundled copy the image does
+            # not have.
+            cli_path=_program_path(),
             mcp_servers=servers,
-            # Only the tools LabDog built. Omitting this hands the model
-            # Bash, Read, Write and Edit inside LabDog's container.
+            # Only the tools unbork built. Omitting this hands the model
+            # Bash, Read, Write and Edit inside unbork's container.
             tools=NO_BUILTIN_TOOLS,
             strict_mcp_config=True,
             # Do not read the host's own Claude Code configuration: a
             # CLAUDE.md or an MCP server belonging to whoever administers
-            # the box is not part of LabDog's threat model.
+            # the box is not part of unbork's threat model.
             setting_sources=[],
             # Deliberately empty. An entry here would auto-approve that
             # tool *before* can_use_tool is consulted, silently disabling

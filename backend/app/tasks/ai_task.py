@@ -29,7 +29,7 @@ from sqlalchemy import update
 
 from app.ai.loop import AgentLoop, LoopCaps, redis_publisher
 from app.ai.models import AIProvider, AISession
-from app.ai.providers.factory import runs_on_agent_sdk
+from app.ai.providers.factory import runs_on_agent_sdk, uses_subscription
 from app.ai.service import (
     AIDisabledError,
     BudgetExceededError,
@@ -44,6 +44,23 @@ from app.tasks import celery_app
 logger = logging.getLogger(__name__)
 
 SESSION_CHANNEL = "ai.session.{id}"
+
+
+def _ensure_program() -> None:
+    """Install Claude Code here if this worker has none (S-009).
+
+    The API queues the install when a provider is turned on, but a split
+    deployment's worker may have a volume of its own, and an upgraded
+    install has none until the first session asks. Installing once here
+    costs that session the download; failing raises the same text the
+    providers page shows.
+    """
+    from app.ai import claude_code
+
+    try:
+        claude_code.ensure_installed()
+    except claude_code.ClaudeCodeUnavailable as exc:
+        raise AIDisabledError(str(exc)) from exc
 
 
 def build_runner(
@@ -71,6 +88,8 @@ def build_runner(
     a package install without it must still be able to run the HTTP
     backends.
     """
+    if uses_subscription(provider_row):
+        _ensure_program()
     if not runs_on_agent_sdk(provider_row):
         return AgentLoop(db, session, provider_row, caps, publish=publish)
 

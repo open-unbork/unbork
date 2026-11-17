@@ -13,7 +13,7 @@ HTTPS_URL_PREFIX = "https://"
 
 # Networks that must never be reachable via a user-supplied git URL.
 # RFC1918 private ranges (10/8, 172.16/12, 192.168/16) are intentionally
-# absent — labdog's primary use-case is managing hosts on the operator's
+# absent — unbork's primary use-case is managing hosts on the operator's
 # internal LAN and operators may run a git server there.
 _BLOCKED_URL_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),  # loopback

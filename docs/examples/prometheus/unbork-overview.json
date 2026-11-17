@@ -19,7 +19,7 @@
   "links": [],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": ["labdog"],
+  "tags": ["unbork"],
   "templating": {
     "list": [
       {
@@ -37,14 +37,14 @@
       {
         "current": { "selected": true, "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(labdog_host_modules, module)",
+        "definition": "label_values(unbork_host_modules, module)",
         "hide": 0,
         "includeAll": true,
         "label": "Module",
         "multi": true,
         "name": "module",
         "options": [],
-        "query": { "query": "label_values(labdog_host_modules, module)", "refId": "StandardVariableQuery" },
+        "query": { "query": "label_values(unbork_host_modules, module)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "type": "query"
       }
@@ -54,7 +54,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "unbork — Overview",
-  "uid": "labdog-overview",
+  "uid": "unbork-overview",
   "version": 1,
   "panels": [
     {
@@ -70,7 +70,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
       "targets": [
-        { "expr": "sum(labdog_hosts)", "refId": "A", "legendFormat": "hosts" }
+        { "expr": "sum(unbork_hosts)", "refId": "A", "legendFormat": "hosts" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -91,7 +91,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "targets": [
-        { "expr": "labdog_hosts{sync_status=\"in_sync\"}", "refId": "A", "legendFormat": "in sync" }
+        { "expr": "unbork_hosts{sync_status=\"in_sync\"}", "refId": "A", "legendFormat": "in sync" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -112,7 +112,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
       "targets": [
-        { "expr": "labdog_hosts{sync_status=\"out_of_sync\"}", "refId": "A", "legendFormat": "drifted" }
+        { "expr": "unbork_hosts{sync_status=\"out_of_sync\"}", "refId": "A", "legendFormat": "drifted" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -139,7 +139,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "targets": [
-        { "expr": "labdog_hosts{sync_status=\"error\"}", "refId": "A", "legendFormat": "error" }
+        { "expr": "unbork_hosts{sync_status=\"error\"}", "refId": "A", "legendFormat": "error" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -166,7 +166,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "targets": [
-        { "expr": "labdog_hosts_never_synced", "refId": "A", "legendFormat": "never synced" }
+        { "expr": "unbork_hosts_never_synced", "refId": "A", "legendFormat": "never synced" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -194,7 +194,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "targets": [
-        { "expr": "labdog_host_last_sync_age_seconds_max", "refId": "A", "legendFormat": "stalest" }
+        { "expr": "unbork_host_last_sync_age_seconds_max", "refId": "A", "legendFormat": "stalest" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -231,7 +231,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
       "targets": [
-        { "expr": "labdog_hosts", "refId": "A", "legendFormat": "{{sync_status}}", "instant": true }
+        { "expr": "unbork_hosts", "refId": "A", "legendFormat": "{{sync_status}}", "instant": true }
       ],
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
       "options": {
@@ -248,7 +248,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
       "targets": [
         {
-          "expr": "sum(labdog_host_modules{module=~\"$module\", sync_status!=\"in_sync\"}) by (module, sync_status)",
+          "expr": "sum(unbork_host_modules{module=~\"$module\", sync_status!=\"in_sync\"}) by (module, sync_status)",
           "refId": "A",
           "legendFormat": "{{module}} / {{sync_status}}",
           "instant": true
@@ -279,7 +279,7 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
       "targets": [
-        { "expr": "labdog_module_rules", "refId": "A", "legendFormat": "{{module}}", "instant": true }
+        { "expr": "unbork_module_rules", "refId": "A", "legendFormat": "{{module}}", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
@@ -309,7 +309,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
       "targets": [
         {
-          "expr": "sum(rate(labdog_sync_jobs_total{status=~\"success|failed|cancelled\"}[$__rate_interval])) by (status)",
+          "expr": "sum(rate(unbork_sync_jobs_total{status=~\"success|failed|cancelled\"}[$__rate_interval])) by (status)",
           "refId": "A",
           "legendFormat": "{{status}}"
         }
@@ -334,9 +334,9 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(labdog_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "A", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(labdog_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "B", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(labdog_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "C", "legendFormat": "p99" }
+        { "expr": "histogram_quantile(0.50, sum(rate(unbork_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "A", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(unbork_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "B", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(unbork_sync_job_duration_seconds_bucket[$__rate_interval])) by (le))", "refId": "C", "legendFormat": "p99" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -355,10 +355,10 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
       "targets": [
-        { "expr": "sum(labdog_sync_jobs_inflight)", "refId": "A", "legendFormat": "syncs in flight" },
-        { "expr": "sum(labdog_action_runs_inflight)", "refId": "B", "legendFormat": "action runs in flight" },
-        { "expr": "labdog_hosts_queue_blocked", "refId": "C", "legendFormat": "hosts blocked" },
-        { "expr": "labdog_stale_sync_jobs", "refId": "D", "legendFormat": "stale sync jobs" }
+        { "expr": "sum(unbork_sync_jobs_inflight)", "refId": "A", "legendFormat": "syncs in flight" },
+        { "expr": "sum(unbork_action_runs_inflight)", "refId": "B", "legendFormat": "action runs in flight" },
+        { "expr": "unbork_hosts_queue_blocked", "refId": "C", "legendFormat": "hosts blocked" },
+        { "expr": "unbork_stale_sync_jobs", "refId": "D", "legendFormat": "stale sync jobs" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -387,7 +387,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
       "targets": [
         {
-          "expr": "sum(rate(labdog_drift_checks_total{result=\"out_of_sync\", module=~\"$module\"}[$__rate_interval])) by (module) / clamp_min(sum(rate(labdog_drift_checks_total{module=~\"$module\"}[$__rate_interval])) by (module), 0.0001)",
+          "expr": "sum(rate(unbork_drift_checks_total{result=\"out_of_sync\", module=~\"$module\"}[$__rate_interval])) by (module) / clamp_min(sum(rate(unbork_drift_checks_total{module=~\"$module\"}[$__rate_interval])) by (module), 0.0001)",
           "refId": "A",
           "legendFormat": "{{module}}"
         }
@@ -412,7 +412,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
       "targets": [
         {
-          "expr": "sum(rate(labdog_drift_checks_total{result=\"error\", module=~\"$module\"}[$__rate_interval])) by (module)",
+          "expr": "sum(rate(unbork_drift_checks_total{result=\"error\", module=~\"$module\"}[$__rate_interval])) by (module)",
           "refId": "A",
           "legendFormat": "{{module}}"
         }
@@ -434,7 +434,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
       "targets": [
         {
-          "expr": "sum(rate(labdog_drift_changes_total{module=~\"$module\"}[$__rate_interval])) by (kind)",
+          "expr": "sum(rate(unbork_drift_changes_total{module=~\"$module\"}[$__rate_interval])) by (kind)",
           "refId": "A",
           "legendFormat": "{{kind}}"
         }
@@ -455,7 +455,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(labdog_drift_check_duration_seconds_bucket{module=~\"$module\"}[$__rate_interval])) by (le, module))",
+          "expr": "histogram_quantile(0.95, sum(rate(unbork_drift_check_duration_seconds_bucket{module=~\"$module\"}[$__rate_interval])) by (le, module))",
           "refId": "A",
           "legendFormat": "{{module}}"
         }
@@ -485,7 +485,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
       "targets": [
         {
-          "expr": "topk(10, sum(increase(labdog_action_runs_total{status=\"failed\"}[24h])) by (action_key))",
+          "expr": "topk(10, sum(increase(unbork_action_runs_total{status=\"failed\"}[24h])) by (action_key))",
           "refId": "A",
           "format": "table",
           "instant": true
@@ -507,10 +507,10 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
       "targets": [
-        { "expr": "labdog_scheduled_actions_orphaned", "refId": "A", "legendFormat": "orphaned schedules" },
-        { "expr": "sum(labdog_action_packs{sync_status=\"failed\"})", "refId": "B", "legendFormat": "packs failing sync" },
-        { "expr": "sum(labdog_action_resolutions{origin=\"frozen\"})", "refId": "C", "legendFormat": "unreviewed pin conflicts" },
-        { "expr": "labdog_scheduled_action_last_dispatch_age_seconds_max", "refId": "D", "legendFormat": "stalest schedule dispatch" }
+        { "expr": "unbork_scheduled_actions_orphaned", "refId": "A", "legendFormat": "orphaned schedules" },
+        { "expr": "sum(unbork_action_packs{sync_status=\"failed\"})", "refId": "B", "legendFormat": "packs failing sync" },
+        { "expr": "sum(unbork_action_resolutions{origin=\"frozen\"})", "refId": "C", "legendFormat": "unreviewed pin conflicts" },
+        { "expr": "unbork_scheduled_action_last_dispatch_age_seconds_max", "refId": "D", "legendFormat": "stalest schedule dispatch" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -556,7 +556,7 @@
       "gridPos": { "h": 8, "w": 16, "x": 0, "y": 57 },
       "targets": [
         {
-          "expr": "(labdog_ca_cert_not_after_timestamp_seconds - time()) / 86400",
+          "expr": "(unbork_ca_cert_not_after_timestamp_seconds - time()) / 86400",
           "refId": "A",
           "format": "table",
           "instant": true
@@ -598,8 +598,8 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 57 },
       "targets": [
-        { "expr": "labdog_scan_pending_hosts", "refId": "A", "legendFormat": "pending hosts" },
-        { "expr": "sum(labdog_scan_config_last_run{status=\"failed\"})", "refId": "B", "legendFormat": "failed scans" }
+        { "expr": "unbork_scan_pending_hosts", "refId": "A", "legendFormat": "pending hosts" },
+        { "expr": "sum(unbork_scan_config_last_run{status=\"failed\"})", "refId": "B", "legendFormat": "failed scans" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -635,9 +635,9 @@
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "gridPos": { "h": 7, "w": 12, "x": 0, "y": 66 },
           "targets": [
-            { "expr": "labdog_metrics_scrape_duration_seconds", "refId": "A", "legendFormat": "collection time" },
-            { "expr": "labdog_metrics_cache_age_seconds", "refId": "B", "legendFormat": "served snapshot age" },
-            { "expr": "scrape_duration_seconds{job=\"labdog\"}", "refId": "C", "legendFormat": "prometheus scrape time" }
+            { "expr": "unbork_metrics_scrape_duration_seconds", "refId": "A", "legendFormat": "collection time" },
+            { "expr": "unbork_metrics_cache_age_seconds", "refId": "B", "legendFormat": "served snapshot age" },
+            { "expr": "scrape_duration_seconds{job=\"unbork\"}", "refId": "C", "legendFormat": "prometheus scrape time" }
           ],
           "fieldConfig": {
             "defaults": {
@@ -655,7 +655,7 @@
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "gridPos": { "h": 7, "w": 12, "x": 12, "y": 66 },
           "targets": [
-            { "expr": "labdog_build_info", "refId": "A", "format": "table", "instant": true }
+            { "expr": "unbork_build_info", "refId": "A", "format": "table", "instant": true }
           ],
           "fieldConfig": { "defaults": { "custom": { "align": "auto" } }, "overrides": [] },
           "options": { "showHeader": true },

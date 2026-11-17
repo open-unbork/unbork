@@ -1,5 +1,5 @@
 [Unit]
-Description=LabDog
+Description=unbork
 Documentation=https://open-unbork.github.io/unbork/
 # Order after network and (optional) local DB/Redis. We do NOT Require= them
 # because PostgreSQL and Redis are commonly hosted off-box in production.
@@ -9,12 +9,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=labdog
-Group=labdog
-WorkingDirectory=/usr/lib/labdog/backend
-Environment=PATH=/usr/lib/labdog/venv/bin:/usr/bin:/bin
-Environment=LABDOG_CONFIG=/etc/labdog/labdog.toml
-ExecStart=/usr/lib/labdog/venv/bin/python -m app
+User=unbork
+Group=unbork
+WorkingDirectory=/usr/lib/unbork/backend
+Environment=PATH=/usr/lib/unbork/venv/bin:/usr/bin:/bin
+Environment=UNBORK_CONFIG=/etc/unbork/unbork.toml
+ExecStart=/usr/lib/unbork/venv/bin/python -m app
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=65
@@ -31,8 +31,8 @@ RestrictSUIDSGID=true
 LockPersonality=true
 # Logs and state files should not be world-readable: they carry host
 # names, run output and audit detail. 0027 rather than 0077 so the
-# labdog group can still read them (the .deb installs /etc/labdog
-# root:labdog 0750 on the same reasoning).
+# unbork group can still read them (the .deb installs /etc/unbork
+# root:unbork 0750 on the same reasoning).
 UMask=0027
 RestrictRealtime=true
 RestrictNamespaces=true
@@ -56,7 +56,7 @@ PrivateDevices=true
 # set but leaves the /dev/shm mount alone. So the per-run SSH key still
 # lands in shared memory — the mkstemp 0600 mode is what keeps it to its
 # owner, not the sandbox.
-ReadWritePaths=/var/lib/labdog /var/log/labdog /run/labdog /dev/shm
+ReadWritePaths=/var/lib/unbork /var/log/unbork /run/unbork /dev/shm
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+{
+  "sdk_version": "0.2.134",
+  "wheels": {
+    "aarch64": {
+      "sha256": "f259671f03823e07544b52ed37e29accd295012e7d9304f5b7c1ec6a3508c758",
+      "url": "https://files.pythonhosted.org/packages/67/b2/cb099e7b82eb43626e9dcfbf24e09cd760d59ff3b9e498642c4dffa4fa6f/claude_agent_sdk-0.2.134-py3-none-manylinux_2_17_aarch64.whl"
+    },
+    "x86_64": {
+      "sha256": "0cba177a0f234dcdb8dfcdd46803fbe0aadd42fbc5aebba41f65f9d00d05a420",
+      "url": "https://files.pythonhosted.org/packages/88/17/59e7a9cc6ebebc9708733a03ddd2b9c90051c7de359686e1e14b1b81d2b1/claude_agent_sdk-0.2.134-py3-none-manylinux_2_17_x86_64.whl"
+    }
+  }
+}

@@ -67,7 +67,7 @@ export function MetricsTab({ hostId, host }: { hostId: number; host?: Host }) {
           ) : (
             <>
               Mimir is set up, but nothing labelled with this host has arrived. Add an action pack with an agent that
-              labels its series with <span className="mono">labdog_host_id</span> — the default pack&apos;s{" "}
+              labels its series with <span className="mono">unbork_host_id</span> — the default pack&apos;s{" "}
               <b>Install Alloy agent</b> does — and run it on this host.
             </>
           )

@@ -10,10 +10,10 @@ The entry point names a callable that takes the FastAPI app. It adds its
 routes and calls the documented hooks (``set_permission_resolver``,
 ``register_login_provider_source``, ``register_audit_subscriber``,
 ``register_run_gate``, ``register_task_module``,
-``register_permission`` ...) from inside it; the full list, by contract
-version, is the comment above ``PLUGIN_API``. It also carries a
-``requires_plugin_api = "1.0"`` attribute naming the contract version it
-was written against (``app.auth.permissions.PLUGIN_API``):
+``register_permission``, ``set_provider_type_policy`` ...) from inside it;
+the full list, by contract version, is the comment above ``PLUGIN_API``.
+It also carries a ``requires_plugin_api = "1.0"`` attribute naming the
+contract version it was written against (``app.auth.permissions.PLUGIN_API``):
 
 * same major, minor at most ours: loaded;
 * anything else, or no attribute: skipped, with an error in the log.

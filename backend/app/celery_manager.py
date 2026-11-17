@@ -103,7 +103,7 @@ API_ROLES = frozenset({"all", "api"})
 
 
 def parse_roles(value: str | None) -> tuple[str, ...]:
-    """Split a ``--role`` / ``LABDOG_ROLE`` value into known roles.
+    """Split a ``--role`` / ``UNBORK_ROLE`` value into known roles.
 
     Empty means ``all``. ``all`` cannot be combined with anything, since
     it already runs every process; two schedulers against one RedBeat
@@ -235,9 +235,9 @@ class CeleryManager:
         import os  # noqa: PLC0415
 
         logger.info("Starting Celery %r: %s", name, " ".join(cmd))
-        # The worker_ready handlers read LABDOG_ROLE to know which siblings
+        # The worker_ready handlers read UNBORK_ROLE to know which siblings
         # share this container (and so this disk): see app.tasks.
-        env = {**os.environ, "LABDOG_ROLE": ",".join(self._roles)}
+        env = {**os.environ, "UNBORK_ROLE": ",".join(self._roles)}
         self._processes[name] = subprocess.Popen(
             cmd,
             cwd=BACKEND_DIR,

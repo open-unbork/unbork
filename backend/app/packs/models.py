@@ -69,13 +69,13 @@ class ActionPack(Base):
     #: lives; empty string = repo root. For 'local': ignored.
     path: Mapped[str] = mapped_column(String(500), default="", server_default="")
 
-    #: For source_type='local': absolute filesystem path on the LabDog
+    #: For source_type='local': absolute filesystem path on the unbork
     #: host. For 'git': NULL.
     local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    #: Whether this pack may ship content that runs on the LabDog host —
+    #: Whether this pack may ship content that runs on the unbork host —
     #: ansible plugin directories, or plays targeting localhost. Not a
     #: privilege boundary (the model is flat; any user can set it), but it
     #: makes loading controller-side code deliberate and audited rather

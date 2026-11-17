@@ -18,6 +18,21 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Third-party notices and a source offer ship with every build.**
+  `/usr/share/doc/unbork/` holds `LICENSE`, `THIRD-PARTY-NOTICES` (every
+  Python, npm and Debian component, with version, licence and text) and
+  `SOURCE-OFFER.md`; the image carries the OCI `licenses`, `source` and
+  `revision` labels. The build fails on a dependency whose licence is
+  unknown or not compatible with the AGPL.
+- **The assistant can be left out.** `[assistant] enabled = false` on an
+  install, or `--build-arg WITH_ASSISTANT=0` for an image (which then has
+  no Agent SDK and no assistant pages). No AI routes, pages, providers,
+  tasks or settings are loaded; alerts still run their actions. See
+  [Running without the assistant](docs/ui/assistant.md#running-without-the-assistant).
+- **Extension hook to restrict AI provider types.** An extension can
+  refuse provider types; a refused type cannot be created, tested or used,
+  and the form leaves it out. Stored providers are never deleted or
+  changed. A Community install refuses nothing. Plugin API 1.7.
 - **Extension hook for permissions.** An extension can declare
   permissions of its own for its routes. The built-in catalog and roles
   are unchanged. Plugin API 1.6.
@@ -95,6 +110,33 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Changed
 
+- **The Docker image no longer contains the Claude Code program.** It is
+  downloaded to the state volume (`/var/lib/unbork/claude-code`) the first
+  time a provider that needs it is turned on, tested or used, and checked
+  against the checksum the release pins before it is ever run. The image is
+  smaller, and a server without outbound access must provide the program
+  itself on PATH. See
+  [the upgrade note](docs/upgrade.md#the-claude-code-program-is-no-longer-in-the-image).
+- **The Claude providers take no token any more.** "Claude agent" and
+  "Claude single-shot" (the new names for the Claude Agent SDK and Claude
+  Code CLI types) use the Claude Code sign-in of the `unbork` service
+  account on the server. A token saved by an earlier version keeps working
+  until you remove it from the provider.
+- **Breaking: everything is renamed to unbork, and the old names are no
+  longer read.** Environment variables are `UNBORK_*`, the config file is
+  `/etc/unbork/unbork.toml` (key `security.unbork_server_ip`), the package,
+  service and system user are `unbork` with files under `/etc/unbork`,
+  `/usr/lib/unbork`, `/var/lib/unbork` and `/var/log/unbork`, the Python
+  distribution is `unbork-backend`. Metric names, alert labels, the host
+  variables handed to packs, iptables chains, rule comments, files written
+  to hosts and Proxmox snapshot names all use `unbork`. The session cookies
+  were renamed, so everyone signs in again once. Nothing renames or removes
+  the old names on the server or on managed hosts: follow
+  [Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
+  before starting this version. A server whose secrets are set only under the
+  old names refuses to start, and its error lists the old names it found. Sync run output
+  shows play names beginning "unbork".
+
 - CI no longer publishes a floating `:test` image tag. Test images are
   `:test-<short sha>`; follow `:dev-latest` to track `dev`.
 
@@ -169,6 +211,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Fixed
 
+- An API path that no route serves (`GET /api/...`), such as the
+  assistant's on a server without it, now answers a JSON 404 instead of
+  the web page with status 200.
 - Firewall rule and chain policy changes are now written to the audit
   log, like every other module's: create, update, delete, reorder, and
   a group's input and output policy (BUG-147).

@@ -342,7 +342,7 @@ async def _run_action_group_async(action_run_id: int) -> None:
     redis_client = redis_lib.from_url(settings.redis.url)
     channel = f"actions.run.{action_run_id}"
 
-    private_data_dir = tempfile.mkdtemp(prefix="labdog-action-group-")
+    private_data_dir = tempfile.mkdtemp(prefix="unbork-action-group-")
     # Per-host SSH key files written to tmpfs; tracked for cleanup.
     ssh_key_paths: list[str] = []
 
@@ -585,7 +585,7 @@ async def _prepare_member(
     ctx.ssh_user = ssh_key.ssh_user or "root"
     ctx.ssh_key_path = key_path
     # SEC-26: pin this member's connections to the host key
-    # LabDog recorded over asyncssh; None until first contact,
+    # unbork recorded over asyncssh; None until first contact,
     # which leaves the accept-new fallback in place.
     ctx.known_hosts_path = write_known_hosts(host.ssh_host_key_entry, key_path)
     ctx.hostname = host.hostname
@@ -601,7 +601,7 @@ def _write_member_key(private_key_text: str) -> str:
     """Write a member's private key to a fresh 0600 tmpfs file; return its path."""
     fd, key_path = tempfile.mkstemp(
         dir="/dev/shm",  # nosec B108 — intentional tmpfs for in-memory key storage
-        prefix="labdog-action-group-",
+        prefix="unbork-action-group-",
         suffix=".key",
     )
     os.close(fd)
@@ -795,7 +795,7 @@ def _run_group_playbook(
     # reserved key must not reach the playbook as an extra-var.
     parameters.pop(METRICS_DESTINATIONS_PARAM, None)
     # Fail closed before these become extra-vars. Ansible evaluates
-    # extra-vars on the controller — the LabDog host — not on the
+    # extra-vars on the controller — the unbork host — not on the
     # target, so a template expression here is code execution here.
     # The API rejects them too; this catches rows that did not come
     # through that path. See app/actions/extra_vars.py.

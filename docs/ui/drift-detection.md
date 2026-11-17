@@ -40,9 +40,9 @@ quiet too. The UI says so where it can; the exporter cannot:
 | Overview → drift trend | "Drift checking is off on all *n* hosts — nothing is being checked", with a way to turn it on |
 | Operations → Drift | The same banner above an empty findings list: "Nothing is being checked, so nothing can be found" |
 | Hosts list | `off` in every row's drift check column |
-| `/metrics` exporter | No `labdog_drift_*` series at all — absent, not zero |
+| `/metrics` exporter | No `unbork_drift_*` series at all — absent, not zero |
 
-The exporter's `labdog_hosts_drift_check_enabled` gauge is the quickest way to
+The exporter's `unbork_hosts_drift_check_enabled` gauge is the quickest way to
 see the fleet-wide answer. See [Metrics export](../metrics-export.md).
 
 ## The two flags
@@ -114,5 +114,5 @@ it writes the host record rather than a module row.
 - [Overview](dashboard.md) — the fleet-wide drift trend
 - [Operations › Drift](operations.md#drift) — the findings list
 - [Settings](settings.md) — `drift.check_interval_minutes`
-- [Metrics export](../metrics-export.md) — `labdog_drift_*` and
-  `labdog_hosts_drift_check_enabled`
+- [Metrics export](../metrics-export.md) — `unbork_drift_*` and
+  `unbork_hosts_drift_check_enabled`

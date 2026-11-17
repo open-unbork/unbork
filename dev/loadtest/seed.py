@@ -15,7 +15,7 @@ from lt_api import Api
 
 HERE = Path(__file__).resolve().parent
 ADMIN = {"email": "admin@loadtest.example.com", "password": "loadtest-Passw0rd-only"}
-SSH_USER = "labdog"
+SSH_USER = "unbork"
 DRIFT_PATHS = ["hosts-mgmt", "resolver", "linux-users", "cron", "packages"]
 MODULES = ["packages", "hosts-file", "cron", "linux-users", "resolver"]
 
@@ -53,7 +53,7 @@ def assert_applied():
 def fake_host_ips():
     ids = subprocess.check_output(
         ["docker", "ps", "-q", "--filter", "label=com.docker.compose.service=fakehost",
-         "--filter", "label=com.docker.compose.project=labdog-loadtest"], text=True).split()
+         "--filter", "label=com.docker.compose.project=unbork-loadtest"], text=True).split()
     out = subprocess.check_output(
         ["docker", "inspect", "--format",
          "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", *ids], text=True)

@@ -51,10 +51,10 @@ _NULL_TIME_YEAR = 1
 #: :func:`meets_severity`.
 SEVERITY_ORDER = ("info", "warning", "critical")
 
-#: Labels the alloy-install action stamps on every series it ships: LabDog's
+#: Labels the alloy-install action stamps on every series it ships: unbork's
 #: own host id and hostname. Exact, so they are tried before anything else.
-LABDOG_HOST_ID_LABEL = "labdog_host_id"
-LABDOG_HOSTNAME_LABEL = "labdog_hostname"
+UNBORK_HOST_ID_LABEL = "unbork_host_id"
+UNBORK_HOSTNAME_LABEL = "unbork_hostname"
 
 #: Labels that conventionally carry the host, most specific first.
 #: ``instance`` is last because it is the noisiest — it usually carries a
@@ -211,19 +211,19 @@ async def resolve_host(db: AsyncSession, labels: dict[str, Any]) -> int | None:
     on none, because the session would then read a healthy host and
     report that nothing is wrong.
 
-    ``labdog_host_id`` comes first: an alert on a metric Alloy shipped
+    ``unbork_host_id`` comes first: an alert on a metric Alloy shipped
     names the host exactly, while the conventional labels are matched
     against a hostname or address and may carry a port. An id that is not
     a host any more (the host was deleted; ids are not reused) falls
     through to the names.
     """
-    raw_id = str(labels.get(LABDOG_HOST_ID_LABEL) or "").strip()
+    raw_id = str(labels.get(UNBORK_HOST_ID_LABEL) or "").strip()
     if raw_id.isdigit():
         found = await db.execute(select(Host.id).where(Host.id == int(raw_id)))
         host_id = found.scalar_one_or_none()
         if host_id is not None:
             return host_id
-    for key in (LABDOG_HOSTNAME_LABEL, *HOST_LABELS):
+    for key in (UNBORK_HOSTNAME_LABEL, *HOST_LABELS):
         raw = labels.get(key)
         if not raw:
             continue
@@ -231,7 +231,7 @@ async def resolve_host(db: AsyncSession, labels: dict[str, Any]) -> int | None:
         if not candidate:
             continue
         # `instance` is conventionally host:port; the port is not part of
-        # any identity LabDog stores.
+        # any identity unbork stores.
         bare = candidate.rsplit(":", 1)[0] if ":" in candidate else candidate
         for value in (candidate, bare):
             result = await db.execute(

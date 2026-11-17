@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { AISpark } from "@/components/investigate-button"
 import { Confirm } from "@/components/ld"
 import { ApiError, apiFetch } from "@/lib/api"
+import { useFeatures } from "@/lib/features"
 import type { ActionHostRun, ActionRun, AIProvider } from "@/lib/types"
 
 /** An earlier investigation in one of these is not reopened; the button
@@ -45,11 +46,14 @@ export function InvestigateRunButton({
   const router = useRouter()
   const queryClient = useQueryClient()
   const [confirming, setConfirming] = useState(false)
+  // No button at all on a server without the assistant (C-026).
+  const { assistant } = useFeatures()
   const { data: providers } = useQuery<AIProvider[]>({
     queryKey: ["ai-providers"],
     queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"),
     retry: false,
     staleTime: 60_000,
+    enabled: assistant,
   })
 
   const start = useMutation({
@@ -74,7 +78,7 @@ export function InvestigateRunButton({
     : (run.host_runs ?? []).flatMap((hr) => (hr.host_id !== null ? [hr.host_id] : []))
   const earlier = (run.investigations ?? []).find((i) => !ABANDONED.has(i.status) && sameIds(i.target_host_ids, scopeIds))
   // A deleted host leaves nothing to connect to; the API refuses it too.
-  if (scopeIds.length === 0) return null
+  if (scopeIds.length === 0 || !assistant) return null
 
   if (earlier) {
     return (

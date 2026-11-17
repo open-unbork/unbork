@@ -25,7 +25,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from app.ai import labdog_host, remediation
+from app.ai import remediation, unbork_host
 from app.ai.alert_autonomy import MIN_WEBHOOK_TOKEN_CHARS, resolve
 from app.ai.loop import AgentLoop, LoopCaps
 from app.ai.models import AIRollback, AISession, AIToolCall, AlertEvent
@@ -41,7 +41,7 @@ from tests.conftest import create_host, create_ssh_key
 
 ALERT = "NginxDown"
 TOKEN = "t" * MIN_WEBHOOK_TOKEN_CHARS
-REMOTE_LABDOG = "10.9.9.9"
+REMOTE_UNBORK = "10.9.9.9"
 
 
 async def _set(db, key: str, value: str) -> None:
@@ -64,10 +64,10 @@ async def _clear_settings_cache():
 
 
 @pytest.fixture(autouse=True)
-def _forget_where_labdog_runs():
-    labdog_host.forget()
+def _forget_where_unbork_runs():
+    unbork_host.forget()
     yield
-    labdog_host.forget()
+    unbork_host.forget()
 
 
 @pytest.fixture(autouse=True)
@@ -92,7 +92,7 @@ class FakeSSH:
     def __init__(self) -> None:
         self.reachable = True
         self.key_changed = False
-        self.client_ip = REMOTE_LABDOG
+        self.client_ip = REMOTE_UNBORK
         self.interfaces = ["2: eth0    inet 10.0.0.21/24 brd 10.0.0.255 scope global eth0"]
         self.connects = 0
         self.commands: list[str] = []
@@ -107,7 +107,7 @@ class FakeSSH:
                     command = input
                 fake.commands.append(command)
                 stdout = ""
-                if command == labdog_host.PROBE_COMMAND:
+                if command == unbork_host.PROBE_COMMAND:
                     stdout = "\n".join([f"{fake.client_ip} 51515 22", *fake.interfaces]) + "\n"
                 return SimpleNamespace(stdout=stdout, stderr="", exit_status=0)
 
@@ -140,7 +140,7 @@ class FakeProxmox:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.deleted: list[str] = []
-        self.on_vm: list[str] = ["labdog-ai-snap-1"]
+        self.on_vm: list[str] = ["unbork-ai-snap-1"]
         self.storage_type = "zfspool"
         self.api_down = False
 
@@ -239,7 +239,7 @@ async def _mapped_host(db, *, ip: str = "10.0.0.21"):
     node = ProxmoxNode(
         name=f"pve-{uuid.uuid4().hex[:6]}",
         api_url="https://pve.test:8006",
-        token_id="labdog@pve!ci",
+        token_id="unbork@pve!ci",
         encrypted_token_secret=encrypt_ssh_key("secret", get_master_key()),
         verify_ssl=False,
     )
@@ -293,7 +293,7 @@ async def _fix(
     finished_ago: timedelta = timedelta(minutes=11),
     status: str = "succeeded",
     autonomy: str = "full_auto",
-    snapshots: tuple[str | None, ...] = ("labdog-ai-snap-1",),
+    snapshots: tuple[str | None, ...] = ("unbork-ai-snap-1",),
     call_status: str = "executed",
     classification: str = "mutating",
     alert_status: str = "firing",
@@ -520,7 +520,7 @@ class TestJudgingTheFix:
         assert verdict.outcome == "made_worse"
         assert verdict.detail.endswith("the last with: timed out.")
 
-    async def test_an_outage_on_labdogs_side_is_not_held_against_the_host(
+    async def test_an_outage_on_unborks_side_is_not_held_against_the_host(
         self, db, ai_provider, ssh, proxmox
     ) -> None:
         """unbork's own route or DNS gone: neither the host nor Proxmox
@@ -562,7 +562,7 @@ class TestJudgingTheFix:
         ssh.reachable = False
         assert (await remediation.assess(db, event, session)).outcome == "made_worse"
 
-    async def test_a_new_alert_still_counts_when_labdog_is_cut_off(
+    async def test_a_new_alert_still_counts_when_unbork_is_cut_off(
         self, db, ai_provider, ssh, proxmox
     ) -> None:
         host = await _mapped_host(db)
@@ -672,7 +672,7 @@ class TestJudgingTheFix:
 
 
 # ---------------------------------------------------------------------------
-# Which host LabDog runs on
+# Which host unbork runs on
 # ---------------------------------------------------------------------------
 
 DOCKER_HOST = [
@@ -684,9 +684,9 @@ DOCKER_HOST = [
 ]
 
 
-class TestWhereLabDogRuns:
+class TestWhereUnborkRuns:
     def test_the_probe_output_is_read(self) -> None:
-        client, addresses = labdog_host.parse_probe(
+        client, addresses = unbork_host.parse_probe(
             "\n".join(["172.18.0.4 40022 22", *DOCKER_HOST])
         )
         assert client == "172.18.0.4"
@@ -706,40 +706,40 @@ class TestWhereLabDogRuns:
         ],
     )
     def test_which_connections_come_from_this_machine(self, client, expected) -> None:
-        _, addresses = labdog_host.parse_probe("\n".join(["x 1 22", *DOCKER_HOST]))
-        assert labdog_host.runs_here(client, addresses) is expected
+        _, addresses = unbork_host.parse_probe("\n".join(["x 1 22", *DOCKER_HOST]))
+        assert unbork_host.runs_here(client, addresses) is expected
 
     def test_a_lan_bridge_is_not_a_container_bridge(self) -> None:
         """A hypervisor's ``vmbr0`` carries its LAN address; an unbork
         elsewhere on that LAN is inside its subnet and is still elsewhere."""
-        _, addresses = labdog_host.parse_probe(
+        _, addresses = unbork_host.parse_probe(
             "x 1 22\n2: vmbr0    inet 10.10.10.2/24 brd 10.10.10.255 scope global vmbr0"
         )
-        assert not labdog_host.runs_here("10.10.10.9", addresses)
+        assert not unbork_host.runs_here("10.10.10.9", addresses)
 
-    async def test_other_hosts_seeing_labdog_from_its_address(self, db) -> None:
+    async def test_other_hosts_seeing_unbork_from_its_address(self, db) -> None:
         """lin-manager: every other host records unbork as 10.10.101.5."""
         here = await create_host(db, ip="10.10.101.5")
         await create_host(db, ip="10.10.10.51")
         other = await create_host(db, ip="10.10.10.52")
-        other.labdog_source_ip = "10.10.101.5"
+        other.unbork_source_ip = "10.10.101.5"
         await db.flush()
-        assert await labdog_host.labdog_runs_on(db, here, ask=False)
-        assert not await labdog_host.labdog_runs_on(db, other, ask=False)
+        assert await unbork_host.unbork_runs_on(db, here, ask=False)
+        assert not await unbork_host.unbork_runs_on(db, other, ask=False)
 
     async def test_the_configured_server_address(self, db, monkeypatch) -> None:
-        """``[security] labdog_server_ip`` is the operator saying so."""
-        monkeypatch.setattr(settings.security, "labdog_server_ip", "10.10.101.5")
+        """``[security] unbork_server_ip`` is the operator saying so."""
+        monkeypatch.setattr(settings.security, "unbork_server_ip", "10.10.101.5")
         here = await create_host(db, ip="10.10.101.5")
         elsewhere = await create_host(db, ip="10.10.101.6")
-        assert await labdog_host.labdog_runs_on(db, here, ask=False)
-        assert not await labdog_host.labdog_runs_on(db, elsewhere, ask=False)
+        assert await unbork_host.unbork_runs_on(db, here, ask=False)
+        assert not await unbork_host.unbork_runs_on(db, elsewhere, ask=False)
 
-    async def test_a_host_seeing_labdog_from_its_own_address(self, db) -> None:
+    async def test_a_host_seeing_unbork_from_its_own_address(self, db) -> None:
         here = await create_host(db, ip="10.10.101.5")
-        here.labdog_source_ip = "10.10.101.5"
+        here.unbork_source_ip = "10.10.101.5"
         await db.flush()
-        assert await labdog_host.labdog_runs_on(db, here, ask=False)
+        assert await unbork_host.unbork_runs_on(db, here, ask=False)
 
     async def test_the_host_is_asked_when_the_database_cannot_tell(self, db, ssh) -> None:
         """The only host unbork manages, in a container on it: nothing in
@@ -747,13 +747,13 @@ class TestWhereLabDogRuns:
         here = await _mapped_host(db, ip="10.10.101.5")
         ssh.client_ip = "172.18.0.4"
         ssh.interfaces = DOCKER_HOST
-        assert await labdog_host.labdog_runs_on(db, here)
-        assert labdog_host.PROBE_COMMAND in ssh.commands
+        assert await unbork_host.unbork_runs_on(db, here)
+        assert unbork_host.PROBE_COMMAND in ssh.commands
 
     async def test_an_unreachable_host_is_not_assumed_to_be_it(self, db, ssh) -> None:
         here = await _mapped_host(db)
         ssh.reachable = False
-        assert not await labdog_host.labdog_runs_on(db, here)
+        assert not await unbork_host.unbork_runs_on(db, here)
 
     @pytest.mark.parametrize("reachable", [True, False], ids=["answered", "could-not-ask"])
     async def test_the_hosts_answer_is_kept(self, db, ssh, reachable) -> None:
@@ -762,15 +762,15 @@ class TestWhereLabDogRuns:
         here = await _mapped_host(db)
         ssh.reachable = reachable
         for _ in range(3):
-            await labdog_host.labdog_runs_on(db, here)
+            await unbork_host.unbork_runs_on(db, here)
         assert ssh.connects == 1
 
     async def test_could_not_ask_is_kept_for_less(self, db, ssh, monkeypatch) -> None:
         here = await _mapped_host(db)
         ssh.reachable = False
-        monkeypatch.setattr(labdog_host, "NO_ANSWER_TTL_SECONDS", -1)
-        await labdog_host.labdog_runs_on(db, here)
-        await labdog_host.labdog_runs_on(db, here)
+        monkeypatch.setattr(unbork_host, "NO_ANSWER_TTL_SECONDS", -1)
+        await unbork_host.unbork_runs_on(db, here)
+        await unbork_host.unbork_runs_on(db, here)
         assert ssh.connects == 2
 
 
@@ -932,10 +932,10 @@ class TestRollingBack:
         assert rollback.status == "failed"
         assert "SSH did not recover" in rollback.detail
 
-    async def test_never_the_host_labdog_runs_on(self, db, ai_provider, ssh, proxmox) -> None:
+    async def test_never_the_host_unbork_runs_on(self, db, ai_provider, ssh, proxmox) -> None:
         host = await _mapped_host(db, ip="10.10.101.5")
         neighbour = await create_host(db, ip="10.10.10.51")
-        neighbour.labdog_source_ip = "10.10.101.5"
+        neighbour.unbork_source_ip = "10.10.101.5"
         _, session, _ = await _fix(db, ai_provider, host)
         with pytest.raises(remediation.RollbackRefused, match="unbork runs on"):
             await remediation.prepare_rollback(
@@ -1015,7 +1015,7 @@ class TestTheHostQueue:
     """A rollback stops and restores the machine: nothing else may run on
     it meanwhile, and what was queued behind it runs after."""
 
-    async def test_not_while_labdog_is_working_on_the_host(
+    async def test_not_while_unbork_is_working_on_the_host(
         self, db, ai_provider, ssh, proxmox
     ) -> None:
         host = await _mapped_host(db)
@@ -1101,7 +1101,7 @@ class TestRollingBackAutomatically:
         assert "ai.alert_auto_rollback" in rollback.detail
         assert proxmox.restored == []
 
-    async def test_it_waits_for_labdogs_own_work_then_gives_up(
+    async def test_it_waits_for_unborks_own_work_then_gives_up(
         self, db, ai_provider, ssh, proxmox, monkeypatch
     ) -> None:
         monkeypatch.setattr(remediation, "BUSY_WAIT_SECONDS", 0)
@@ -1289,7 +1289,7 @@ class TestTheTasks:
         )
         result = await _run_rollback(rollback.id)
         assert result["status"] == "succeeded"
-        assert proxmox.restored == ["labdog-ai-snap-1"]
+        assert proxmox.restored == ["unbork-ai-snap-1"]
 
     def test_the_sweep_is_scheduled_and_the_slow_tasks_are_routed(self) -> None:
         from tests.test_task_routing import _queue_for
@@ -1320,22 +1320,22 @@ async def full_auto_ready(db, monkeypatch):
 
 
 class TestNewSafeguards:
-    async def test_not_on_the_host_labdog_runs_on(self, db, full_auto_ready) -> None:
+    async def test_not_on_the_host_unbork_runs_on(self, db, full_auto_ready) -> None:
         here = await create_host(db, ip="10.10.101.5")
         neighbour = await create_host(db, ip="10.10.10.51")
-        neighbour.labdog_source_ip = "10.10.101.5"
+        neighbour.unbork_source_ip = "10.10.101.5"
         await db.flush()
         decided = await resolve(db, await _alert(db, here.id))
         assert decided.level == "read_only"
         assert "unbork runs on this host" in decided.note
 
-    async def test_a_remote_labdog_on_the_same_lan_is_not_mistaken_for_local(
+    async def test_a_remote_unbork_on_the_same_lan_is_not_mistaken_for_local(
         self, db, full_auto_ready, ssh
     ) -> None:
         host = await _mapped_host(db)
         decided = await resolve(db, await _alert(db, host.id))
         assert decided.level == "full_auto"
-        assert labdog_host.PROBE_COMMAND in ssh.commands
+        assert unbork_host.PROBE_COMMAND in ssh.commands
 
     async def test_a_fix_that_made_the_host_worse_keeps_full_auto_off_it(
         self, db, ai_provider, full_auto_ready
@@ -1406,7 +1406,7 @@ class TestTheApi:
         body = response.json()
         assert body["status"] == "running"
         assert body["trigger"] == "manual"
-        assert body["snapshot_name"] == "labdog-ai-snap-1"
+        assert body["snapshot_name"] == "unbork-ai-snap-1"
         assert body["requested_by_user_id"] is not None
         sent.assert_called_once_with(
             "app.tasks.ai_remediation.run_rollback", kwargs={"rollback_id": body["id"]}
@@ -1417,7 +1417,7 @@ class TestTheApi:
     ) -> None:
         host = await _mapped_host(db, ip="10.10.101.5")
         neighbour = await create_host(db, ip="10.10.10.51")
-        neighbour.labdog_source_ip = "10.10.101.5"
+        neighbour.unbork_source_ip = "10.10.101.5"
         _, session, _ = await _fix(db, ai_provider, host)
 
         response = await superuser_client.post(f"/api/ai/sessions/{session.id}/rollback", json={})
@@ -1426,7 +1426,7 @@ class TestTheApi:
         assert "unbork runs on" in response.json()["detail"]
         sent.assert_not_called()
 
-    async def test_not_while_labdog_is_working_on_the_host(
+    async def test_not_while_unbork_is_working_on_the_host(
         self, db, ai_provider, ssh, proxmox, superuser_client, sent
     ) -> None:
         host = await _mapped_host(db)
@@ -1525,10 +1525,10 @@ async def subscribed(db):
             host="mail.home.arpa",
             port=587,
             tls_mode="starttls",
-            from_address="labdog@home.arpa",
+            from_address="unbork@home.arpa",
         )
     )
-    await _set(db, "notifications.public_url", "https://labdog.example.com")
+    await _set(db, "notifications.public_url", "https://unbork.example.com")
     user = User(
         email=f"u{uuid.uuid4().hex[:8]}@home.arpa",
         hashed_password="x",
@@ -1668,7 +1668,7 @@ class TestFromAlertToRollback:
         assert event.investigation_autonomy == "full_auto", event.investigation_autonomy_note
         session = await db.get(AISession, decided["session_id"])
 
-        # 2. The model restarts nginx; LabDog snapshots first.
+        # 2. The model restarts nginx; unbork snapshots first.
         fake = FakeProvider(
             [
                 ScriptedTurn(

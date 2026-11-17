@@ -240,8 +240,8 @@ class TestAuthorizedKeyLookup:
         assert tasks[0]["ansible.builtin.getent"] == {"database": "passwd"}
         # A user the play has not created yet (check mode) is missing from
         # the result rather than None.
-        assert {t["when"] for t in tasks[1:]} == {"labdog_key_user in ansible_facts.getent_passwd"}
-        assert [t["vars"]["labdog_key_user"] for t in tasks[1:]] == ["alice", "alice", "bob", "bob"]
+        assert {t["when"] for t in tasks[1:]} == {"unbork_key_user in ansible_facts.getent_passwd"}
+        assert [t["vars"]["unbork_key_user"] for t in tasks[1:]] == ["alice", "alice", "bob", "bob"]
 
     def test_the_ssh_paths_get_the_users_primary_group(self):
         """BUG-173: with only `owner`, become left them in group root."""
@@ -251,7 +251,7 @@ class TestAuthorizedKeyLookup:
             [{"username": "alice", "state": "present", "authorized_keys": ["ssh-ed25519 A"]}]
         )
 
-        gid = "{{ ansible_facts.getent_passwd[labdog_key_user][2] }}"
+        gid = "{{ ansible_facts.getent_passwd[unbork_key_user][2] }}"
         assert tasks[1]["ansible.builtin.file"]["group"] == gid
         assert tasks[2]["ansible.builtin.copy"]["group"] == gid
         assert tasks[1]["ansible.builtin.file"]["owner"] == "alice"

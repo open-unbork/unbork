@@ -164,7 +164,7 @@ the Plans screen, delegate to the same orchestrator.
 - **SSH lockout prevention**: An SSH ACCEPT rule for the unbork server IP is always injected at the top of the firewall ruleset (priority 999999). This rule cannot be deleted and ensures you never lock yourself out.
 - **System /etc/hosts entries**: `127.0.0.1 localhost` and `::1 localhost` are always injected into the rendered hosts file, regardless of what you configure. So is `127.0.1.1 <full name> <short name>` with the name the host reports, unless one of your entries already maps one of those names or uses `127.0.1.1`.
 - **Protected service deny-list**: Critical services (`sshd`, `systemd-*`) are blocked from management to prevent accidental lockout.
-- **DNS resolver header**: A `# Managed by LabDog` comment is injected into rendered resolver config files.
+- **DNS resolver header**: A `# Managed by unbork` comment is injected into rendered resolver config files.
 
 ## Architecture
 
@@ -200,16 +200,16 @@ the [Docker image](#quick-start-docker) on those hosts.
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/labdog_${VERSION}-1_amd64.deb
-sudo apt install ./labdog_${VERSION}-1_amd64.deb
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork_${VERSION}-1_amd64.deb
+sudo apt install ./unbork_${VERSION}-1_amd64.deb
 ```
 
 **RHEL / Fedora / Rocky (.rpm)**
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/labdog-${VERSION}-1.x86_64.rpm
-sudo dnf install ./labdog-${VERSION}-1.x86_64.rpm
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-1.x86_64.rpm
+sudo dnf install ./unbork-${VERSION}-1.x86_64.rpm
 ```
 
 After package install, skip to [Post-install configuration](#post-install-configuration).
@@ -218,9 +218,9 @@ After package install, skip to [Post-install configuration](#post-install-config
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/labdog-${VERSION}-linux-amd64.tar.gz
-tar -xzf labdog-${VERSION}-linux-amd64.tar.gz
-cd labdog-${VERSION}-linux-amd64
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-linux-amd64.tar.gz
+tar -xzf unbork-${VERSION}-linux-amd64.tar.gz
+cd unbork-${VERSION}-linux-amd64
 sudo ./install.sh
 ```
 
@@ -231,12 +231,32 @@ curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/SHA
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-### Post-install Configuration
+### Licence and third-party notices
 
-All three install methods place the default config at `/etc/labdog/labdog.toml`. Edit it before starting the service:
+Every image and package carries, in `/usr/share/doc/unbork/` (packages
+also in `/usr/lib/unbork/`, which a minimal system that drops
+`/usr/share/doc` keeps; the tarball at its root too):
+
+- `LICENSE`: unbork's own licence, AGPL-3.0-or-later.
+- `THIRD-PARTY-NOTICES`: every third-party component it ships, Python,
+  npm and (in the image) Debian, with version, licence and licence text.
+- `SOURCE-OFFER.md`: where to get the source of unbork and of each of
+  those components.
+
+The image also carries the OCI labels `org.opencontainers.image.licenses`,
+`.source` and `.revision` (the commit it was built from):
 
 ```bash
-sudo nano /etc/labdog/labdog.toml
+docker run --rm --entrypoint cat unbork/unbork /usr/share/doc/unbork/THIRD-PARTY-NOTICES | less
+docker inspect --format '{{ json .Config.Labels }}' unbork/unbork
+```
+
+### Post-install Configuration
+
+All three install methods place the default config at `/etc/unbork/unbork.toml`. Edit it before starting the service:
+
+```bash
+sudo nano /etc/unbork/unbork.toml
 ```
 
 **Required fields:**
@@ -245,17 +265,17 @@ sudo nano /etc/labdog/labdog.toml
 |---------|-------------|-----------------|
 | `[security] secret_key` | JWT signing key | `openssl rand -base64 32` |
 | `[security] encryption_key` | AES-256-GCM key for SSH key encryption (32 bytes; standard or url-safe base64) | `openssl rand -base64 32` |
-| `[security] labdog_server_ip` | This server's IP (used in SSH lockout prevention rule) | `ip route get 1 \| awk '{print $7; exit}'` |
+| `[security] unbork_server_ip` | This server's IP (used in SSH lockout prevention rule) | `ip route get 1 \| awk '{print $7; exit}'` |
 | `[database] url` | PostgreSQL async connection string | — |
 
 ```toml
 [security]
 secret_key    = "<output of: openssl rand -base64 32>"
 encryption_key = "<output of: openssl rand -base64 32>"
-labdog_server_ip = "192.168.1.10"   # this server's IP
+unbork_server_ip = "192.168.1.10"   # this server's IP
 
 [database]
-url = "postgresql+asyncpg://labdog:password@localhost:5432/labdog"
+url = "postgresql+asyncpg://unbork:password@localhost:5432/unbork"
 ```
 
 **Prerequisites** (not bundled):
@@ -266,10 +286,10 @@ url = "postgresql+asyncpg://labdog:password@localhost:5432/labdog"
 **Start the service:**
 
 ```bash
-sudo systemctl enable --now labdog.service
-sudo systemctl status labdog.service
+sudo systemctl enable --now unbork.service
+sudo systemctl status unbork.service
 # Logs:
-sudo journalctl -u labdog -f
+sudo journalctl -u unbork -f
 ```
 
 unbork listens on `http://127.0.0.1:8000` by default. Put it behind a reverse proxy (nginx, Caddy) for HTTPS.
@@ -280,24 +300,24 @@ unbork listens on `http://127.0.0.1:8000` by default. Put it behind a reverse pr
 
 ```bash
 # Remove (keeps config, data, and logs)
-sudo apt remove labdog
+sudo apt remove unbork
 
 # Remove everything including config, data, logs, and system user
-sudo apt purge labdog
+sudo apt purge unbork
 ```
 
 **RHEL / Fedora / Rocky**
 
 ```bash
-sudo dnf remove labdog
-# Config, data, and logs under /etc/labdog, /var/lib/labdog,
-# /var/log/labdog are preserved. Remove manually if no longer needed.
+sudo dnf remove unbork
+# Config, data, and logs under /etc/unbork, /var/lib/unbork,
+# /var/log/unbork are preserved. Remove manually if no longer needed.
 ```
 
 **Tarball install**
 
 ```bash
-cd labdog-<version>-linux-amd64
+cd unbork-<version>-linux-amd64
 sudo ./uninstall.sh          # keeps config/data/logs
 sudo ./uninstall.sh --purge  # removes everything
 ```
@@ -342,22 +362,22 @@ sudo ./uninstall.sh --purge  # removes everything
 ## Environment Variables
 
 unbork reads settings as environment variables using the pattern
-`LABDOG_<SECTION>__<KEY>` (double underscore between section and key) —
-e.g. `LABDOG_SERVER__PORT=9000`. They can also be set in
-`dev/labdog.toml`; env vars override the file. See
+`UNBORK_<SECTION>__<KEY>` (double underscore between section and key) —
+e.g. `UNBORK_SERVER__PORT=9000`. They can also be set in
+`dev/unbork.toml`; env vars override the file. See
 [`.env.example`](../.env.example) for the full reference. The most
 common ones:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LABDOG_SECURITY__SECRET_KEY` | Yes (production) | `change-me-in-production` (insecure default rejected at startup) | JWT signing key |
-| `LABDOG_SECURITY__ENCRYPTION_KEY` | Yes (production) | insecure default rejected at startup | AES-256-GCM master key for encrypting stored SSH keys, Proxmox API tokens, and git HTTPS PATs (must decode to 32 bytes; standard or url-safe base64) |
-| `LABDOG_DATABASE__URL` | Auto (Docker) | `postgresql+asyncpg://labdog:labdog@localhost:5432/labdog` | Async PostgreSQL connection string |
-| `LABDOG_REDIS__URL` | Auto (Docker) | `redis://localhost:6379/0` | Redis URL for the Celery broker and result backend |
-| `LABDOG_SECURITY__LABDOG_SERVER_IP` | No | `127.0.0.1` | IP of the unbork server (used in the auto-injected SSH lockout rule) |
-| `POSTGRES_PASSWORD` | Docker | `labdog` | PostgreSQL password — consumed by the `postgres` container and interpolated into `LABDOG_DATABASE__URL` in the compose file |
+| `UNBORK_SECURITY__SECRET_KEY` | Yes (production) | `change-me-in-production` (insecure default rejected at startup) | JWT signing key |
+| `UNBORK_SECURITY__ENCRYPTION_KEY` | Yes (production) | insecure default rejected at startup | AES-256-GCM master key for encrypting stored SSH keys, Proxmox API tokens, and git HTTPS PATs (must decode to 32 bytes; standard or url-safe base64) |
+| `UNBORK_DATABASE__URL` | Auto (Docker) | `postgresql+asyncpg://unbork:unbork@localhost:5432/unbork` | Async PostgreSQL connection string |
+| `UNBORK_REDIS__URL` | Auto (Docker) | `redis://localhost:6379/0` | Redis URL for the Celery broker and result backend |
+| `UNBORK_SECURITY__UNBORK_SERVER_IP` | No | `127.0.0.1` | IP of the unbork server (used in the auto-injected SSH lockout rule) |
+| `POSTGRES_PASSWORD` | Docker | `unbork` | PostgreSQL password — consumed by the `postgres` container and interpolated into `UNBORK_DATABASE__URL` in the compose file |
 | `NEXT_PUBLIC_API_URL` | Frontend build | `http://localhost:8000` | Backend API URL baked into the frontend at build time |
-| `LABDOG_METRICS__ENABLED` | No | `false` | Enable the public, unauthenticated Prometheus `/metrics` endpoint — see [metrics-export.md](./metrics-export.md) |
+| `UNBORK_METRICS__ENABLED` | No | `false` | Enable the public, unauthenticated Prometheus `/metrics` endpoint — see [metrics-export.md](./metrics-export.md) |
 
 > Operational settings (drift interval, log level, SSH/Ansible
 > timeouts, audit retention, discovery tuning) are managed on the
@@ -582,7 +602,7 @@ See [ui/assistant.md](./ui/assistant.md) for autonomy levels, approvals, snapsho
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/webhooks/grafana-alerts` | Grafana contact-point receiver (bearer or basic auth against `[alerts] webhook_token`; an unset token refuses every request) |
-| `GET` | `/api/alerts` | Alerts received, with what each one's `labdog_action` came to and the investigation it did or did not get |
+| `GET` | `/api/alerts` | Alerts received, with what each one's `unbork_action` came to and the investigation it did or did not get |
 | `POST` | `/api/alerts/{id}/investigate` | Start an investigation by hand, whatever the alert's labels |
 | `GET` | `/api/alerts/actions` · `POST` | The actions alerts may run / allow one (action, where, parameters, snapshot / verify / rollback, cooldown, enabled) |
 | `GET` · `PUT` · `DELETE` | `/api/alerts/actions/{id}` | Read, change or remove one; the action itself cannot change |
@@ -598,7 +618,7 @@ See [ui/alerts.md](./ui/alerts.md) for the labels, the intake paths, deduplicati
 | `GET/POST` | `/api/grafana/instances` | List/register Grafana Mimir/Loki backends (bearer or basic auth; secret encrypted at rest) |
 | `GET/PUT/DELETE` | `/api/grafana/instances/{id}` | Manage a registered instance |
 | `POST` | `/api/grafana/instances/{id}/test` · `/api/grafana/instances/test` | Connection test (saved instance / pre-save draft) |
-| `GET` | `/api/grafana/hosts/{id}/metrics` | Instant CPU/memory/disk for a host (queried from the default Mimir instance by the `labdog_host_id` label) |
+| `GET` | `/api/grafana/hosts/{id}/metrics` | Instant CPU/memory/disk for a host (queried from the default Mimir instance by the `unbork_host_id` label) |
 
 See [ui/host-metrics.md](./ui/host-metrics.md) for the end-to-end loop with the Alloy install action from `unbork-playbooks`.
 
@@ -656,7 +676,7 @@ unbork/
 │   ├── lib/                 # API client, utilities
 │   ├── Dockerfile
 │   └── package.json
-├── labdog-lint/           # CLI tool for YAML rule validation
+├── unbork-lint/           # CLI tool for YAML rule validation
 ├── packaging/               # Linux package build system (deb/rpm/tarball)
 ├── docs/                    # This directory — docs index + examples
 ├── dev/                     # Local development tools
@@ -664,7 +684,7 @@ unbork/
 │   ├── build.sh             # Local Docker build script
 │   ├── deploy.sh            # Local Docker deploy script
 │   ├── docker-compose.yml   # Local dev stack (postgres + redis)
-│   ├── labdog.toml          # Dev configuration
+│   ├── unbork.toml          # Dev configuration
 │   └── .env                 # Local secrets (gitignored — copy from .env.example)
 ├── dev.sh                   # Thin wrapper → dev/dev.sh
 ├── .env.example             # Environment variable template

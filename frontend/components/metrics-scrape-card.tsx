@@ -21,7 +21,7 @@ const PROMETHEUS_EXAMPLES_URL =
  *  parseable absolute URL. */
 function buildAlloyConfig(status: MetricsStatus): string {
   let scheme = "https"
-  let host = "<labdog-host:port>"
+  let host = "<unbork-host:port>"
   try {
     const u = new URL(status.scrape_url)
     scheme = u.protocol.replace(":", "") || scheme
@@ -30,9 +30,9 @@ function buildAlloyConfig(status: MetricsStatus): string {
     // scrape_url wasn't absolute — keep the placeholder host.
   }
   return [
-    'prometheus.scrape "labdog" {',
+    'prometheus.scrape "unbork" {',
     `  targets         = [{ __address__ = "${host}" }]`,
-    '  job_name        = "labdog"',
+    '  job_name        = "unbork"',
     `  scheme          = "${scheme}"`,
     `  metrics_path    = "${status.path}"`,
     '  scrape_interval = "30s"',
@@ -121,9 +121,9 @@ export function MetricsScrapeCard() {
       ) : (
         <div className="flex flex-col gap-2">
           <div className="text-xs text-text-2">
-            Add to <span className="mono text-text">/etc/labdog/labdog.toml</span> and restart:
+            Add to <span className="mono text-text">/etc/unbork/unbork.toml</span> and restart:
           </div>
-          <CodeBlock title="labdog.toml" actions={<Copy text={data.toml_snippet} />} wrap={false}>
+          <CodeBlock title="unbork.toml" actions={<Copy text={data.toml_snippet} />} wrap={false}>
             {data.toml_snippet}
           </CodeBlock>
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-2">

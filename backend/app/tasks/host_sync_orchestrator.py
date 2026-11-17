@@ -161,7 +161,7 @@ def _make_tmpfs_workspace() -> tuple[str, str]:
     # generates a random suffix, and the parent dir is checked for
     # existence before use.
     parent = "/dev/shm" if Path("/dev/shm").is_dir() else None  # nosec B108
-    private_data_dir = tempfile.mkdtemp(prefix="labdog-sync-", dir=parent)
+    private_data_dir = tempfile.mkdtemp(prefix="unbork-sync-", dir=parent)
     ssh_key_path = os.path.join(private_data_dir, "id_ssh")
     return private_data_dir, ssh_key_path
 
@@ -176,17 +176,17 @@ def _cleanup_tmpfs(private_data_dir: str | None) -> None:
         logger.exception("tmpfs cleanup failed for %s", private_data_dir)
 
 
-_TMPFS_PATH_RE = re.compile(r"(/dev/shm|/tmp)/labdog-sync-[A-Za-z0-9_]+(?:/[^\s'\"]*)?")
+_TMPFS_PATH_RE = re.compile(r"(/dev/shm|/tmp)/unbork-sync-[A-Za-z0-9_]+(?:/[^\s'\"]*)?")
 
 
 def _redact_path(msg: str | None) -> str | None:
     """Replace tmpfs SSH-key paths in error messages with ``<tmpfs>``.
 
     The orchestrator stages decrypted SSH keys under
-    ``/dev/shm/labdog-sync-XXXXXXXX/id_ssh`` (or ``/tmp`` when
+    ``/dev/shm/unbork-sync-XXXXXXXX/id_ssh`` (or ``/tmp`` when
     ``/dev/shm`` is missing). Any exception traceback that includes the
     full path leaks (a) the use of ``/dev/shm``, (b) the
-    ``labdog-sync-`` prefix convention, and (c) the per-run random
+    ``unbork-sync-`` prefix convention, and (c) the per-run random
     suffix. None are credentials but a hardened deployment shouldn't
     surface them via the jobs API. (SEC-06.)
 

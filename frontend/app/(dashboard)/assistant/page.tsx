@@ -3,7 +3,9 @@
 import { Suspense } from "react"
 
 import { Empty, PageHead } from "@/components/ld"
+import { AssistantAbsent } from "@/components/assistant-absent"
 import { can, useAuth } from "@/lib/auth"
+import { useFeatures } from "@/lib/features"
 import AssistantPage from "./client-page"
 
 /**
@@ -16,7 +18,9 @@ import AssistantPage from "./client-page"
  */
 export default function Page() {
   const { user, loading } = useAuth()
-  if (loading) return null
+  const features = useFeatures()
+  if (loading || !features.ready) return null
+  if (!features.assistant) return <AssistantAbsent title="Assistant" />
   if (!can(user, "ai.use")) {
     return (
       <>

@@ -55,7 +55,7 @@ function AlertsSection({ hostId }: { hostId: number }) {
         {data.alert_actions.length > 0 && (
           <div className="flex flex-col gap-1" data-testid="host-alert-actions">
             <span className="text-text-3">
-              Alerts labelled <span className="mono">labdog_action</span> may run these actions here:
+              Alerts labelled <span className="mono">unbork_action</span> may run these actions here:
             </span>
             <ul className="m-0 flex list-none flex-col gap-1 p-0">
               {data.alert_actions.map((a) => (
@@ -312,7 +312,7 @@ export function OverviewTab({ hostId, host, groups, goTab }: { hostId: number; h
                 <Facts
                   items={[
                     { k: "hostname", v: host.hostname, mono: true },
-                    { k: "management ip", v: host.labdog_source_ip ?? "not yet detected", mono: !!host.labdog_source_ip },
+                    { k: "management ip", v: host.unbork_source_ip ?? "not yet detected", mono: !!host.unbork_source_ip },
                     { k: "sync status", v: <Status s={host.sync_status} /> },
                     { k: "last sync", v: host.last_sync_at ? new Date(host.last_sync_at).toLocaleString() : "never" },
                     { k: "last drift check", v: host.last_drift_check_at ? new Date(host.last_drift_check_at).toLocaleString() : "never" },

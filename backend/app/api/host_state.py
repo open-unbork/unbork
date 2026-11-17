@@ -289,8 +289,8 @@ async def _probe_host(
     """Before any collector runs: record the source address unbork reaches
     the host from, and the firewall competing-store notice. Raises what the
     connection raises."""
-    host.labdog_source_ip = await get_source_ip(probe)
-    # Check whether LabDog-managed rules linger in the backend we are NOT
+    host.unbork_source_ip = await get_source_ip(probe)
+    # Check whether unbork-managed rules linger in the backend we are NOT
     # managing (dual-stack hosts). Skip when the backend is still unknown —
     # detection runs later in the firewall collector and emits its own
     # competing-store notice.
@@ -408,7 +408,7 @@ async def _drift_firewall(host: Host, hms: HostModuleStatus, db: AsyncSession) -
     desired, desired_policies = await _get_desired_state_for_host(
         host.id,
         db,
-        host_source_ip=host.labdog_source_ip,
+        host_source_ip=host.unbork_source_ip,
     )
     if not desired:
         hms.sync_status = "in_sync"
@@ -773,32 +773,32 @@ async def _collect_firewall(host: Host, db: AsyncSession, private_pem: str, ssh_
 # weak signal. The probes below distinguish what actually matters:
 #
 #   * presence      — is the binary installed at all
-#   * LabDog marker — does this backend already carry a LabDog-managed ruleset
+#   * unbork marker — does this backend already carry an unbork-managed ruleset
 #                     (used for *stickiness* and for the *competing-store*
-#                     warning). iptables isolates its rules in the LABDOG-INPUT
+#                     warning). iptables isolates its rules in the UNBORK-INPUT
 #                     chain; nftables owns the whole `inet filter` table, whose
-#                     rules carry the "Managed by LabDog" comment.
+#                     rules carry the "Managed by unbork" comment.
 #   * active        — is *some* real input filtering configured in this backend
-#                     (a tiebreaker when neither backend carries a LabDog marker)
+#                     (a tiebreaker when neither backend carries an unbork marker)
 #
 # The `nft` / `iptables` binaries are frequently in /usr/sbin, which isn't on a
 # non-login shell's PATH, so every command resolves the binary defensively.
 # ---------------------------------------------------------------------------
 
-# Managed by LabDog: firewall probe commands, not credentials.  # nosec B105
+# Managed by unbork: firewall probe commands, not credentials.  # nosec B105
 _NFT = "n=$(command -v nft || echo /usr/sbin/nft)"
 _IPT = "i=$(command -v iptables || echo /usr/sbin/iptables)"
 
 _PROBE_NFT_PRESENT = "command -v nft >/dev/null 2>&1 || test -x /usr/sbin/nft"
 _PROBE_IPT_PRESENT = "command -v iptables >/dev/null 2>&1 || test -x /usr/sbin/iptables"
-# LabDog's nftables rules all carry the "Managed by LabDog" comment.
-_PROBE_NFT_LABDOG = f'{_NFT}; "$n" list table inet filter 2>/dev/null | grep -q "Managed by LabDog"'
-# LabDog's iptables rules live in the dedicated LABDOG-INPUT chain.
-_PROBE_IPT_LABDOG = f'{_IPT}; "$i" -S LABDOG-INPUT >/dev/null 2>&1'
-# "active" = some real input filtering exists (LabDog's or the operator's).
+# unbork's nftables rules all carry the "Managed by unbork" comment.
+_PROBE_NFT_UNBORK = f'{_NFT}; "$n" list table inet filter 2>/dev/null | grep -q "Managed by unbork"'
+# unbork's iptables rules live in the dedicated UNBORK-INPUT chain.
+_PROBE_IPT_UNBORK = f'{_IPT}; "$i" -S UNBORK-INPUT >/dev/null 2>&1'
+# "active" = some real input filtering exists (unbork's or the operator's).
 _PROBE_NFT_ACTIVE = f'{_NFT}; "$n" list table inet filter 2>/dev/null | grep -qE "hook input"'
 _PROBE_IPT_ACTIVE = (
-    f'{_IPT}; "$i" -S LABDOG-INPUT >/dev/null 2>&1 '
+    f'{_IPT}; "$i" -S UNBORK-INPUT >/dev/null 2>&1 '
     f'|| "$i" -S INPUT 2>/dev/null | grep -qvE "^-P|^-N"'
 )
 
@@ -814,7 +814,7 @@ async def _probe_competing_firewall_store(conn, active_backend: str) -> str | No
 
     On a dual-stack host unbork manages exactly one backend, but a leftover
     unbork ruleset can survive in the other one — e.g. after the operator
-    switches backends, or after a manual `iptables -F LABDOG-INPUT` on a host
+    switches backends, or after a manual `iptables -F UNBORK-INPUT` on a host
     unbork actually manages via nftables. Collection only ever reads the active
     backend, so those stale rules are invisible to the "Current State" view yet
     may still be filtering traffic. Surface that explicitly; the next firewall
@@ -824,14 +824,14 @@ async def _probe_competing_firewall_store(conn, active_backend: str) -> str | No
     store. ``active_backend`` must be ``"nftables"`` or ``"iptables"``.
     """
     if active_backend == "nftables":
-        if await _probe_ok(conn, _PROBE_IPT_LABDOG):
+        if await _probe_ok(conn, _PROBE_IPT_UNBORK):
             return (
                 "nftables is the active backend, but unbork-managed iptables rules "
-                "(LABDOG-INPUT / LABDOG-OUTPUT) are still present on this host. They are "
+                "(UNBORK-INPUT / UNBORK-OUTPUT) are still present on this host. They are "
                 "ignored by collection and will be removed on the next firewall sync."
             )
     elif active_backend == "iptables":
-        if await _probe_ok(conn, _PROBE_NFT_LABDOG):
+        if await _probe_ok(conn, _PROBE_NFT_UNBORK):
             return (
                 "iptables is the active backend, but an unbork-managed nftables "
                 "'inet filter' table is still present on this host. It is ignored by "
@@ -950,25 +950,25 @@ async def _choose_firewall_backend(conn) -> tuple[str | None, list[str]]:
 
 async def _choose_between_installed_backends(conn) -> tuple[str, list[str]]:
     """Ladder steps 2–5, for a host with both nftables and iptables."""
-    nft_labdog = await _probe_ok(conn, _PROBE_NFT_LABDOG)
-    ipt_labdog = await _probe_ok(conn, _PROBE_IPT_LABDOG)
+    nft_unbork = await _probe_ok(conn, _PROBE_NFT_UNBORK)
+    ipt_unbork = await _probe_ok(conn, _PROBE_IPT_UNBORK)
 
-    # 2. Marker stickiness — keep whichever backend LabDog already manages.
-    if nft_labdog and not ipt_labdog:
+    # 2. Marker stickiness — keep whichever backend unbork already manages.
+    if nft_unbork and not ipt_unbork:
         return "nftables", [
             "Both firewalls installed; keeping nftables (an existing "
             "unbork-managed nftables ruleset was found)."
         ]
-    if ipt_labdog and not nft_labdog:
+    if ipt_unbork and not nft_unbork:
         return "iptables", [
             "Both firewalls installed; keeping iptables (an existing "
             "unbork-managed iptables ruleset was found)."
         ]
 
-    # Either both carry a LabDog ruleset (competing store — warn and
+    # Either both carry an unbork ruleset (competing store — warn and
     # pick via the tiebreakers) or neither does (a fresh host).
     messages: list[str] = []
-    if nft_labdog and ipt_labdog:
+    if nft_unbork and ipt_unbork:
         messages.append(
             "unbork-managed rules found in BOTH nftables and iptables — "
             "the inactive backend's copy will be removed on the next sync."

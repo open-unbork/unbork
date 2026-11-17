@@ -81,7 +81,7 @@ class ActionDefinition:
     #: a verdict nobody can read is not evidence that anything is wrong,
     #: and failing verification can restore a pre-change snapshot.
     ai_verify_fail_closed: bool = False
-    #: Optional mapping of LabDog's default Grafana instance URLs onto this
+    #: Optional mapping of unbork's default Grafana instance URLs onto this
     #: action's playbook var names (see ``ActionManifest.metrics_backend``).
     #: ``None`` = no injection. Stored as a plain dict to keep the dataclass
     #: free of the pydantic model.
@@ -98,7 +98,7 @@ class ActionDefinition:
     #: no post-run sync. Validated against ``CANONICAL_ORDER`` at
     #: manifest-load time.
     post_run_sync: tuple[str, ...] = field(default_factory=tuple)
-    #: Resources to register as host-scope overrides in labdog's
+    #: Resources to register as host-scope overrides in unbork's
     #: desired-state model after a successful run. See
     #: ``ActionManifest.post_run_register`` for the full contract.
     #: Mapped as a frozen-ish structure: module-name keyed, with each

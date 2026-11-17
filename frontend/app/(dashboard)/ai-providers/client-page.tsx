@@ -8,7 +8,7 @@ import { UsagePanel } from "@/components/ai/usage-panel"
 import { Banner, Confirm, Field, Help, Modal, PageHead, Panel, Table, Tag } from "@/components/ld"
 import { MODEL_PRESETS, type ModelPreset } from "@/lib/ai-presets"
 import { apiFetch, ApiError } from "@/lib/api"
-import type { AIProvider, AIProviderTestResult, AIProviderType } from "@/lib/types"
+import type { AIProvider, AIProviderRuntime, AIProviderTestResult, AIProviderType, AIProviderTypeInfo } from "@/lib/types"
 
 const CRUMBS = [
   { label: "settings", href: "/settings" },
@@ -18,8 +18,8 @@ const CRUMBS = [
 const TYPE_LABEL: Record<AIProviderType, string> = {
   openai_compat: "OpenAI-compatible",
   anthropic: "Anthropic",
-  claude_agent: "Claude Code (agentic)",
-  claude_cli: "Claude Code (single-shot)",
+  claude_agent: "Claude agent",
+  claude_cli: "Claude single-shot",
 }
 
 const TYPE_HELP: Record<AIProviderType, string> = {
@@ -27,21 +27,33 @@ const TYPE_HELP: Record<AIProviderType, string> = {
     "Any server speaking the OpenAI chat-completions API — Ollama, vLLM, LM Studio, OpenRouter, or OpenAI itself.",
   anthropic: "The Anthropic Messages API. Leave the base URL blank for the public API.",
   claude_agent:
-    "Claude Code driven through the Claude Agent SDK. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token. Bundled in the unbork container image.",
+    "Runs Claude as an agent through the Claude Agent SDK, using the Claude Code program on this server. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token. unbork downloads the program the first time it is needed.",
   claude_cli:
-    "Claude Code called once per prompt. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick the agentic option above.",
+    "Calls Claude once per prompt through the Claude Code program on this server. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick Claude agent. unbork downloads the program the first time it is needed.",
+}
+
+/** Where the Claude Code program stands for a program-backed provider (S-009). */
+function RuntimeLine({ runtime }: { runtime: AIProviderRuntime }) {
+  if (runtime.state === "ready") {
+    return <span className="text-[10.5px] text-text-faint">program ready</span>
+  }
+  if (runtime.state === "failed") {
+    return <span className="text-[10.5px] text-warn">unavailable: {runtime.detail}</span>
+  }
+  return <span className="text-[10.5px] text-text-3">installing the Claude Code program…</span>
 }
 
 /**
- * Backends that drive Claude Code rather than an HTTP API.
+ * Backends that run the Claude Code program rather than call an HTTP API.
  *
- * Both authenticate with a subscription token from `claude setup-token`,
- * neither has a base URL, and neither is billed per token — so the form
- * treats them alike everywhere except capability.
+ * Both use the Claude Code sign-in of the service account on the server
+ * and take no credential here (S-014), neither has a base URL, and neither
+ * is billed per token — so the form treats them alike everywhere except
+ * capability.
  */
 const CLAUDE_CODE_TYPES = new Set<AIProviderType>(["claude_cli", "claude_agent"])
 
-function isClaudeCode(type: AIProviderType): boolean {
+function isClaudeProgramBacked(type: AIProviderType): boolean {
   return CLAUDE_CODE_TYPES.has(type)
 }
 
@@ -49,7 +61,7 @@ function isClaudeCode(type: AIProviderType): boolean {
  * A suggested name per type.
  *
  * A single placeholder cannot serve all of them: "ollama-local" suggested on
- * a Claude Code provider is exactly the kind of leftover that makes a form
+ * a Claude agent provider is exactly the kind of leftover that makes a form
  * look like it was not built for the option you picked.
  */
 const NAME_PLACEHOLDER: Record<AIProviderType, string> = {
@@ -89,7 +101,7 @@ const ALWAYS_SENDS_OFFSITE = new Set<AIProviderType>([
  * which the row already tells us — genuinely costs nothing per token.
  */
 function pricingLabel(provider: AIProvider, currency: string): string {
-  if (isClaudeCode(provider.provider_type)) return "subscription"
+  if (isClaudeProgramBacked(provider.provider_type)) return "subscription"
   const { input_cost_per_mtok: input, output_cost_per_mtok: output } = provider
   if (input === 0 && output === 0) {
     return provider.sends_data_offsite ? "rates not set" : "free"
@@ -112,21 +124,19 @@ function isCredentialUrgent(provider: AIProvider): boolean {
 }
 
 /**
- * When a subscription token runs out.
+ * When a subscription token saved by an earlier version runs out.
  *
- * `claude setup-token` mints a one-year token, and Anthropic's own docs
- * warn that an unattended session "stops making progress once the
- * credential expires and can't recover". unbork's scheduled checks are
- * exactly that, so the first sign of an expired token would otherwise be
- * nightly runs quietly failing. API-key providers get nothing here —
- * their keys do not expire on a schedule.
+ * New providers of these types hold no token (S-014); one saved before
+ * still works until it expires or is removed, and an unattended session
+ * on an expired one stops making progress. API-key providers get nothing
+ * here — their keys do not expire on a schedule.
  */
 function describeCredentialExpiry(provider: AIProvider): string | null {
   const days = daysUntilExpiry(provider)
   if (days === null) return null
-  if (days < 0) return "token expired — run claude setup-token again"
-  if (days <= CREDENTIAL_WARN_DAYS) return `token expires in ${days} day${days === 1 ? "" : "s"}`
-  return `token expires in ${Math.round(days / 30)} months`
+  if (days < 0) return "stored token expired — remove it to use the server sign-in"
+  if (days <= CREDENTIAL_WARN_DAYS) return `stored token expires in ${days} day${days === 1 ? "" : "s"}`
+  return `stored token expires in ${Math.round(days / 30)} months`
 }
 
 /**
@@ -138,7 +148,7 @@ function describeCredentialExpiry(provider: AIProvider): string | null {
  */
 const TYPE_LIMITATION: Partial<Record<AIProviderType, string>> = {
   claude_cli:
-    "Single-shot only — it cannot run tools, so it cannot drive an investigation. Use it for AI verify steps and written reports. For subscription billing that can also investigate, pick Claude Code (agentic) instead.",
+    "Single-shot only — it cannot run tools, so it cannot drive an investigation. Use it for AI verify steps and written reports. For subscription billing that can also investigate, pick Claude agent instead.",
 }
 
 /**
@@ -201,6 +211,17 @@ export default function AIProvidersPage() {
   const { data: providers, isLoading } = useQuery<AIProvider[]>({
     queryKey: ["ai-providers"],
     queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"),
+    // While the Claude Code program downloads (S-009), poll so the state
+    // turns to ready (or says why not) without a reload. "missing" on an
+    // enabled provider means the install is queued but not started; give
+    // that two minutes, since a split deployment may install on its
+    // workers only, where this page cannot see it.
+    refetchInterval: (query) => {
+      const rows = query.state.data ?? []
+      if (rows.some((p) => p.runtime?.state === "installing")) return 5000
+      const queued = rows.some((p) => p.enabled && p.runtime?.state === "missing")
+      return queued && query.state.dataUpdateCount < 24 ? 5000 : false
+    },
   })
 
   // The display currency comes from the server (ai.currency) so the label on
@@ -212,6 +233,17 @@ export default function AIProvidersPage() {
     staleTime: 300_000,
   })
   const currency = usage?.currency ?? "USD"
+
+  // An extension may refuse some provider types (S-017). Until the list
+  // arrives every type is offered; the API refuses a refused one anyway.
+  const { data: typeInfo } = useQuery<AIProviderTypeInfo[]>({
+    queryKey: ["ai-provider-types"],
+    queryFn: () => apiFetch<AIProviderTypeInfo[]>("/api/ai/provider-types"),
+    staleTime: 300_000,
+  })
+  const allowedTypes = (Object.keys(TYPE_LABEL) as AIProviderType[]).filter(
+    (t) => typeInfo?.find((i) => i.type === t)?.allowed !== false,
+  )
 
   const presets = MODEL_PRESETS[form.provider_type] ?? []
 
@@ -262,7 +294,8 @@ export default function AIProvidersPage() {
 
   function openCreate() {
     setEditing(null)
-    setForm(EMPTY_FORM)
+    const start = allowedTypes.includes(EMPTY_FORM.provider_type) ? EMPTY_FORM.provider_type : allowedTypes[0]
+    setForm(start && start !== EMPTY_FORM.provider_type ? { ...EMPTY_FORM, provider_type: start, base_url: BASE_URL_DEFAULT[start] } : EMPTY_FORM)
     setError(null)
     setDialogOpen(true)
   }
@@ -302,7 +335,8 @@ export default function AIProvidersPage() {
         verify_ssl: form.verify_ssl,
       }
       // Omitting the key on edit keeps the stored one; sending "" clears it.
-      if (form.api_key || !editing) body.api_key = form.api_key || null
+      // The program-backed types take no credential (S-014).
+      if (!isClaudeProgramBacked(form.provider_type) && (form.api_key || !editing)) body.api_key = form.api_key || null
 
       return editing
         ? apiFetch<AIProvider>(`/api/ai/providers/${editing.id}`, {
@@ -329,14 +363,31 @@ export default function AIProvidersPage() {
     },
   })
 
+  // S-014: a token an earlier version stored is used until it is removed.
+  const clearToken = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<AIProvider>(`/api/ai/providers/${id}`, { method: "PATCH", json: { api_key: "" } }),
+    onSuccess: (updated) => {
+      setEditing(updated)
+      queryClient.invalidateQueries({ queryKey: ["ai-providers"] })
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : "Could not remove the stored token.")
+    },
+  })
+
   const test = useMutation({
     mutationFn: (id: number) =>
       apiFetch<AIProviderTestResult>(`/api/ai/providers/${id}/test`, { method: "POST" }),
-    onSuccess: (result, id) => setTestResults((prev) => ({ ...prev, [id]: result })),
+    onSuccess: (result, id) => {
+      setTestResults((prev) => ({ ...prev, [id]: result }))
+      // A Test can start the program's install (S-009); show its state.
+      queryClient.invalidateQueries({ queryKey: ["ai-providers"] })
+    },
   })
 
   const all = providers ?? []
-  const claude = isClaudeCode(form.provider_type)
+  const claude = isClaudeProgramBacked(form.provider_type)
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((prev) => ({ ...prev, [k]: v }))
 
   return (
@@ -385,6 +436,7 @@ export default function AIProvidersPage() {
                         {provider.is_default && <Tag tone="accent">default</Tag>}
                         {!provider.enabled && <Tag>disabled</Tag>}
                       </span>
+                      {provider.refused_reason && <span className="text-[11px] text-warn">{provider.refused_reason}</span>}
                       {result && (
                         <span className="text-[11px]" style={{ color: result.ok ? "var(--ok)" : "var(--danger)" }}>
                           {result.message}
@@ -403,6 +455,7 @@ export default function AIProvidersPage() {
                   <span className="flex min-w-0 flex-col">
                     <span className="trunc text-text-2">{TYPE_LABEL[provider.provider_type]}</span>
                     {provider.base_url && <span className="mono trunc text-[10.5px] text-text-faint">{provider.base_url}</span>}
+                    {provider.runtime && <RuntimeLine runtime={provider.runtime} />}
                   </span>
                 ),
               },
@@ -431,7 +484,7 @@ export default function AIProvidersPage() {
                 sortable: false,
                 cell: (provider) => (
                   <span className="flex gap-0.5">
-                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => test.mutate(provider.id)} disabled={test.isPending}>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => test.mutate(provider.id)} disabled={test.isPending || !!provider.refused_reason}>
                       test
                     </button>
                     <button type="button" className="btn btn-sm btn-ghost" onClick={() => openEdit(provider)}>
@@ -447,7 +500,7 @@ export default function AIProvidersPage() {
             rows={all}
             keyOf={(p) => p.id}
             loading={isLoading}
-            empty="No providers yet. Add a local Ollama, an Anthropic API key, or a Claude Code subscription token — the assistant cannot run without one."
+            empty="No providers yet. Add a local Ollama, an Anthropic API key, or a Claude agent that uses this server's Claude sign-in — the assistant cannot run without one."
           />
         </Panel>
       </div>
@@ -480,7 +533,9 @@ export default function AIProvidersPage() {
             </Field>
             <Field label="type" htmlFor="provider_type">
               <select id="provider_type" className="inp" value={form.provider_type} onChange={(e) => changeType(e.target.value as AIProviderType)}>
-                {(Object.keys(TYPE_LABEL) as AIProviderType[]).map((t) => (
+                {(Object.keys(TYPE_LABEL) as AIProviderType[])
+                  .filter((t) => allowedTypes.includes(t) || t === editing?.provider_type)
+                  .map((t) => (
                   <option key={t} value={t}>
                     {TYPE_LABEL[t]}
                   </option>
@@ -514,7 +569,7 @@ export default function AIProvidersPage() {
               className="inp mono"
               value={form.model}
               onChange={(e) => setField("model", e.target.value)}
-              placeholder={form.provider_type === "anthropic" ? "claude-opus-5" : claude ? "blank — uses Claude Code's own default model" : "llama3.1:8b"}
+              placeholder={form.provider_type === "anthropic" ? "claude-opus-5" : claude ? "blank — uses the Claude Code program's default model" : "llama3.1:8b"}
             />
             {presets.length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -528,45 +583,50 @@ export default function AIProvidersPage() {
             <Help>For Ollama the tag you pulled, for a hosted API the published model id. Pick a suggestion to fill this in, or type any name the endpoint serves.</Help>
           </Field>
 
-          <Field label={claude ? "subscription token" : "api key"} htmlFor="api_key" hint={form.provider_type === "anthropic" ? "required" : editing?.has_api_key ? "stored — blank keeps it" : undefined}>
-            <input
-              id="api_key"
-              type="password"
-              className="inp mono"
-              autoComplete="off"
-              value={form.api_key}
-              onChange={(e) => setField("api_key", e.target.value)}
-              placeholder={
-                editing?.has_api_key
-                  ? "stored — leave blank to keep it"
-                  : claude
-                    ? "sk-ant-oat01-… from `claude setup-token` — blank uses the host's own login"
+          {claude ? (
+            <>
+              <div className="text-[11.5px] text-text-3">
+                This type takes no credential. It uses the Claude Code sign-in of the unbork service account on this server, kept in unbork&apos;s state directory so it survives a restart. Sign in once from a
+                shell on the server as described in{" "}
+                <a href="https://open-unbork.github.io/unbork/ui/assistant/#signing-in" className="text-ld-accent" target="_blank" rel="noreferrer">
+                  the assistant guide, Signing in
+                </a>
+                . Sessions count against that account&apos;s plan, so use your own sign-in on your own instance.
+              </div>
+              {editing?.has_api_key && (
+                <Banner tone="warn">
+                  This provider still holds a subscription token saved by an earlier version. It is used until you remove it.{" "}
+                  <button type="button" className="btn btn-sm" onClick={() => clearToken.mutate(editing.id)} disabled={clearToken.isPending}>
+                    {clearToken.isPending ? "Removing…" : "Remove stored token"}
+                  </button>
+                </Banner>
+              )}
+            </>
+          ) : (
+            <Field label="api key" htmlFor="api_key" hint={form.provider_type === "anthropic" ? "required" : editing?.has_api_key ? "stored — blank keeps it" : undefined}>
+              <input
+                id="api_key"
+                type="password"
+                className="inp mono"
+                autoComplete="off"
+                value={form.api_key}
+                onChange={(e) => setField("api_key", e.target.value)}
+                placeholder={
+                  editing?.has_api_key
+                    ? "stored — leave blank to keep it"
                     : form.provider_type === "anthropic"
                       ? "sk-ant-… from platform.claude.com"
                       : "leave blank for an unauthenticated local server"
-              }
-            />
-            {form.provider_type === "anthropic" && (
-              <Help summary="where to get one">
-                Create one in the Claude Console at <span className="mono">platform.claude.com</span> under API keys. It starts with <span className="mono">sk-ant-</span> and is billed per token. A Pro or Max
-                subscription does not cover API usage — to spend against a subscription instead, use a Claude Code provider type.
-              </Help>
-            )}
-            {claude && (
-              <Help summary="how to get one, and what it authenticates as">
-                Run <span className="mono">claude setup-token</span> on your own machine, not the server. It shows three strings in turn, and only the last belongs here: an <strong>authorize URL</strong> to open in a
-                browser, an <strong>authorization code</strong> to paste back at the terminal, then the <strong>token</strong> starting <span className="mono">sk-ant-oat01-</span> — that is this field. It is stored
-                encrypted, like every other unbork credential, and injected only into the CLI process; leave it blank to use whatever the host is already logged in as. The token lasts a year, and sessions count against
-                your plan&apos;s usage limits — the same ones the Claude apps use. Anthropic&apos;s terms allow this for your own use but not for routing other people&apos;s requests through your plan, so use your own
-                token on your own instance and pick an API-key provider if you run unbork for someone else.
-                <br />
-                <br />
-                Two things outrank this token in Claude Code&apos;s own credential order, and both would quietly authenticate as a different account: the <span className="mono">ANTHROPIC_API_KEY</span> and{" "}
-                <span className="mono">ANTHROPIC_AUTH_TOKEN</span> environment variables, and a login left on disk by <span className="mono">claude login</span>. When a token is set unbork neutralises both variables and
-                points Claude Code at its own config directory, so neither can shadow what you enter here.
-              </Help>
-            )}
-          </Field>
+                }
+              />
+              {form.provider_type === "anthropic" && (
+                <Help summary="where to get one">
+                  Create one in the Claude Console at <span className="mono">platform.claude.com</span> under API keys. It starts with <span className="mono">sk-ant-</span> and is billed per token. A Pro or Max
+                  subscription does not cover API usage — to spend against a subscription instead, use the Claude agent or Claude single-shot type.
+                </Help>
+              )}
+            </Field>
+          )}
 
           {/*
             Every field below is inert on a subscription, and a Monthly

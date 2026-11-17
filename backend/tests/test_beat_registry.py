@@ -210,3 +210,35 @@ class TestEveryModuleIsStillFound:
             f"a later module stopped registering: {results}"
         )
         assert sweeper is not None  # imported for the name above
+
+
+class TestBeatStartLog:
+    """Stage 2 live check: with the assistant off, every beat start logged
+    its schedule deletions ("removed", "absent") as failed registrations."""
+
+    def _run(self, results, caplog):
+        import logging
+
+        import app.tasks as tasks
+
+        with (
+            patch("app.tasks.beat_registry.register_all", return_value=results),
+            caplog.at_level(logging.INFO, logger=tasks.logger.name),
+        ):
+            tasks._register_beat_schedules_on_beat_start()
+        return [r for r in caplog.records if r.levelname == "ERROR"]
+
+    def test_assistant_deletions_are_not_failures(self, caplog):
+        results = {
+            "app.tasks.x.register_beat": "ok",
+            "assistant-off:prune-ai-snapshots": "removed",
+            "assistant-off:check-due-remediations": "absent",
+        }
+        assert self._run(results, caplog) == []
+
+    def test_a_real_failure_is_still_logged(self, caplog):
+        results = {"app.tasks.x.register_beat": "failed", "assistant-off:y": "absent"}
+        errors = self._run(results, caplog)
+        assert len(errors) == 1
+        assert "app.tasks.x.register_beat" in errors[0].getMessage()
+        assert "assistant-off:y" not in errors[0].getMessage()

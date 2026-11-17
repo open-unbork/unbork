@@ -194,7 +194,7 @@ class TestTheVerdictExplainsItself:
         assert verdict.segment == "cat /etc/hosts"
 
     def test_a_command_of_only_separators_is_not_allowed(self) -> None:
-        """Default-deny. Nothing parseable came out of it, so LabDog does
+        """Default-deny. Nothing parseable came out of it, so unbork does
         not get to call it read-only — which is what the placeholder used
         to make it."""
         verdict = classify_command(";;;")
