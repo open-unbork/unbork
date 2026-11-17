@@ -1236,7 +1236,9 @@ jobs:
         run: |
           set -euo pipefail
           docker pull --quiet "$IMAGE"
-          found="$(docker run --rm --entrypoint sh "$IMAGE" -c \
+          # As root: the image's own user cannot read every directory, and
+          # find then exits non-zero, which set -e takes for a failure.
+          found="$(docker run --rm --user 0 --entrypoint sh "$IMAGE" -c \
             'find / -xdev -type f \( -name claude -o -name "claude-*" \) -size +1M 2>/dev/null')"
           if [ -n "$found" ]; then
             echo "::error::The image contains a Claude Code binary:"
