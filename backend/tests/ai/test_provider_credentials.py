@@ -87,3 +87,31 @@ async def test_anthropic_still_requires_a_key(superuser_client) -> None:
         "/api/ai/providers", json={"name": _name(), "provider_type": "anthropic", "model": "m"}
     )
     assert resp.status_code == 400
+
+
+async def test_a_type_change_must_clear_a_stored_key(superuser_client, db) -> None:
+    """Otherwise an API key saved under another type becomes the program's token."""
+    provider = AIProvider(
+        name=_name(),
+        provider_type="anthropic",
+        model="m",
+        max_tokens=4096,
+        temperature=0.0,
+        enabled=False,
+        encrypted_api_key=encrypt_ssh_key("sk-ant-oat01-smuggled", get_master_key()),
+    )
+    db.add(provider)
+    await db.flush()
+
+    kept = await superuser_client.patch(
+        f"/api/ai/providers/{provider.id}", json={"provider_type": "claude_agent"}
+    )
+    assert kept.status_code == 422
+    await db.refresh(provider)
+    assert provider.provider_type == "anthropic"
+
+    cleared = await superuser_client.patch(
+        f"/api/ai/providers/{provider.id}", json={"provider_type": "claude_agent", "api_key": ""}
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["has_api_key"] is False

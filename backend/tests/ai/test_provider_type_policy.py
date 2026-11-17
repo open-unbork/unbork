@@ -144,6 +144,17 @@ class TestTheApi:
         )
         assert renamed.status_code == 400
 
+        # Taking it out of use is allowed, so it need not be deleted.
+        disabled = await superuser_client.patch(
+            f"/api/ai/providers/{cli_provider.id}", json={"enabled": False, "is_default": False}
+        )
+        assert disabled.status_code == 200, disabled.text
+        assert disabled.json()["enabled"] is False
+        enabled = await superuser_client.patch(
+            f"/api/ai/providers/{cli_provider.id}", json={"enabled": True}
+        )
+        assert enabled.status_code == 400
+
         moved = await superuser_client.patch(
             f"/api/ai/providers/{cli_provider.id}",
             json={"provider_type": "openai_compat", "base_url": "http://localhost:11434/v1"},

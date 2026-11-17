@@ -258,10 +258,34 @@ async def update_provider(
         )
 
     _refuse_credential(provider.provider_type, api_key)
+    # A key stored under an API-key type would be handed to the program as
+    # its token once the type changes (S-014): the change must clear it.
+    if (
+        "provider_type" in data
+        and provider.provider_type in SUBSCRIPTION_BACKED_TYPES
+        and provider.encrypted_api_key
+        and api_key != ""
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This provider type takes no credential. Clear the stored key "
+                '(api_key: "") in the same change, and sign in to Claude Code on the '
+                "server instead."
+            ),
+        )
     # Checked against the type the row has after this update: moving a
-    # refused provider to an allowed type passes, any other edit of it is
+    # refused provider to an allowed type passes, and so does taking it out
+    # of use (disabling it, unsetting the default); any other edit of it is
     # refused (S-017).
-    _refuse_provider_type(provider.provider_type)
+    standing_down = (
+        api_key is None
+        and set(data) <= {"enabled", "is_default"}
+        and not data.get("enabled")
+        and not data.get("is_default")
+    )
+    if not standing_down:
+        _refuse_provider_type(provider.provider_type)
 
     # Tri-state: absent keeps, "" clears, a value replaces.
     if api_key is not None:
