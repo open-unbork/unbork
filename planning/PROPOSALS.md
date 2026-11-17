@@ -263,7 +263,10 @@ later and are unranked.
   "needs the Claude Code program"; `_ensure_program` raises
   `AIDisabledError` for a missing program.
 - `claude_code.status()` runs once per provider row of a list; compute it
-  once per request.
+  once per request. `send_task` publishes synchronously in async handlers;
+  move it to the threadpool.
+- `AIProviderRuntime.state` repeats `claude_code.State` as its own
+  `Literal`; reuse it.
 - Dockerfile: copy and run `claude_code_pin.py` in a later layer so an
   edit to it does not reinstall every Python dependency.
 - A shared docs base URL constant in the frontend.

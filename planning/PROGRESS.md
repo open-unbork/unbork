@@ -110,3 +110,4 @@ Work branch: `claude/project-thread-1sra3u` (the session's assigned branch, in p
 - 2026-11-17 S-009 review 70a787b. Install on a running stack checked in the stage review.
 - 2026-11-17 C-026 review 9828765. Whole suite passes with the assistant off (AI tests skip). Assumptions A-05, A-06.
 - 2026-11-17 S-010 blocked 24ae507. Code done; D-31 (contact address and wording) open. Assumptions A-07, A-08.
+- 2026-11-17 Stage 2 review: pass (planning/reviews/stage-2.md). 30 findings: 22 fixed, 7 deferred (PR-31 to PR-33), 1 rejected; CI 5,062 passed, coverage 84%. Live checks on lin-manager-2. S-010 still blocked on D-31; stage status stays review.
