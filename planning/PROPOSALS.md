@@ -161,7 +161,7 @@ later and are unranked.
   skips them for the tick.
 - **Fix:** ask the gate first, then lock and re-check the host, or commit
   and release the lock around the gate call. Also consider a timeout per
-  gate call in `check_run`. Community, S. Status: open.
+  gate call in `check_run`. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-23 Make a long run-gate hold cheap
 - **Finding (stage 1 review, medium):** each held sync or action run goes
@@ -172,7 +172,7 @@ later and are unranked.
 - **Fix:** ask the gate in `retry_held` before sending, and push
   `gate_retry_at` forward on a repeated deferral, so a still-held row
   costs no task; load due rows in one query; tell gate authors to return
-  a real `retry_at`. Community, S. Status: open.
+  a real `retry_at`. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-24 A deferred schedule asks the gate every tick
 - **Finding (stage 1 review, low):** `_gate_schedule` ignores
@@ -180,7 +180,7 @@ later and are unranked.
   serial walk over schedules. With many due schedules and a slow gate a
   tick can outlast its interval.
 - **Fix:** keep the hold on the schedule (or cache it per tick) and skip
-  the gate until it passes. Community, S. Status: open.
+  the gate until it passes. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-25 An action run is gated once, before it waits for a host
 - **Finding (stage 1 review, medium):** `gate_action_run` asks when the
@@ -190,14 +190,14 @@ later and are unranked.
   Documented in `CLAUDE.md` for now.
 - **Fix:** also ask in the per-host claim (`action_host`, `action_group`)
   when the run had to wait. Needs care with partial group runs (what a
-  refusal means for members already done). Community, M. Status: open.
+  refusal means for members already done). Community, M. Status: accepted 2026-11-16 (D-52).
 
 ## PR-26 Bound the firewall rule reorder
 - **Finding (stage 1 review, low):** `reorder_rules` loads one rule per
   id, and `RuleReorder.rule_ids` has no upper bound; the new audit row
   carries the whole list. 500 ids is 500 SELECTs and one ~50 KB row.
 - **Fix:** one `id.in_(rule_ids)` query and a `max_length` on the list
-  (an API change, so it needs a number). Community, S. Status: open.
+  (an API change, so it needs a number). Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-27 Small tidy-ups from the stage 1 review
 - **Finding (stage 1 review, low):** cross-module imports of underscore
@@ -209,7 +209,7 @@ later and are unranked.
   for one test; four copies of the contract-version test.
 - **Fix:** make the shared helpers public, share one small hook-registry
   helper, point the test at `app.client_ip`, keep one exact
-  `PLUGIN_API` test. Community, S. Status: open.
+  `PLUGIN_API` test. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-28 Audit host create, edit and delete
 - **Finding (stage 1 live check):** `POST /api/hosts` (and the host edit
@@ -219,7 +219,7 @@ later and are unranked.
   ... leaves an audit row") left short on the most basic object.
 - **Fix:** `log_action` create/update/delete on `host`, with the
   connection fields in before/after and no secrets. Community, S.
-  Status: open.
+  Status: accepted 2026-11-16 (D-52).
 
 ## PR-29 Log a successful plugin load in the Celery processes
 - **Finding (stage 1 live check):** core's "plugin ... loaded" line shows
@@ -228,14 +228,14 @@ later and are unranked.
   INFO line is dropped (failures, at ERROR, do show).
 - **Fix:** log the loaded plugins again at `worker_ready` / `beat_init`
   from `loaded_plugins`, or configure logging before the signal. Community,
-  S. Status: open.
+  S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-30 Clear pending_reason when a run starts
 - **Finding (stage 1 live check):** a sync or action run that waited
   (host busy, or held by a gate) keeps its `pending_reason` after it ran
   and finished, so a finished row still says "test hold".
 - **Fix:** clear it on claim, or show it only while `pending`. Community,
-  S. Status: open.
+  S. Status: accepted 2026-11-16 (D-52).
 
 ## Other work Dennis asked to add
 
