@@ -18,6 +18,10 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Extension hook to restrict AI provider types.** An extension can
+  refuse provider types; a refused type cannot be created, tested or used,
+  and the form leaves it out. Stored providers are never deleted or
+  changed. A Community install refuses nothing. Plugin API 1.7.
 - **Extension hook for permissions.** An extension can declare
   permissions of its own for its routes. The built-in catalog and roles
   are unchanged. Plugin API 1.6.
@@ -95,6 +99,18 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Changed
 
+- **The Docker image no longer contains the Claude Code program.** It is
+  downloaded to the state volume (`/var/lib/unbork/claude-code`) the first
+  time a provider that needs it is turned on, tested or used, and checked
+  against the checksum the release pins before it is ever run. The image is
+  smaller, and a server without outbound access must provide the program
+  itself on PATH. See
+  [the upgrade note](docs/upgrade.md#the-claude-code-program-is-no-longer-in-the-image).
+- **The Claude providers take no token any more.** "Claude agent" and
+  "Claude single-shot" (the new names for the Claude Agent SDK and Claude
+  Code CLI types) use the Claude Code sign-in of the `unbork` service
+  account on the server. A token saved by an earlier version keeps working
+  until you remove it from the provider.
 - **Breaking: everything is renamed to unbork, and the old names are no
   longer read.** Environment variables are `UNBORK_*`, the config file is
   `/etc/unbork/unbork.toml` (key `security.unbork_server_ip`), the package,

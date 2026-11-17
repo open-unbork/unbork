@@ -8,7 +8,7 @@ import { UsagePanel } from "@/components/ai/usage-panel"
 import { Banner, Confirm, Field, Help, Modal, PageHead, Panel, Table, Tag } from "@/components/ld"
 import { MODEL_PRESETS, type ModelPreset } from "@/lib/ai-presets"
 import { apiFetch, ApiError } from "@/lib/api"
-import type { AIProvider, AIProviderTestResult, AIProviderType, AIProviderTypeInfo } from "@/lib/types"
+import type { AIProvider, AIProviderRuntime, AIProviderTestResult, AIProviderType, AIProviderTypeInfo } from "@/lib/types"
 
 const CRUMBS = [
   { label: "settings", href: "/settings" },
@@ -27,9 +27,20 @@ const TYPE_HELP: Record<AIProviderType, string> = {
     "Any server speaking the OpenAI chat-completions API — Ollama, vLLM, LM Studio, OpenRouter, or OpenAI itself.",
   anthropic: "The Anthropic Messages API. Leave the base URL blank for the public API.",
   claude_agent:
-    "Runs Claude as an agent through the Claude Agent SDK, using the Claude Code program on this server. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token.",
+    "Runs Claude as an agent through the Claude Agent SDK, using the Claude Code program on this server. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token. unbork downloads the program the first time it is needed.",
   claude_cli:
-    "Calls Claude once per prompt through the Claude Code program on this server. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick Claude agent.",
+    "Calls Claude once per prompt through the Claude Code program on this server. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick Claude agent. unbork downloads the program the first time it is needed.",
+}
+
+/** Where the Claude Code program stands for a program-backed provider (S-009). */
+function RuntimeLine({ runtime }: { runtime: AIProviderRuntime }) {
+  if (runtime.state === "ready") {
+    return <span className="text-[10.5px] text-text-faint">program ready</span>
+  }
+  if (runtime.state === "failed") {
+    return <span className="text-[10.5px] text-warn">unavailable: {runtime.detail}</span>
+  }
+  return <span className="text-[10.5px] text-text-3">installing the Claude Code program…</span>
 }
 
 /**
@@ -200,6 +211,12 @@ export default function AIProvidersPage() {
   const { data: providers, isLoading } = useQuery<AIProvider[]>({
     queryKey: ["ai-providers"],
     queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"),
+    // While the Claude Code program downloads (S-009), poll so the state
+    // turns to ready (or says why not) without a reload.
+    refetchInterval: (query) =>
+      query.state.data?.some((p) => p.runtime && (p.runtime.state === "installing" || p.runtime.state === "missing"))
+        ? 5000
+        : false,
   })
 
   // The display currency comes from the server (ai.currency) so the label on
@@ -357,7 +374,11 @@ export default function AIProvidersPage() {
   const test = useMutation({
     mutationFn: (id: number) =>
       apiFetch<AIProviderTestResult>(`/api/ai/providers/${id}/test`, { method: "POST" }),
-    onSuccess: (result, id) => setTestResults((prev) => ({ ...prev, [id]: result })),
+    onSuccess: (result, id) => {
+      setTestResults((prev) => ({ ...prev, [id]: result }))
+      // A Test can start the program's install (S-009); show its state.
+      queryClient.invalidateQueries({ queryKey: ["ai-providers"] })
+    },
   })
 
   const all = providers ?? []
@@ -429,6 +450,7 @@ export default function AIProvidersPage() {
                   <span className="flex min-w-0 flex-col">
                     <span className="trunc text-text-2">{TYPE_LABEL[provider.provider_type]}</span>
                     {provider.base_url && <span className="mono trunc text-[10.5px] text-text-faint">{provider.base_url}</span>}
+                    {provider.runtime && <RuntimeLine runtime={provider.runtime} />}
                   </span>
                 ),
               },

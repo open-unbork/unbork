@@ -65,7 +65,16 @@ async def test_connection(provider: AIProvider) -> str:
         TextBlock,
     )
 
+    from app.ai.claude_code import binary_path
+    from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
+
+    program = binary_path()
+    if program is None:
+        raise LLMProviderError(NOT_FOUND_MESSAGE)
+
     options = ClaudeAgentOptions(
+        # The program unbork installed (S-009); the image ships none.
+        cli_path=str(program),
         # No tools at all for the probe. It has nothing to look up, and
         # the built-ins would be a shell in the container either way.
         tools=NO_BUILTIN_TOOLS,

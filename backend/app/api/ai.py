@@ -126,6 +126,30 @@ async def list_provider_types(_: User = Depends(require("ai.use"))):
     return rows
 
 
+def _queue_program_install(provider: AIProvider) -> str | None:
+    """Start installing Claude Code if this provider needs it and it is absent.
+
+    Returns the program's state (``None`` for types that need no program).
+    The download runs on a worker (``app.tasks.ai_runtime``), never in the
+    request (S-009).
+    """
+    from app.ai import claude_code
+    from app.ai.providers.factory import uses_subscription
+
+    if not uses_subscription(provider):
+        return None
+    state = claude_code.status().state
+    if state in ("missing", "failed"):
+        from app.tasks import celery_app
+
+        try:
+            # retry=False: a broker outage must not hold the request.
+            celery_app.send_task("app.tasks.ai_runtime.install_claude_code", retry=False)
+        except Exception:
+            logger.warning("ai: could not queue the Claude Code install", exc_info=True)
+    return state
+
+
 @router.get("/providers", response_model=list[AIProviderResponse])
 async def list_providers(
     _: User = Depends(require("ai.use")),
@@ -204,6 +228,8 @@ async def create_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    if provider.enabled:
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
@@ -261,6 +287,10 @@ async def update_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    # Turning a provider on, or moving it to a program-backed type, is when
+    # the program is needed. Other edits leave a failed install alone.
+    if provider.enabled and ("enabled" in data or "provider_type" in data):
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
@@ -298,6 +328,19 @@ async def test_provider(
     refusal = provider_type_refusal(provider.provider_type)
     if refusal:
         return AIProviderTestResponse(ok=False, message=refusal)
+    state = _queue_program_install(provider)
+    if state in ("missing", "installing"):
+        return AIProviderTestResponse(
+            ok=False,
+            message="Installing the Claude Code program; try again in a few minutes.",
+        )
+    if state == "failed":
+        from app.ai import claude_code
+
+        return AIProviderTestResponse(
+            ok=False,
+            message=f"{claude_code.status().detail} Trying the install again in the background.",
+        )
     try:
         if runs_on_agent_sdk(provider):
             # No LLMProvider exists for these — the SDK owns the loop — so

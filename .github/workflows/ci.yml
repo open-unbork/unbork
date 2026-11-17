@@ -1091,6 +1091,35 @@ jobs:
           ignore-unfixed: "true"
           trivyignores: .trivyignore
 
+  image-has-no-claude-code:
+    # S-009: the image must not carry the Claude Code program, which
+    # unbork downloads on first use instead. Fails on any file named
+    # claude* over 1 MB, and on a `claude` reachable on PATH.
+    if: >-
+      always() &&
+      needs.build-test-image.result == 'success'
+    needs: [build-test-image]
+    runs-on: ubuntu-26.04
+    steps:
+      - name: No Claude Code binary in the image
+        env:
+          IMAGE: ${{ needs.build-test-image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$IMAGE"
+          found="$(docker run --rm --entrypoint sh "$IMAGE" -c \
+            'find / -xdev -type f \( -name claude -o -name "claude-*" \) -size +1M 2>/dev/null')"
+          if [ -n "$found" ]; then
+            echo "::error::The image contains a Claude Code binary:"
+            echo "$found"
+            exit 1
+          fi
+          if docker run --rm --entrypoint sh "$IMAGE" -c 'command -v claude'; then
+            echo "::error::claude is on PATH in the image"
+            exit 1
+          fi
+          echo "No Claude Code program in $IMAGE"
+
   gitleaks:
     if: >-
       github.event_name == 'pull_request' ||

@@ -110,5 +110,9 @@ skip_empty = true
 [tool.setuptools]
 packages = ["app"]
 
+[tool.setuptools.package-data]
+# Read at run time by app/ai/claude_code.py (S-009).
+app = ["ai/claude_code_pin.json"]
+
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}

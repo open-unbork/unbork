@@ -101,6 +101,11 @@ services:
       # last a day. Without the volume, upgrading the image mid-approval
       # loses everything the assistant established before it stopped.
       - unbork_claude:/var/lib/unbork/claude-cli
+      # The Claude Code program those providers run. The image does not
+      # ship it: unbork downloads it from files.pythonhosted.org the first
+      # time it is needed. Without this volume it is downloaded again
+      # after every container replacement.
+      - unbork_claude_code:/var/lib/unbork/claude-code
       # Optional: mount a host-side TOML for non-secret tunables.
       - ./unbork.toml:/etc/unbork/unbork.toml:ro
     depends_on:
@@ -130,6 +135,7 @@ volumes:
   postgres_data:
   unbork_packs:
   unbork_claude:
+  unbork_claude_code:
   caddy_data:
   caddy_config:
 ```

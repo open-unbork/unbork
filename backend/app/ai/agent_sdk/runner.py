@@ -94,6 +94,15 @@ logger = logging.getLogger(__name__)
 #: directory on disk. Worth revisiting only if the volume proves fragile.
 SESSION_STATE_DIR = DEFAULT_CONFIG_DIR
 
+
+def _program_path() -> str | None:
+    """The Claude Code program to run, or ``None`` to let the SDK look."""
+    from app.ai.claude_code import binary_path
+
+    found = binary_path()
+    return str(found) if found is not None else None
+
+
 #: How the CLI's ``rate_limit_type`` values read in a sentence. An
 #: unrecognised value is used verbatim rather than dropped: a window this
 #: version has not heard of is still the reason a run stopped, and
@@ -632,6 +641,10 @@ class AgentSDKRunner:
         resume = (self.session.resume_state or {}).get("sdk_session_id")
 
         return ClaudeAgentOptions(
+            # build_runner() made sure there is a program (S-009). Left
+            # unset, the SDK would look for a bundled copy the image does
+            # not have.
+            cli_path=_program_path(),
             mcp_servers=servers,
             # Only the tools unbork built. Omitting this hands the model
             # Bash, Read, Write and Edit inside unbork's container.

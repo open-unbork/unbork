@@ -1182,12 +1182,22 @@ export interface AIProvider {
   credential_expires_at: string | null
   /** Why an extension's provider policy refuses this type (S-017); null when allowed. */
   refused_reason: string | null
+  /**
+   * The Claude Code program's install state for the two program-backed
+   * types (S-009); null for API-key types, which need no program.
+   */
+  runtime: AIProviderRuntime | null
   input_cost_per_mtok: number
   output_cost_per_mtok: number
   monthly_budget: number
   enabled: boolean
   created_at: string
   updated_at: string
+}
+
+export interface AIProviderRuntime {
+  state: "ready" | "missing" | "installing" | "failed"
+  detail: string
 }
 
 /** One row of GET /api/ai/provider-types: whether this install accepts the type. */

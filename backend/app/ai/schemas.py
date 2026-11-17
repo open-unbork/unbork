@@ -97,6 +97,13 @@ class AIProviderUpdate(BaseModel):
         return _validate_ca_cert_pem(v)
 
 
+class AIProviderRuntime(BaseModel):
+    """The Claude Code program's install state (S-009)."""
+
+    state: Literal["ready", "missing", "installing", "failed"]
+    detail: str
+
+
 class AIProviderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
@@ -128,6 +135,11 @@ class AIProviderResponse(BaseModel):
     #: (S-017); null when it is allowed. A refused provider cannot be tested
     #: or used until its type is changed.
     refused_reason: str | None = None
+    #: Whether the Claude Code program these backends run is installed
+    #: (S-009): ``{state, detail}`` with state ``ready``, ``missing``,
+    #: ``installing`` or ``failed``. Null for API-key types, which need no
+    #: program.
+    runtime: AIProviderRuntime | None = None
     input_cost_per_mtok: float
     output_cost_per_mtok: float
     monthly_budget: float
@@ -157,6 +169,12 @@ def credential_expiry(provider: AIProvider) -> datetime | None:
     return provider.credential_set_at + SUBSCRIPTION_TOKEN_LIFETIME
 
 
+def _runtime(provider: AIProvider) -> AIProviderRuntime:
+    from app.ai import claude_code
+
+    return AIProviderRuntime(**claude_code.status().as_dict())
+
+
 def provider_to_response(provider: AIProvider) -> AIProviderResponse:
     # Imported here: factory pulls in the provider backends, which the
     # schema module itself has no need for.
@@ -182,6 +200,7 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         uses_subscription=uses_subscription(provider),
         credential_expires_at=credential_expiry(provider),
         refused_reason=provider_type_refusal(provider.provider_type),
+        runtime=_runtime(provider) if uses_subscription(provider) else None,
         input_cost_per_mtok=provider.input_cost_per_mtok,
         output_cost_per_mtok=provider.output_cost_per_mtok,
         monthly_budget=provider.monthly_budget,

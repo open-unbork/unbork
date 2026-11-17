@@ -39,6 +39,7 @@ a release artifact.
 | `security.secret_key` | Recommended | same file | JWT signing key. Losing it invalidates all existing sessions but doesn't lose data — users re-login. |
 | Ansible pack checkouts | **No** | `/var/lib/unbork/packs/<id>/` | Re-cloned from the pack's linked `GitRepository` on next sync. |
 | Claude Code session state | Optional — but **must persist across restarts** | `/var/lib/unbork/claude-cli/` | Only relevant to the `claude_agent` and `claude_cli` providers. Holds the stored subscription login and the CLI's own session files. An AI session parked awaiting approval keeps only its `sdk_session_id` in the database — the conversation it resumes into lives here, so a container without this path on a volume loses parked sessions on restart. Not worth backing up (a lost login is re-entered, a lost parked session is re-run), but it does need to survive a restart: the shipped compose in [production-deploy.md](production-deploy.md) mounts it. |
+| Claude Code program | No | `/var/lib/unbork/claude-code/` | Downloaded by unbork the first time a Claude subscription provider needs it, checked against the checksum the release pins. Lost, it is downloaded again on next use; keep it on a volume to avoid that. |
 | Logs | Optional | `/var/log/unbork/` or `journalctl -u unbork` | Only for incident forensics; not required for service restoration. |
 | Frontend build | **No** | `/usr/lib/unbork/frontend/out/` | Comes from the release artifact. |
 | Backend venv | **No** | `/usr/lib/unbork/venv/` | Comes from the release artifact. |

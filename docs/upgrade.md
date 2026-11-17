@@ -159,6 +159,27 @@ whole `inet filter` table. Old Proxmox snapshots named `labdog-…` are no
 longer cleaned up by unbork; delete them in Proxmox when you no longer
 need them.
 
+#### The Claude Code program is no longer in the image
+
+The image used to carry the Claude Code program for the "Claude agent"
+and "Claude single-shot" providers. It no longer does: the first time
+such a provider is turned on, tested or used, a worker downloads the
+build that this release pins from `files.pythonhosted.org`, checks its
+checksum and keeps it in `/var/lib/unbork/claude-code`. Until that
+finishes, such a provider shows "installing" and its sessions wait for
+the download; it happens once while the directory is kept.
+
+- Add a volume for `/var/lib/unbork/claude-code` (see the compose file in
+  [production-deploy.md](production-deploy.md)), or the program is
+  downloaded again after every container replacement. A volume on the
+  whole of `/var/lib/unbork` already covers it.
+- A server without outbound HTTPS to `files.pythonhosted.org` cannot
+  download it. The provider then shows "unavailable" with the reason.
+  Install a `claude` program on PATH for the `unbork` user yourself
+  (a derived image, or a package install's system-wide install), and
+  unbork uses that.
+- API-key providers need no program and are not affected.
+
 ### Upgrading to 1.0.0
 
 Nothing is required unless you deleted the seeded `labdog-playbooks`

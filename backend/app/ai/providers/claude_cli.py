@@ -44,7 +44,6 @@ import asyncio
 import json
 import logging
 import os
-import shutil
 from collections.abc import AsyncIterator
 
 from app.ai.providers.base import (
@@ -91,19 +90,30 @@ OVERRIDING_CREDENTIAL_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "/var/lib/unbork/claude-cli"
 
-#: Raised when the binary is absent. Names both deployment shapes because
-#: the cause differs entirely between them: on a package install the
-#: operator supplies the binary, whereas the official container image
-#: bundles it — so a container hitting this is on a custom image or one
-#: built before the CLI was added, which is a different fix.
+#: Raised when the program is absent. Since S-009 no deployment ships it:
+#: unbork downloads it on first use (``app.ai.claude_code``), and a server
+#: that cannot reach the download puts its own copy on PATH.
 NOT_FOUND_MESSAGE = (
-    f"The {CLI_BINARY!r} CLI was not found on PATH for the unbork service user. "
-    "On a package install, install it system-wide (a per-user install under a "
-    "home directory is not visible to the service). In a container, the official "
-    "image bundles it, so check whether you are on a custom image or one built "
-    "before it was added. Either way, an Anthropic provider needs no binary and "
-    "can also run tools. See docs/ui/assistant.md."
+    "The Claude Code program is not installed. unbork downloads it the first "
+    "time a provider that needs it is turned on or tested, in a container and "
+    "on a package install alike; the provider shows the reason when that fails. "
+    "A server without outbound access can install a `claude` program on PATH "
+    "for the unbork service user instead (system-wide: a per-user install under "
+    "a home directory is not visible to the service). An Anthropic provider "
+    "needs no program and can also run tools. See docs/ui/assistant.md."
 )
+
+
+def program_path() -> str:
+    """The program to run: the one unbork installed, else ``claude`` on PATH.
+
+    Falls back to the bare name when neither exists, so starting it fails
+    with ``FileNotFoundError`` and the caller reports :data:`NOT_FOUND_MESSAGE`.
+    """
+    from app.ai.claude_code import binary_path
+
+    found = binary_path()
+    return str(found) if found is not None else CLI_BINARY
 
 
 def build_cli_env(
@@ -187,7 +197,7 @@ class ClaudeCLIProvider:
             )
 
     def _argv(self, prompt: str) -> list[str]:
-        argv = [CLI_BINARY, "-p", prompt]
+        argv = [program_path(), "-p", prompt]
         if self.model:
             argv += ["--model", self.model]
         # Deny the CLI its own tools — host access belongs to unbork's
@@ -306,12 +316,15 @@ class ClaudeCLIProvider:
         trivial round-trip against the account, which is the same bargain
         every other provider's test already makes.
         """
-        path = shutil.which(CLI_BINARY)
-        if not path:
+        from app.ai.claude_code import binary_path
+
+        found = binary_path()
+        if found is None:
             raise LLMProviderError(NOT_FOUND_MESSAGE)
+        path = str(found)
         self._ensure_config_dir()
 
-        code, version, stderr = await self._run([CLI_BINARY, "--version"], timeout=30)
+        code, version, stderr = await self._run([path, "--version"], timeout=30)
         if code != 0:
             raise LLMProviderError(stderr[:300] or "CLI error")
 
@@ -334,7 +347,7 @@ async def cli_supports_stream_json() -> bool:
     """
     try:
         proc = await asyncio.create_subprocess_exec(
-            CLI_BINARY,
+            program_path(),
             "--help",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

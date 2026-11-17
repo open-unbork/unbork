@@ -279,30 +279,29 @@ class TestNoCredentialForProgramBackedTypes:
 
 
 class TestMissingBinary:
-    """The message an operator sees when the CLI is not installed.
+    """The message an operator sees when the program is not installed.
 
-    The cause differs by deployment shape — a package install expects the
-    operator to supply the binary, while the official image bundles it, so
-    a container hitting this is on a custom or outdated image. A bare "not
-    found" sends a container user looking in the wrong place entirely.
+    Since S-009 no deployment ships it: unbork downloads it on first use,
+    and a server that cannot reach the download supplies its own on PATH.
+    The message has to say both, or an offline operator has nowhere to go.
     """
 
-    def test_message_covers_both_deployment_shapes(self) -> None:
+    def test_message_names_the_download_and_the_offline_route(self) -> None:
         from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
 
         lowered = NOT_FOUND_MESSAGE.lower()
+        assert "downloads it" in lowered
+        assert "path" in lowered and "service user" in lowered
         assert "container" in lowered, "container users get no guidance"
         assert "anthropic" in lowered, "no pointer to the provider that needs no binary"
         assert "docs/ui/assistant.md" in NOT_FOUND_MESSAGE
 
-    def test_message_does_not_claim_the_image_lacks_the_binary(self) -> None:
-        """It did lack it until the CLI was added to the Dockerfile. Leaving
-        that claim in place would send operators to build a derived image
-        they no longer need."""
+    def test_message_does_not_claim_the_image_bundles_it(self) -> None:
+        """It did until S-009. Leaving that claim would send a container
+        operator looking for a binary that is no longer there."""
         from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
 
-        assert "does not include" not in NOT_FOUND_MESSAGE.lower()
-        assert "extend the image" not in NOT_FOUND_MESSAGE.lower()
+        assert "bundles" not in NOT_FOUND_MESSAGE.lower()
 
 
 class TestAnthropicKeyIsRequired:

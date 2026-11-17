@@ -71,6 +71,7 @@ celery_app.conf.update(
         "app.tasks.scheduled_action_schedule.*": {"queue": "long_running"},
         "app.tasks.facts.*": {"queue": "long_running"},
         "app.tasks.ai_task.*": {"queue": "long_running"},
+        "app.tasks.ai_runtime.*": {"queue": "long_running"},
         # The sweep is quick and stays on default; the check and a rollback
         # wait on SSH and on Proxmox restarting a VM.
         "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
@@ -336,6 +337,7 @@ celery_app.conf.include = [
     "app.tasks.run_retention",
     "app.tasks.drift_retention",
     "app.tasks.ai_task",
+    "app.tasks.ai_runtime",
     "app.tasks.ai_approvals",
     "app.tasks.ai_snapshots",
     "app.tasks.snapshot_reaper",
