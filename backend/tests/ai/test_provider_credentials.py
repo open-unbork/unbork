@@ -12,8 +12,8 @@ import uuid
 import pytest
 
 from app.ai.models import AIProvider
-from app.crypto.key_management import get_master_key
 from app.crypto.encryption import encrypt_ssh_key
+from app.crypto.key_management import get_master_key
 
 PROGRAM_BACKED = ("claude_agent", "claude_cli")
 
@@ -40,7 +40,8 @@ async def test_create_with_a_token_is_refused(superuser_client, provider_type) -
 @pytest.mark.parametrize("provider_type", PROGRAM_BACKED)
 async def test_create_without_a_token_works(superuser_client, provider_type) -> None:
     resp = await superuser_client.post(
-        "/api/ai/providers", json={"name": _name(), "provider_type": provider_type, "model": "claude-opus-5"}
+        "/api/ai/providers",
+        json={"name": _name(), "provider_type": provider_type, "model": "claude-opus-5"},
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["has_api_key"] is False

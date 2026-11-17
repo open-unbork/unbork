@@ -64,4 +64,5 @@ def test_no_old_name_outside_the_exemptions():
 def test_guard_catches_a_new_file(tmp_path):
     (tmp_path / "new.md").write_text("Set " + "LAB" + "DOG_CONFIG here.\n")
     (tmp_path / "ok.md").write_text("LAB" + "DOG_CONFIG  # " + MARKER + "\n")
-    assert old_name_hits(["new.md", "ok.md"], tmp_path) == ["new.md:1: Set " + "LAB" + "DOG_CONFIG here."]
+    expected = "new.md:1: Set " + "LAB" + "DOG_CONFIG here."
+    assert old_name_hits(["new.md", "ok.md"], tmp_path) == [expected]

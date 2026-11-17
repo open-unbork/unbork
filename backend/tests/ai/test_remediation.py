@@ -25,7 +25,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from app.ai import unbork_host, remediation
+from app.ai import remediation, unbork_host
 from app.ai.alert_autonomy import MIN_WEBHOOK_TOKEN_CHARS, resolve
 from app.ai.loop import AgentLoop, LoopCaps
 from app.ai.models import AIRollback, AISession, AIToolCall, AlertEvent
