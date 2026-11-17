@@ -56,7 +56,7 @@ async def collect_resolver_state(
 
             elif resolver_type == "networkmanager":
                 result = await c.run(
-                    "cat /etc/NetworkManager/conf.d/90-labdog-dns.conf 2>/dev/null",
+                    "cat /etc/NetworkManager/conf.d/90-unbork-dns.conf 2>/dev/null",
                     check=False,
                 )
                 output = _stdout(result)
@@ -183,7 +183,7 @@ def parse_resolved_conf(text: str) -> dict:
 
 
 def parse_networkmanager_conf(text: str) -> dict:
-    """Parse /etc/NetworkManager/conf.d/90-labdog-dns.conf INI content."""
+    """Parse /etc/NetworkManager/conf.d/90-unbork-dns.conf INI content."""
     nameservers: list[str] = []
     search_domains: list[str] = []
 

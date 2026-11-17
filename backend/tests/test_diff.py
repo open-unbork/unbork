@@ -46,7 +46,7 @@ def test_diff_empty_both():
 
 
 def test_diff_host_ref_rule_matches_parsed_cidr():
-    # Regression: a desired rule that referenced a labdog host is resolved to a
+    # Regression: a desired rule that referenced an unbork host is resolved to a
     # concrete /32 CIDR before diffing, but keeps its source_host_id FK (the
     # effective-rules display needs it to show the host name). The current state
     # parsed back over SSH only ever carries the CIDR (bare, no /32, no FK).
@@ -67,7 +67,7 @@ def test_diff_host_ref_rule_matches_parsed_cidr():
             protocol="tcp",
             direction="input",
             source_cidr="10.10.3.3",
-            comment="Managed by LabDog",
+            comment="Managed by unbork",
             port_start=22,
         )
     ]

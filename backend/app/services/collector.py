@@ -290,7 +290,7 @@ async def collect_unit_file_content(
 ) -> str | None:
     quoted = shlex.quote(service_name)
     if deploy_mode == "override":
-        cmd = f"cat /etc/systemd/system/{quoted}.service.d/labdog.conf"
+        cmd = f"cat /etc/systemd/system/{quoted}.service.d/unbork.conf"
     else:
         cmd = f"cat /etc/systemd/system/{quoted}.service"
 

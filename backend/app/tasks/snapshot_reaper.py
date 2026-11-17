@@ -8,7 +8,7 @@ cleanup task to reap", but until this module nothing ran
 the manual ``POST /api/proxmox-nodes/cleanup-snapshots``, so they piled up
 on the VMs until someone removed them by hand.
 
-The sweep removes ``labdog-<run>-<ts>`` snapshots older than
+The sweep removes ``unbork-<run>-<ts>`` snapshots older than
 ``workflow.snapshot_max_age_hours`` whose run is not still using them. It
 gives a finished run's snapshot the same grace as one of unknown origin,
 so an operator has that long to restore a kept snapshot by hand. AI

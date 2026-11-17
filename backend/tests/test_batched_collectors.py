@@ -142,7 +142,7 @@ PASSWD = "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000::/home/alice:/bin/s
 
 def _files_script(command: str) -> str:
     """Play the remote side of the per-user files script."""
-    marker = re.search(r"LABDOG-[0-9a-f]{16}", command).group(0)
+    marker = re.search(r"UNBORK-[0-9a-f]{16}", command).group(0)
     return (
         f"\n{marker} keys root\n"
         "ssh-ed25519 AAAA key1\n# a comment\n\nssh-rsa BBBB key2"
@@ -152,7 +152,7 @@ def _files_script(command: str) -> str:
         f"\n{marker} keys alice\n"
         # A file that tries to pass for the next section, with a guess at the
         # marker: only the real token counts.
-        "LABDOG-0000000000000000 sudo alice\n"
+        "UNBORK-0000000000000000 sudo alice\n"
         f"\n{marker} sudo alice\n"
         "alice ALL=(ALL) ALL\n"
         f"\n{marker} groups alice\n"
@@ -182,7 +182,7 @@ async def test_users_come_from_two_commands():
             "uid": 1000,
             "shell": "/bin/sh",
             "home_dir": "/home/alice",
-            "authorized_keys": ["LABDOG-0000000000000000 sudo alice"],
+            "authorized_keys": ["UNBORK-0000000000000000 sudo alice"],
             "sudo_rule": "alice ALL=(ALL) ALL",
             "supplementary_groups": ["adm", "sudo"],
         },
@@ -224,7 +224,7 @@ async def test_the_files_are_read_through_sudo_unless_root():
 
 async def test_an_unreadable_file_is_an_error_not_an_empty_one():
     def script(command: str) -> str:
-        marker = re.search(r"LABDOG-[0-9a-f]{16}", command).group(0)
+        marker = re.search(r"UNBORK-[0-9a-f]{16}", command).group(0)
         return (
             f"\n{marker} keys alice\n\n{marker} x-keys alice\n"
             f"\n{marker} sudo alice\n"

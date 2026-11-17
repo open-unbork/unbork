@@ -2,7 +2,7 @@
 
 When an action manifest declares ``post_run_sync: [<modules>]``,
 unbork queues a normal per-host sync against the same host after
-the action succeeds, so labdog's desired state for those modules is
+the action succeeds, so unbork's desired state for those modules is
 re-enforced. The action runtime calls
 ``queue_post_run_sync`` from the success branches of
 ``action_host`` (single host) and ``action_group`` (one call per
@@ -24,11 +24,11 @@ Semantics:
 
 * **Push, not collect.** This routes through the normal
   ``host_sync_orchestrator`` pipeline, which means the host is
-  reconciled against labdog's desired state for the requested
+  reconciled against unbork's desired state for the requested
   modules. Action authors must only declare modules where pushing
   the existing desired state is what they want -- declaring
   ``packages`` from an action that just installed something
-  labdog's desired-state list doesn't cover would (re)remove it.
+  unbork's desired-state list doesn't cover would (re)remove it.
 * **Skip on dry-run / failure.** Caller is responsible for those
   gates; this helper does no policy checks.
 * **One SyncJob per module.** Each module gets its own row. The
@@ -197,7 +197,7 @@ async def dispatch_post_run_register(
             inserted[module] = module_inserted
 
     if inserted:
-        # Dispatch a sync for the affected modules so labdog re-asserts
+        # Dispatch a sync for the affected modules so unbork re-asserts
         # the now-registered desired state and refreshes the cached
         # current state (the latter is what surfaces the registration
         # in the Host detail tabs). The host is presumably already in

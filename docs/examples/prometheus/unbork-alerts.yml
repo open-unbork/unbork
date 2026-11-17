@@ -1,21 +1,21 @@
 # Example Prometheus alerting rules for unbork.
 #
-# Load with `rule_files: [labdog-alerts.yml]` in prometheus.yml, or drop into
+# Load with `rule_files: [unbork-alerts.yml]` in prometheus.yml, or drop into
 # a PrometheusRule CR (the `groups:` block below is the CR's `spec:` verbatim).
 #
 # Thresholds here are deliberately conservative for a homelab / small fleet.
 # Tune `for:` durations and comparisons to your environment before relying on
-# them -- in particular LabDogHostsOutOfSync will be noisy if you routinely
+# them -- in particular UnborkHostsOutOfSync will be noisy if you routinely
 # leave hosts drifted.
 #
 # runbook_url anchors point at docs/metrics-export.md.
 
 groups:
-  - name: labdog
+  - name: unbork
     rules:
       # --- Availability ------------------------------------------------------
-      - alert: LabDogDown
-        expr: up{job="labdog"} == 0
+      - alert: UnborkDown
+        expr: up{job="unbork"} == 0
         for: 5m
         labels:
           severity: critical
@@ -28,8 +28,8 @@ groups:
           runbook_url: "https://github.com/open-unbork/unbork/blob/main/docs/metrics-export.md#troubleshooting"
 
       # --- Fleet state -------------------------------------------------------
-      - alert: LabDogHostsInError
-        expr: labdog_hosts{sync_status="error"} > 0
+      - alert: UnborkHostsInError
+        expr: unbork_hosts{sync_status="error"} > 0
         for: 15m
         labels:
           severity: critical
@@ -40,8 +40,8 @@ groups:
             Fleet Overview triage table for the affected hosts.
           runbook_url: "https://github.com/open-unbork/unbork/blob/main/docs/metrics-export.md#fleet-state"
 
-      - alert: LabDogHostsOutOfSync
-        expr: labdog_hosts{sync_status="out_of_sync"} > 0
+      - alert: UnborkHostsOutOfSync
+        expr: unbork_hosts{sync_status="out_of_sync"} > 0
         for: 1h
         labels:
           severity: warning
@@ -51,8 +51,8 @@ groups:
             Configuration drift has persisted for an hour without a
             reconciling sync.
 
-      - alert: LabDogDriftChecksStalled
-        expr: labdog_host_last_drift_check_age_seconds_max > 86400
+      - alert: UnborkDriftChecksStalled
+        expr: unbork_host_last_drift_check_age_seconds_max > 86400
         for: 1h
         labels:
           severity: warning
@@ -63,8 +63,8 @@ groups:
             {{ $value | humanizeDuration }} ago. Drift checking may be
             disabled for that host, or celery-beat/RedBeat may be down.
 
-      - alert: LabDogDriftCheckErrors
-        expr: sum(rate(labdog_drift_checks_total{result="error"}[1h])) by (module) > 0
+      - alert: UnborkDriftCheckErrors
+        expr: sum(rate(unbork_drift_checks_total{result="error"}[1h])) by (module) > 0
         for: 30m
         labels:
           severity: warning
@@ -76,12 +76,12 @@ groups:
             true state is unknown.
 
       # --- Sync health -------------------------------------------------------
-      - alert: LabDogSyncFailureRateHigh
+      - alert: UnborkSyncFailureRateHigh
         expr: >-
           (
-            sum(rate(labdog_sync_jobs_total{status="failed"}[1h]))
+            sum(rate(unbork_sync_jobs_total{status="failed"}[1h]))
             /
-            clamp_min(sum(rate(labdog_sync_jobs_total{status=~"success|failed|cancelled"}[1h])), 0.0001)
+            clamp_min(sum(rate(unbork_sync_jobs_total{status=~"success|failed|cancelled"}[1h])), 0.0001)
           ) > 0.1
         for: 15m
         labels:
@@ -90,8 +90,8 @@ groups:
           summary: "Over 10% of syncs are failing"
           description: "Sync failure ratio over the last hour: {{ $value | humanizePercentage }}."
 
-      - alert: LabDogSyncQueueStuck
-        expr: labdog_stale_sync_jobs > 0
+      - alert: UnborkSyncQueueStuck
+        expr: unbork_stale_sync_jobs > 0
         for: 10m
         labels:
           severity: critical
@@ -102,8 +102,8 @@ groups:
             runs every 5 minutes and should clear these -- if they persist,
             celery-beat/RedBeat is likely not running.
 
-      - alert: LabDogHostQueueBlocked
-        expr: labdog_hosts_queue_blocked > 0
+      - alert: UnborkHostQueueBlocked
+        expr: unbork_hosts_queue_blocked > 0
         for: 30m
         labels:
           severity: warning
@@ -114,8 +114,8 @@ groups:
             and have not drained in 30 minutes.
 
       # --- Scheduling & packs ------------------------------------------------
-      - alert: LabDogScheduledActionOrphaned
-        expr: labdog_scheduled_actions_orphaned > 0
+      - alert: UnborkScheduledActionOrphaned
+        expr: unbork_scheduled_actions_orphaned > 0
         for: 15m
         labels:
           severity: warning
@@ -127,8 +127,8 @@ groups:
             pack was removed, or the key is unresolved and needs a winner
             pinned on the Action Packs page.
 
-      - alert: LabDogActionPackSyncFailing
-        expr: labdog_action_packs{sync_status="failed"} > 0
+      - alert: UnborkActionPackSyncFailing
+        expr: unbork_action_packs{sync_status="failed"} > 0
         for: 1h
         labels:
           severity: warning
@@ -138,8 +138,8 @@ groups:
             unbork is running against a stale copy of the pack's playbooks.
 
       # --- Certificates ------------------------------------------------------
-      - alert: LabDogCACertExpiringSoon
-        expr: (labdog_ca_cert_not_after_timestamp_seconds - time()) < 30 * 86400
+      - alert: UnborkCACertExpiringSoon
+        expr: (unbork_ca_cert_not_after_timestamp_seconds - time()) < 30 * 86400
         for: 1h
         labels:
           severity: warning
@@ -147,8 +147,8 @@ groups:
           summary: "CA certificate {{ $labels.name }} expires in under 30 days"
           description: "Expires {{ $value | humanizeDuration }} from now."
 
-      - alert: LabDogCACertExpiringCritical
-        expr: (labdog_ca_cert_not_after_timestamp_seconds - time()) < 7 * 86400
+      - alert: UnborkCACertExpiringCritical
+        expr: (unbork_ca_cert_not_after_timestamp_seconds - time()) < 7 * 86400
         for: 1h
         labels:
           severity: critical
@@ -156,8 +156,8 @@ groups:
           summary: "CA certificate {{ $labels.name }} expires in under 7 days"
 
       # --- Discovery ---------------------------------------------------------
-      - alert: LabDogPendingHostsBacklog
-        expr: labdog_scan_pending_hosts > 20
+      - alert: UnborkPendingHostsBacklog
+        expr: unbork_scan_pending_hosts > 20
         for: 24h
         labels:
           severity: info
@@ -165,8 +165,8 @@ groups:
           summary: "{{ $value }} discovered hosts awaiting review"
 
       # --- Exporter health ---------------------------------------------------
-      - alert: LabDogMetricsSlow
-        expr: labdog_metrics_scrape_duration_seconds > 5
+      - alert: UnborkMetricsSlow
+        expr: unbork_metrics_scrape_duration_seconds > 5
         for: 15m
         labels:
           severity: warning

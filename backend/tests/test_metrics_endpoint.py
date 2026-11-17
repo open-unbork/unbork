@@ -155,15 +155,15 @@ class TestEnabled:
         GitRepository.auth_type column exists on an empty DB regardless."""
         resp = await client.get("/metrics")
         body = resp.text
-        assert 'labdog_hosts{sync_status="error"} 0' in body
-        assert 'labdog_hosts{sync_status="pending"} 0' in body
-        assert 'labdog_hosts{sync_status="in_sync"} 0' in body
-        assert 'labdog_hosts{sync_status="out_of_sync"} 0' in body
-        assert 'labdog_hosts{sync_status="unknown"} 0' in body
-        assert 'labdog_groups_gitops{status="error"} 0' in body
-        assert 'labdog_groups_gitops{status="importing"} 0' in body
-        assert 'labdog_git_repositories{auth_type="ssh_key"} 0' in body
-        assert 'labdog_git_repositories{auth_type="https_token"} 0' in body
+        assert 'unbork_hosts{sync_status="error"} 0' in body
+        assert 'unbork_hosts{sync_status="pending"} 0' in body
+        assert 'unbork_hosts{sync_status="in_sync"} 0' in body
+        assert 'unbork_hosts{sync_status="out_of_sync"} 0' in body
+        assert 'unbork_hosts{sync_status="unknown"} 0' in body
+        assert 'unbork_groups_gitops{status="error"} 0' in body
+        assert 'unbork_groups_gitops{status="importing"} 0' in body
+        assert 'unbork_git_repositories{auth_type="ssh_key"} 0' in body
+        assert 'unbork_git_repositories{auth_type="https_token"} 0' in body
 
     async def test_cache_is_single_flight(self, metrics_enabled, client, monkeypatch):
         import app.metrics.collector as collector_module
@@ -187,9 +187,9 @@ class TestEnabled:
     async def test_exporter_self_metrics_present(self, metrics_enabled, client):
         resp = await client.get("/metrics")
         body = resp.text
-        assert "labdog_metrics_scrape_duration_seconds" in body
-        assert "labdog_metrics_cache_age_seconds" in body
-        assert "labdog_metrics_scrape_errors_total" in body
+        assert "unbork_metrics_scrape_duration_seconds" in body
+        assert "unbork_metrics_cache_age_seconds" in body
+        assert "unbork_metrics_scrape_errors_total" in body
 
 
 # ---------------------------------------------------------------------------
@@ -209,8 +209,8 @@ class TestValuesMatchSeededRows:
 
         resp = await client.get("/metrics")
         samples = _parse_samples(resp.text)
-        assert samples[("labdog_hosts", (("sync_status", "error"),))] == 2
-        assert samples[("labdog_hosts", (("sync_status", "pending"),))] == 0
+        assert samples[("unbork_hosts", (("sync_status", "error"),))] == 2
+        assert samples[("unbork_hosts", (("sync_status", "pending"),))] == 0
 
     async def test_sync_jobs_total_vs_inflight(self, metrics_enabled, client, db):
         from app.models.sync_job import JobStatus, SyncJob
@@ -231,11 +231,11 @@ class TestValuesMatchSeededRows:
         samples = _parse_samples(resp.text)
 
         total_key = lambda status, module: (  # noqa: E731
-            "labdog_sync_jobs_total",
+            "unbork_sync_jobs_total",
             (("module", module), ("status", status)),
         )
         inflight_key = lambda status, module: (  # noqa: E731
-            "labdog_sync_jobs_inflight",
+            "unbork_sync_jobs_inflight",
             (("module", module), ("status", status)),
         )
 
@@ -248,7 +248,7 @@ class TestValuesMatchSeededRows:
         assert samples[inflight_key("running", "firewall")] == 1
         assert samples[inflight_key("pending", "package")] == 1
         assert (
-            "labdog_sync_jobs_inflight",
+            "unbork_sync_jobs_inflight",
             (("module", "firewall"), ("status", "success")),
         ) not in samples
 
@@ -268,11 +268,11 @@ class TestValuesMatchSeededRows:
         resp = await client.get("/metrics")
         samples = _parse_samples(resp.text)
         assert (
-            samples[("labdog_drift_checks_total", (("module", "firewall"), ("result", "error")))]
+            samples[("unbork_drift_checks_total", (("module", "firewall"), ("result", "error")))]
             == 2
         )
         assert (
-            samples[("labdog_drift_checks_total", (("module", "firewall"), ("result", "in_sync")))]
+            samples[("unbork_drift_checks_total", (("module", "firewall"), ("result", "in_sync")))]
             == 1
         )
 
@@ -294,7 +294,7 @@ class TestValuesMatchSeededRows:
         resp = await client.get("/metrics")
         samples = _parse_samples(resp.text)
         assert (
-            samples[("labdog_host_modules", (("module", "firewall"), ("sync_status", "drifted")))]
+            samples[("unbork_host_modules", (("module", "firewall"), ("sync_status", "drifted")))]
             == 1
         )
 
@@ -329,7 +329,7 @@ class TestValuesMatchSeededRows:
 
         # Drift duration histogram, module="service": two valid durations
         # (0.8s, 1.5s) and one NULL-duration row that must be excluded from
-        # the histogram but still counts toward labdog_drift_checks_total.
+        # the histogram but still counts toward unbork_drift_checks_total.
         db.add_all(
             [
                 DriftSample(
@@ -358,28 +358,28 @@ class TestValuesMatchSeededRows:
         samples = _parse_samples(resp.text)
 
         # format_float() renders integral bounds without a decimal point.
-        assert samples[("labdog_sync_job_duration_seconds_bucket", (("le", "5"),))] == 1
-        assert samples[("labdog_sync_job_duration_seconds_bucket", (("le", "1800"),))] == 2
-        assert samples[("labdog_sync_job_duration_seconds_count", ())] == 2
-        assert samples[("labdog_sync_job_duration_seconds_sum", ())] == pytest.approx(48.0)
+        assert samples[("unbork_sync_job_duration_seconds_bucket", (("le", "5"),))] == 1
+        assert samples[("unbork_sync_job_duration_seconds_bucket", (("le", "1800"),))] == 2
+        assert samples[("unbork_sync_job_duration_seconds_count", ())] == 2
+        assert samples[("unbork_sync_job_duration_seconds_sum", ())] == pytest.approx(48.0)
 
-        drift_count_key = ("labdog_drift_check_duration_seconds_count", (("module", "service"),))
-        drift_sum_key = ("labdog_drift_check_duration_seconds_sum", (("module", "service"),))
+        drift_count_key = ("unbork_drift_check_duration_seconds_count", (("module", "service"),))
+        drift_sum_key = ("unbork_drift_check_duration_seconds_sum", (("module", "service"),))
         assert samples[drift_count_key] == 2  # excludes the NULL-duration row
         assert samples[drift_sum_key] == pytest.approx(2.3)
 
-        # But labdog_drift_checks_total DOES include the NULL-duration row.
+        # But unbork_drift_checks_total DOES include the NULL-duration row.
         assert (
-            samples[("labdog_drift_checks_total", (("module", "service"), ("result", "in_sync")))]
+            samples[("unbork_drift_checks_total", (("module", "service"), ("result", "in_sync")))]
             == 3
         )
 
         bucket_1 = (
-            "labdog_drift_check_duration_seconds_bucket",
+            "unbork_drift_check_duration_seconds_bucket",
             (("le", "1"), ("module", "service")),
         )
         bucket_2_5 = (
-            "labdog_drift_check_duration_seconds_bucket",
+            "unbork_drift_check_duration_seconds_bucket",
             (("le", "2.5"), ("module", "service")),
         )
         assert samples[bucket_1] == 1
@@ -401,7 +401,7 @@ class TestValuesMatchSeededRows:
 
         resp = await client.get("/metrics")
         samples = _parse_samples(resp.text)
-        assert samples[("labdog_scheduled_actions_orphaned", ())] == 1
+        assert samples[("unbork_scheduled_actions_orphaned", ())] == 1
 
     async def test_ca_cert_expiry(self, metrics_enabled, client, db):
         from app.ca_certs.models import CACertRule, CertState
@@ -423,13 +423,13 @@ class TestValuesMatchSeededRows:
         resp = await client.get("/metrics")
         samples = _parse_samples(resp.text)
         key = (
-            "labdog_ca_cert_not_after_timestamp_seconds",
+            "unbork_ca_cert_not_after_timestamp_seconds",
             (("name", "Test Root CA"),),
         )
         assert samples[key] == pytest.approx(not_after.timestamp())
         # SEC-34: /metrics is unauthenticated and everything else it
         # emits is an aggregate. A per-certificate fingerprint is an
-        # inventory of the trust LabDog manages, handed to anyone who
+        # inventory of the trust unbork manages, handed to anyone who
         # can reach the scrape URL.
         assert "deadbeef" not in resp.text
 
@@ -476,7 +476,7 @@ class TestExposition:
 
     def test_histogram_le_inf_equals_count(self):
         family = histogram(
-            "labdog_test_duration_seconds",
+            "unbork_test_duration_seconds",
             "help text",
             bounds=(1.0, 5.0),
             series=[((), [1, 3], 4, 12.5)],
@@ -492,7 +492,7 @@ class TestExposition:
             pytest.skip("assertions disabled (python -O)")
         with pytest.raises(AssertionError):
             histogram(
-                "labdog_test_duration_seconds",
+                "unbork_test_duration_seconds",
                 "help",
                 bounds=(1.0, 5.0),
                 series=[((), [3, 1], 3, 1.0)],
@@ -500,14 +500,14 @@ class TestExposition:
 
     def test_render_emits_help_and_type_once(self):
         family = histogram(
-            "labdog_test_duration_seconds",
+            "unbork_test_duration_seconds",
             "help text",
             bounds=(1.0,),
             series=[((), [1], 1, 1.0)],
         )
         body = render([family])
-        assert body.count("# HELP labdog_test_duration_seconds") == 1
-        assert body.count("# TYPE labdog_test_duration_seconds histogram") == 1
+        assert body.count("# HELP unbork_test_duration_seconds") == 1
+        assert body.count("# TYPE unbork_test_duration_seconds histogram") == 1
         assert body.endswith("\n")
 
 
@@ -531,7 +531,7 @@ class TestMetricsStatusEndpoint:
         assert data["cache_ttl_seconds"] == pytest.approx(15.0)
         assert data["authenticated"] is False
         assert "enabled = true" in data["toml_snippet"]
-        assert "LABDOG_METRICS__ENABLED" in data["env_snippet"]
+        assert "UNBORK_METRICS__ENABLED" in data["env_snippet"]
 
     async def test_reflects_disabled_state(self, regular_user_client):
         resp = await regular_user_client.get("/api/metrics/status")

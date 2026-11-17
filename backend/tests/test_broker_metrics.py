@@ -1,4 +1,4 @@
-"""``labdog_broker_queue_depth`` / ``labdog_broker_reachable``.
+"""``unbork_broker_queue_depth`` / ``unbork_broker_reachable``.
 
 Everything else in the exporter comes from PostgreSQL, and a scrape that
 reached the database has already proved the database is up. The broker is a
@@ -168,8 +168,8 @@ class TestTheExportedFamilies:
         )
         names = {f.name for f in await collector.collect(db)}
 
-        assert "labdog_broker_reachable" in names
-        assert "labdog_broker_queue_depth" in names
+        assert "unbork_broker_reachable" in names
+        assert "unbork_broker_queue_depth" in names
 
     async def test_an_unreachable_broker_omits_depth_but_keeps_reachable(self, db, monkeypatch):
         """The assertion this whole module exists for."""
@@ -178,11 +178,11 @@ class TestTheExportedFamilies:
         self._families(broker.BrokerSnapshot(reachable=False, depths=None), monkeypatch)
         families = {f.name: f for f in await collector.collect(db)}
 
-        assert "labdog_broker_queue_depth" not in families, (
+        assert "unbork_broker_queue_depth" not in families, (
             "zero-filling an unreachable broker would read as 'queues are empty' "
             "and silence the alert it should trigger"
         )
-        reachable = families["labdog_broker_reachable"]
+        reachable = families["unbork_broker_reachable"]
         assert [s.value for s in reachable.samples] == [0.0]
 
     async def test_reachable_is_one_when_it_answered(self, db, monkeypatch):
@@ -191,7 +191,7 @@ class TestTheExportedFamilies:
         self._families(broker.BrokerSnapshot(reachable=True, depths={"default": 0}), monkeypatch)
         families = {f.name: f for f in await collector.collect(db)}
 
-        assert [s.value for s in families["labdog_broker_reachable"].samples] == [1.0]
+        assert [s.value for s in families["unbork_broker_reachable"].samples] == [1.0]
 
 
 @pytest.fixture(autouse=True)

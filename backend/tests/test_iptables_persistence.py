@@ -32,7 +32,7 @@ def test_no_package_manager_run_unless_it_is_missing():
     assert not any("ansible.builtin.package" in t for t in tasks)
     install = _named("Install iptables-persistent for boot persistence")
     assert install["ansible.builtin.apt"] == {"name": "iptables-persistent", "state": "present"}
-    assert install["when"] == "labdog_netfilter_persistent.stdout == 'missing'"
+    assert install["when"] == "unbork_netfilter_persistent.stdout == 'missing'"
     names = [t["name"] for t in tasks]
     assert names.index("Check for netfilter-persistent") < names.index(install["name"])
     assert names.index(install["name"]) < names.index("Save iptables rules for persistence")
@@ -42,7 +42,7 @@ def test_the_check_reads_but_changes_nothing():
     check = _named("Check for netfilter-persistent")
     assert check["changed_when"] is False
     assert check["check_mode"] is False
-    assert check["register"] == "labdog_netfilter_persistent"
+    assert check["register"] == "unbork_netfilter_persistent"
 
 
 @pytest.mark.parametrize(

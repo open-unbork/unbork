@@ -225,7 +225,7 @@ class _RunSpec:
     verify_enabled: bool
     auto_rollback: bool
     #: Manifest-declared post-run module syncs. Fired against the same
-    #: host after a successful, non-dry-run completion so labdog's desired
+    #: host after a successful, non-dry-run completion so unbork's desired
     #: state is re-enforced. See ``app.sync.post_run.queue_post_run_sync``.
     post_run_sync: tuple[str, ...]
     #: Manifest-declared post-run resource registrations. After success the
@@ -707,7 +707,7 @@ async def _build_inventory(
     from app.ansible_runtime.known_hosts import write_known_hosts
     from app.grafana.service import METRICS_DESTINATIONS_PARAM, build_metrics_extra_vars
 
-    # SEC-26: pin the run to the host key LabDog recorded over asyncssh.
+    # SEC-26: pin the run to the host key unbork recorded over asyncssh.
     # Read fresh rather than from the cached scalars in the spec, because
     # preflight runs in between and is what records the key on a host
     # contacted for the first time.
@@ -724,7 +724,7 @@ async def _build_inventory(
     dry_run = spec.parameters.pop(DRY_RUN_PARAM, False)
     picked_destinations = spec.parameters.pop(METRICS_DESTINATIONS_PARAM, None)
     # Fail closed before these become extra-vars. Ansible evaluates
-    # extra-vars on the controller — the LabDog host — not on the target, so
+    # extra-vars on the controller — the unbork host — not on the target, so
     # a template expression here is code execution here. The API rejects them
     # too; this catches rows that did not come through that path. See
     # app/actions/extra_vars.py.
@@ -738,7 +738,7 @@ async def _build_inventory(
     # stamps queryable labels) + this host's Grafana destinations (URL,
     # tenant, TLS flag) when the manifest opts in via ``metrics_backend``.
     # Operator-supplied values win over injected ones; identity is
-    # LabDog-owned and always wins.
+    # unbork-owned and always wins.
     _dest_vars, _identity_vars = await build_metrics_extra_vars(
         spec.host_id,
         spec.host_hostname,
@@ -882,7 +882,7 @@ def _phase_b_playbook(
             )
 
     hb_thread = threading.Thread(
-        target=_heartbeat, name=f"labdog-hb-{ctx.host_run_id}", daemon=True
+        target=_heartbeat, name=f"unbork-hb-{ctx.host_run_id}", daemon=True
     )
     hb_thread.start()
     try:
@@ -1438,7 +1438,7 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         host_run_id=host_run_id,
         channel=f"actions.run.{action_run_id}",
         r=redis_lib.from_url(settings.redis.url),
-        private_data_dir=tempfile.mkdtemp(prefix="labdog-action-"),
+        private_data_dir=tempfile.mkdtemp(prefix="unbork-action-"),
     )
 
     try:
@@ -1453,7 +1453,7 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         # leaked, the ActionHostRun stayed "queued" forever, and dispatch-next
         # never fired — wedging that host's queue.
         key_dir = "/dev/shm" if Path("/dev/shm").is_dir() else None
-        fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix="labdog-action-", suffix=".key")
+        fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix="unbork-action-", suffix=".key")
         os.close(fd)
         ctx.ssh_key_path = ssh_key_path
 

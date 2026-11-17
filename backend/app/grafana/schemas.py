@@ -101,7 +101,7 @@ class GrafanaInstanceResponse(BaseModel):
     name: str
     kind: str
     url: str
-    #: Derived, read-only — the base LabDog will query (host + kind prefix).
+    #: Derived, read-only — the base unbork will query (host + kind prefix).
     query_url: str
     org_id: str | None
     auth_type: str

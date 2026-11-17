@@ -49,7 +49,7 @@ def _session_cm(db):
     return _cm
 
 
-async def _call_with_snapshot(db, session, host, *, age_days: float, name="labdog-ai-1-1700"):
+async def _call_with_snapshot(db, session, host, *, age_days: float, name="unbork-ai-1-1700"):
     call = AIToolCall(
         session_id=session.id,
         tool_name="run_ssh_command",
@@ -348,8 +348,8 @@ class TestNaming:
         """An action run deletes its own snapshot on success; an agent's is
         kept for a retention window. An operator clearing space by hand has
         to be able to tell which is which."""
-        assert AI_SNAPSHOT_PREFIX == "labdog-ai"
-        assert not AI_SNAPSHOT_PREFIX == "labdog"
+        assert AI_SNAPSHOT_PREFIX == "unbork-ai"
+        assert not AI_SNAPSHOT_PREFIX == "unbork"
 
     async def test_the_prefix_reaches_the_snapshot_name(self, db, make_session) -> None:
         from app.ai.snapshots import snapshot_before_change
@@ -376,7 +376,7 @@ class TestNaming:
             name = await snapshot_before_change(db, host_id=host.id, session_id=session.id)
 
         assert seen["name_prefix"] == AI_SNAPSHOT_PREFIX
-        assert name.startswith("labdog-ai-")
+        assert name.startswith("unbork-ai-")
 
 
 class TestTheApprovalCardTellsTheTruth:
@@ -437,7 +437,7 @@ class TestDeletingASessionWithSnapshots:
         key = await create_ssh_key(db)
         host = await create_host(db, ssh_key_id=key.id)
         session = await make_session(autonomy_level="full_auto", target_host_ids=[host.id])
-        await _call_with_snapshot(db, session, host, age_days=0, name="labdog-ai-9-1700")
+        await _call_with_snapshot(db, session, host, age_days=0, name="unbork-ai-9-1700")
         session.status = "succeeded"
         await db.commit()
 
@@ -446,7 +446,7 @@ class TestDeletingASessionWithSnapshots:
 
         rows = await db.execute(select(AuditLog).where(AuditLog.action == "ai_session_deleted"))
         entry = rows.scalars().all()[-1]
-        assert entry.before_state["snapshots_left_behind"] == ["labdog-ai-9-1700"]
+        assert entry.before_state["snapshots_left_behind"] == ["unbork-ai-9-1700"]
 
 
 def test_the_sweep_is_scheduled() -> None:

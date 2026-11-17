@@ -33,7 +33,7 @@ def generate_hosts_file_playbook(
 
     playbook = [
         {
-            "name": "LabDog /etc/hosts management",
+            "name": "unbork /etc/hosts management",
             "hosts": "all",
             "become": True,
             "gather_facts": False,

@@ -100,7 +100,7 @@ def _runner_events_to_task_events(runner_events: Any) -> list[dict[str, Any]]:
     a ``{"tags": [...], "failed": bool, "unreachable": bool}`` dict.
     The ``tags`` list contains the canonical module name resolved from
     ``event_data.play``, which carries the per-module play name set by
-    the generators (e.g. ``"LabDog Package Management"`` →
+    the generators (e.g. ``"unbork Package Management"`` →
     ``"packages"``).
 
     BUG-44: ansible-runner does *not* populate ``event_data.task_tags``
@@ -235,7 +235,7 @@ async def build_host_sync_plan(
     # Belt-and-braces: tighten perms in case umask suppressed mode bits.
     os.chmod(ssh_key_path, 0o600)
 
-    # SEC-26: pin the playbook run to the host key LabDog already
+    # SEC-26: pin the playbook run to the host key unbork already
     # recorded over asyncssh. Lives beside the key inside
     # ``private_data_dir``, so the caller's tmpfs cleanup removes it.
     from app.ansible_runtime.known_hosts import write_known_hosts
@@ -250,7 +250,7 @@ async def build_host_sync_plan(
     if "firewall" in modules_to_run:
         from app.rules.desired_state import get_desired_state
 
-        rules, policies = await get_desired_state(host_id, db, host_source_ip=host.labdog_source_ip)
+        rules, policies = await get_desired_state(host_id, db, host_source_ip=host.unbork_source_ip)
         fragments.append(
             fragment_firewall(
                 backend=_firewall_backend_str(host),
