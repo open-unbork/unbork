@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
+import { useFeatures } from "@/lib/features"
 import { useApiMutation } from "@/lib/mutations"
 import { shortAgo } from "@/lib/fleet"
 import { CodeBlock, Confirm, Copy, Panel, RunStatus, Table, Tag } from "@/components/ld"
@@ -114,12 +115,14 @@ function ActionsPanel() {
   )
 }
 
-function LabelsPanel() {
-  const rows: [string, string][] = [
+function LabelsPanel({ assistant }: { assistant: boolean }) {
+  const all: [string, string][] = [
     ["unbork_action=<key>", "Runs that action on the alert's host, if it is on the list above."],
     ["unbork_ai=true", "The AI investigates, when there is no action or it did not fix the alert."],
     ["unbork_ai_automate=true", "The same, and the AI may fix what it finds, behind the full-auto safeguards."],
   ]
+  // The AI labels mean nothing on a server without the assistant (C-026).
+  const rows = assistant ? all : all.filter(([label]) => !label.startsWith("unbork_ai"))
   return (
     <Panel title="labels" meta="set on the alert rule in Grafana" pad={11}>
       <div className="flex flex-col gap-2.5 text-[11.5px]" data-testid="alert-labels">
@@ -207,13 +210,14 @@ function AIPanel({ s }: { s: AlertIntakeStatus | undefined }) {
 /** Alerts › Handling: what alerts are allowed to do, and whether they can. */
 export function AlertHandling() {
   const { data: intake } = useQuery<AlertIntakeStatus>({ queryKey: ["alert-intake"], queryFn: () => apiFetch<AlertIntakeStatus>("/api/alerts/intake") })
+  const { assistant } = useFeatures()
   return (
     <div className="scroll flex min-h-0 flex-1 flex-col gap-3 p-3.5">
       <ActionsPanel />
-      <div className="grid gap-3 lg:grid-cols-3">
-        <LabelsPanel />
+      <div className={`grid gap-3 ${assistant ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <LabelsPanel assistant={assistant} />
         <IntakePanel s={intake} />
-        <AIPanel s={intake} />
+        {assistant && <AIPanel s={intake} />}
       </div>
     </div>
   )

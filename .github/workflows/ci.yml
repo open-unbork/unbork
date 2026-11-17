@@ -1091,6 +1091,135 @@ jobs:
           ignore-unfixed: "true"
           trivyignores: .trivyignore
 
+  backend-test-no-assistant:
+    # C-026: the whole suite with the assistant left out, and without the
+    # Agent SDK installed, as an image built with WITH_ASSISTANT=0 runs.
+    # The assistant's own tests skip (needs_assistant); everything else
+    # must pass, which is what catches an AI branch nobody guarded.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
+      REDIS_URL: redis://localhost:6379/0
+      UNBORK_ASSISTANT__ENABLED: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install dependencies (no Agent SDK)
+        working-directory: backend
+        run: |
+          pip install -U pip uv -q
+          uv export --frozen --no-emit-project --extra dev --format requirements-txt -o /tmp/req.txt
+          uv pip install --system -r /tmp/req.txt
+          uv pip install --system --no-deps .
+      - name: pytest without the assistant
+        working-directory: backend
+        run: python -m pytest tests/ -q
+
+  image-without-assistant:
+    # C-026: an image built with WITH_ASSISTANT=0 has no Agent SDK, no
+    # assistant pages, and becomes ready.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: unbork
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build without the assistant
+        run: docker build --build-arg WITH_ASSISTANT=0 -t unbork:noai .
+      - name: No Agent SDK and no assistant pages
+        run: |
+          set -euo pipefail
+          if docker run --rm --entrypoint python unbork:noai -c "import claude_agent_sdk"; then
+            echo "::error::claude_agent_sdk is installed in the WITH_ASSISTANT=0 image"
+            exit 1
+          fi
+          pages="$(docker run --rm --entrypoint sh unbork:noai -c \
+            'ls -d /usr/lib/unbork/frontend/out/assistant /usr/lib/unbork/frontend/out/ai-providers* 2>/dev/null || true')"
+          if [ -n "$pages" ]; then
+            echo "::error::assistant pages in the WITH_ASSISTANT=0 image: $pages"
+            exit 1
+          fi
+      - name: Starts and becomes ready
+        run: |
+          set -euo pipefail
+          docker run -d --name noai --network host \
+            -e UNBORK_DATABASE__URL=postgresql+asyncpg://unbork:unbork@localhost:5432/unbork \
+            -e UNBORK_REDIS__URL=redis://localhost:6379/0 \
+            -e UNBORK_SECURITY__SECRET_KEY=ci-test-secret-key-not-for-production-0123456789 \
+            -e UNBORK_SECURITY__ENCRYPTION_KEY=vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg= \
+            unbork:noai
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/health/ready; then
+              echo
+              curl -fsS http://localhost:8000/api/version | grep -q '"assistant":false'
+              if curl -fsS -o /dev/null http://localhost:8000/openapi.json; then
+                ! curl -fsS http://localhost:8000/openapi.json | grep -q '"/api/ai/'
+              fi
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs noai | tail -100
+          exit 1
+
   image-has-no-claude-code:
     # S-009: the image must not carry the Claude Code program, which
     # unbork downloads on first use instead. Fails on any file named

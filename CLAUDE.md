@@ -242,6 +242,25 @@ them to avoid doing pack sync twice. `tests/test_orchestrator_queue.py`
 asserts the separation; `tests/test_task_routing.py` asserts every task
 lands on a queue some worker consumes.
 
+### Leaving the assistant out
+
+`[assistant] enabled = false` (`UNBORK_ASSISTANT__ENABLED`), read at start
+through `app.features.assistant_enabled()`, leaves the assistant unloaded;
+an image built with `--build-arg WITH_ASSISTANT=0` also drops the Agent
+SDK and the two assistant pages, and writes `app/_built_without_assistant`
+so no config can turn it back on. Off: `app.api.ai` and the two
+`assistant_router`s (`api/alerts.py`, `api/actions.py`) are not included,
+`AI_TASK_MODULES` are not in `conf.include` and beat deletes their
+`AI_ENTRY_NAMES`, `ai.*` settings are not served, `/api/users/me` omits
+`ai.use`/`ai.approve`, `resolve_provider()` refuses (an AI verify step ends
+inconclusive), `wants_ai()` is false, the AI built-ins and notification
+events are not offered. `GET /api/version` carries `features`, which
+`frontend/lib/features.ts` reads. The package and its tables stay
+(`AlertEvent`, `AIRollback`, `redact` are used elsewhere). New AI code
+needs the same guard; tests under `tests/ai/` are marked
+`needs_assistant` and skip when it is off, and CI runs the whole suite
+that way (`backend-test-no-assistant`).
+
 ### Group-dispatch actions
 
 Most actions fan out per-host (one Celery task per target host with a

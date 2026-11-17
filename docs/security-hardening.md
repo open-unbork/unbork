@@ -315,6 +315,13 @@ granting every operator the autonomy levels you allow.
 Off by default, and worth understanding before turning it on: it is the
 one feature that runs commands nobody wrote in advance.
 
+A server that should never run it can leave it out entirely:
+`[assistant] enabled = false` in the config file, or an image built with
+`--build-arg WITH_ASSISTANT=0`, which has no Agent SDK and cannot be
+switched back on. Then no AI route, task or setting exists for an admin
+session to turn on. See
+[Running without the assistant](ui/assistant.md#running-without-the-assistant).
+
 **What bounds it**
 
 - **`ai.enabled`** gates every entry point — chat, scheduled checks, and

@@ -9,6 +9,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 
+from app.features import features
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["version"])
@@ -132,6 +134,9 @@ class VersionResponse(BaseModel):
     build_date: str | None
     license: str
     repo_url: str
+    #: Optional parts this server loads (C-026), known before sign-in so
+    #: the login page and the shell can leave out what is absent.
+    features: dict[str, bool]
 
 
 # ---------------------------------------------------------------------------
@@ -153,4 +158,5 @@ async def get_version() -> VersionResponse:
         build_date=_BUILD_DATE,
         license=_LICENSE,
         repo_url=_REPO_URL,
+        features=features(),
     )

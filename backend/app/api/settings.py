@@ -12,6 +12,7 @@ from app.models.user import User
 from app.settings_service import (
     SETTING_DEFINITIONS,
     get_all_settings,
+    is_served,
     update_setting,
 )
 
@@ -41,7 +42,7 @@ async def patch_setting(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a single setting. Validates type and constraints."""
-    if key not in SETTING_DEFINITIONS:
+    if key not in SETTING_DEFINITIONS or not is_served(key):
         raise HTTPException(status_code=404, detail=f"Unknown setting: {key}")
 
     try:

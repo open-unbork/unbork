@@ -18,6 +18,11 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **The assistant can be left out.** `[assistant] enabled = false` on an
+  install, or `--build-arg WITH_ASSISTANT=0` for an image (which then has
+  no Agent SDK and no assistant pages). No AI routes, pages, providers,
+  tasks or settings are loaded; alerts still run their actions. See
+  [Running without the assistant](docs/ui/assistant.md#running-without-the-assistant).
 - **Extension hook to restrict AI provider types.** An extension can
   refuse provider types; a refused type cannot be created, tested or used,
   and the form leaves it out. Stored providers are never deleted or

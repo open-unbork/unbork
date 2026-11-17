@@ -32,6 +32,7 @@ from app.alerts.models import AlertAction, AlertActionDispatch
 from app.audit.logger import log_action
 from app.auth.permissions import require, require_on
 from app.db import get_db
+from app.features import assistant_enabled
 from app.models.action_run import ActionRun
 from app.models.host import Host
 from app.models.host_group import HostGroup
@@ -46,6 +47,8 @@ from app.schemas.alerts import (
 from app.settings_service import get_setting_typed
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
+#: The assistant's routes here, included only when it is loaded (C-026).
+assistant_router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +191,7 @@ async def list_alerts(
     return await _with_investigation(db, list(result.scalars().all()))
 
 
-@router.post("/{alert_id}/investigate", response_model=AlertEventResponse)
+@assistant_router.post("/{alert_id}/investigate", response_model=AlertEventResponse)
 async def investigate_alert_now(
     alert_id: int,
     user: User = Depends(require("ai.use")),
@@ -284,10 +287,10 @@ async def alert_intake_status(
         token_long_enough_for_full_auto=len(token) >= MIN_WEBHOOK_TOKEN_CHARS,
         source_allowlist=bool(settings.alerts.allowed_sources),
         body_signature=bool(settings.alerts.webhook_hmac_secret),
-        ai_enabled=bool(int(await get_setting_typed("ai.enabled", db))),
-        auto_investigate_enabled=bool(
-            int(await get_setting_typed("ai.auto_investigate_enabled", db))
-        ),
+        # Both false without the assistant (C-026), whatever is stored.
+        ai_enabled=assistant_enabled() and bool(int(await get_setting_typed("ai.enabled", db))),
+        auto_investigate_enabled=assistant_enabled()
+        and bool(int(await get_setting_typed("ai.auto_investigate_enabled", db))),
         full_auto_rules_enabled=rules_enabled,
         full_auto_rules=len(rules),
         allowed_actions=allowed or 0,
@@ -365,10 +368,10 @@ async def host_alerts(
                 )
             )
     return HostAlertsResponse(
-        ai_enabled=bool(int(await get_setting_typed("ai.enabled", db))),
-        auto_investigate_enabled=bool(
-            int(await get_setting_typed("ai.auto_investigate_enabled", db))
-        ),
+        # Both false without the assistant (C-026), whatever is stored.
+        ai_enabled=assistant_enabled() and bool(int(await get_setting_typed("ai.enabled", db))),
+        auto_investigate_enabled=assistant_enabled()
+        and bool(int(await get_setting_typed("ai.auto_investigate_enabled", db))),
         rules_enabled=rules_enabled,
         rules=applicable,
         blockers=blockers,

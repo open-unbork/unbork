@@ -88,7 +88,13 @@ async def wants_ai(db: AsyncSession, event: Any) -> bool:
     Full auto is the label ``unbork_ai_automate=true`` — or, with the
     rules on, a matching rule — so an alert allowed to be fixed is also
     one that gets investigated.
+
+    Never, when the assistant is left out (C-026).
     """
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        return False
     if is_true(event.labels, AI_LABEL):
         return True
     from app.ai.full_auto_rules import first_match

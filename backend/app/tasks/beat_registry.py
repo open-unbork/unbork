@@ -102,6 +102,29 @@ def registrars_in(module) -> list[str]:
     return sorted(n for n in dir(module) if _REGISTRAR_RE.match(n) and callable(getattr(module, n)))
 
 
+#: RedBeat entries the assistant's task modules register. With the
+#: assistant left out (C-026) their modules are not loaded, so beat deletes
+#: these rather than fire them into tasks no worker has.
+AI_ENTRY_NAMES = (
+    "expire-stale-ai-approvals",
+    "check-due-remediations",
+    "archive-old-ai-sessions",
+    "prune-ai-snapshots",
+)
+
+
+def remove_assistant_entries(app) -> dict[str, str]:
+    """Delete the assistant's schedules; one status per entry."""
+    results: dict[str, str] = {}
+    for name in AI_ENTRY_NAMES:
+        try:
+            results[f"assistant-off:{name}"] = "removed" if remove_entry(name, app) else "absent"
+        except Exception:
+            logger.exception("beat registration: could not remove %s", name)
+            results[f"assistant-off:{name}"] = "failed"
+    return results
+
+
 def register_all(app) -> dict[str, str]:
     """Run every task module's schedule registration. Returns per-module status.
 
@@ -134,6 +157,10 @@ def register_all(app) -> dict[str, str]:
                 logger.exception("beat registration failed: %s", key)
                 results[key] = "failed"
     _register_extension_entries(app, results)
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        results.update(remove_assistant_entries(app))
     return results
 
 

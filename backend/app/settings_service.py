@@ -561,6 +561,20 @@ _cache: dict[str, tuple[str, float]] = {}
 _CACHE_TTL = 60  # seconds
 
 
+def is_served(key: str) -> bool:
+    """Whether the settings API offers this key.
+
+    The ``ai.*`` keys are left out when the assistant is (C-026): the page
+    does not list them and a change is refused as unknown. Code that reads
+    one still gets its stored value or default.
+    """
+    if key.startswith("ai."):
+        from app.features import assistant_enabled
+
+        return assistant_enabled()
+    return key in SETTING_DEFINITIONS
+
+
 def _cast_value(key: str, raw: str) -> int | float | str:
     defn = SETTING_DEFINITIONS.get(key)
     if not defn:
@@ -576,7 +590,7 @@ def _cast_value(key: str, raw: str) -> int | float | str:
 def _validate(key: str, value: str) -> str:
     """Validate and return the normalized value string. Raises ValueError on invalid."""
     defn = SETTING_DEFINITIONS.get(key)
-    if not defn:
+    if not defn or not is_served(key):
         raise ValueError(f"Unknown setting: {key}")
 
     vtype = defn["type"]
@@ -669,6 +683,8 @@ async def get_all_settings(db: AsyncSession) -> list[dict]:
 
     settings = []
     for key, defn in SETTING_DEFINITIONS.items():
+        if not is_served(key):
+            continue
         db_row = db_settings.get(key)
         value = db_row.value if db_row else str(defn["default"])
         settings.append(

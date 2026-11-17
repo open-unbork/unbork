@@ -44,7 +44,6 @@ async def _handle(alert_event_id: int) -> dict:
     from app.ai.models import AlertEvent
     from app.alerts.labels import dispatch_for
     from app.db import task_session
-    from app.tasks.ai_alerts import _decide_and_run
 
     async with task_session() as db:
         event = await db.get(AlertEvent, alert_event_id)
@@ -95,6 +94,13 @@ async def _handle(alert_event_id: int) -> dict:
 
     if handled:
         return {"alert_event_id": alert_event_id, "outcome": "action", "actions": summary}
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        # Nothing to hand it to (C-026): the alert stays recorded.
+        return {"alert_event_id": alert_event_id, "outcome": "no_assistant", "actions": summary}
+    from app.tasks.ai_alerts import _decide_and_run
+
     result = await _decide_and_run(alert_event_id, already_tried=already_tried)
     return {**result, "actions": summary}
 
@@ -151,7 +157,6 @@ async def _check(now: datetime | None = None) -> dict:
     from app.models.host import Host
     from app.notifications.service import notify_alert_action
     from app.settings_service import get_setting_typed
-    from app.tasks.ai_alerts import _decide_and_run
 
     now = now or datetime.now(UTC)
     judged = 0
@@ -213,6 +218,11 @@ async def _check(now: datetime | None = None) -> dict:
                 fallbacks[event.id] = await _tried(db, dispatch, run, event, verdict, host)
             await notify_alert_action(db, dispatch, run, event, host=host, handed_to_ai=hand_over)
         await db.commit()
+
+    if fallbacks:
+        # Only a dispatch with hand_to_ai set gets here, which wants_ai()
+        # never sets without the assistant (C-026).
+        from app.tasks.ai_alerts import _decide_and_run
 
     for event_id, tried in fallbacks.items():
         try:

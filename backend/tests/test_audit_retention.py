@@ -136,7 +136,8 @@ _DOCUMENTS_ZERO = re.compile(r"\(0 = ")
 @pytest.mark.parametrize(
     "key",
     [
-        key
+        # The assistant's settings are not served without it (C-026).
+        pytest.param(key, marks=pytest.mark.needs_assistant) if key.startswith("ai.") else key
         for key, defn in SETTING_DEFINITIONS.items()
         if _DOCUMENTS_ZERO.search(defn["description"] + (defn.get("help") or ""))
     ],

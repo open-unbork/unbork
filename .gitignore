@@ -62,6 +62,7 @@ packaging/.cache/
 
 # Generated at Docker/packaging build time — never committed
 backend/app/_build_info.py
+backend/app/_built_without_assistant
 # Staged from the repo-root VERSION at build time so setuptools' dynamic
 # version resolves (see packaging/Makefile _build-venv). Root VERSION is
 # the source of truth; this copy is build-only.

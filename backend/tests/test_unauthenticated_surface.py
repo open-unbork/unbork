@@ -127,6 +127,7 @@ class TestTheApiDocsAreOffByDefault:
         assert TestClient(app).get("/api/version").status_code == 200
 
 
+@pytest.mark.needs_assistant
 class TestTheProviderTestDoesNotEchoExceptions:
     """A client library raising on an auth failure has been known to
     quote the request it sent, credentials included, and this response

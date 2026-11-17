@@ -22,9 +22,11 @@ from starlette.responses import FileResponse, RedirectResponse
 from app.api._repo_scan import router as repo_scan_router
 from app.api.action_packs import router as action_packs_router
 from app.api.action_resolutions import router as action_resolutions_router
+from app.api.actions import assistant_router as actions_assistant_router
 from app.api.actions import router as actions_router
 from app.api.admin_users import router as admin_users_router
 from app.api.ai import router as ai_router
+from app.api.alerts import assistant_router as alerts_assistant_router
 from app.api.alerts import router as alerts_router
 from app.api.audit import router as audit_router
 from app.api.auth_setup import me_router
@@ -74,6 +76,7 @@ from app.auth.schemas import UserRead, UserUpdate
 from app.auth.users import auth_backend, fastapi_users
 from app.client_ip import get_client_ip, is_trusted_proxy
 from app.config import settings
+from app.features import assistant_enabled
 from app.middleware.csrf import CSRFMiddleware
 from app.plugins import load_plugins
 
@@ -756,7 +759,13 @@ def _include_api_routers(app: FastAPI) -> None:
     app.include_router(proxmox_nodes_router, prefix="/api")
     app.include_router(proxmox_discovery_router, prefix="/api")
     app.include_router(grafana_router, prefix="/api")
-    app.include_router(ai_router, prefix="/api")
+    # Left out entirely when the assistant is (C-026): no /api/ai route
+    # exists, not even one that refuses.
+    if assistant_enabled():
+        app.include_router(ai_router, prefix="/api")
+        # Its routes on other prefixes: investigating an alert or a run.
+        app.include_router(alerts_assistant_router, prefix="/api")
+        app.include_router(actions_assistant_router, prefix="/api")
     app.include_router(alerts_router, prefix="/api")
     app.include_router(notifications_router, prefix="/api")
     app.include_router(metrics_status_router, prefix="/api")

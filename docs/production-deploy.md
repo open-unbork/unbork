@@ -142,6 +142,12 @@ volumes:
 
 ---
 
+Not using the AI assistant? Add `UNBORK_ASSISTANT__ENABLED: "false"` to
+the `unbork` service's environment (or `[assistant] enabled = false` in
+`unbork.toml`) and drop the two Claude volumes, or build the image with
+`--build-arg WITH_ASSISTANT=0`. See
+[Running without the assistant](ui/assistant.md#running-without-the-assistant).
+
 ## Caddyfile
 
 ```caddy

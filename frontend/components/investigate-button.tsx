@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Confirm } from "@/components/ld"
 import { ApiError, apiFetch } from "@/lib/api"
+import { useFeatures } from "@/lib/features"
 import { shortAgo } from "@/lib/fleet"
 import type { AIProvider, InvestigationRef, InvestigationSubject } from "@/lib/types"
 
@@ -40,12 +41,13 @@ export function AISpark({ size = 12 }: { size?: number }) {
 
 /** Shared by every button on a page: one request answers which subjects
  *  already have a session to reopen. */
-function useInvestigations() {
+function useInvestigations(enabled = true) {
   return useQuery<InvestigationRef[]>({
     queryKey: ["ai-investigations"],
     queryFn: () => apiFetch<InvestigationRef[]>("/api/ai/investigations"),
     retry: false,
     staleTime: 30_000,
+    enabled,
   })
 }
 
@@ -83,13 +85,16 @@ export function InvestigateButton({
   const router = useRouter()
   const queryClient = useQueryClient()
   const [confirming, setConfirming] = useState(false)
+  // No button at all on a server without the assistant (C-026).
+  const { assistant } = useFeatures()
   const { data: providers } = useQuery<AIProvider[]>({
     queryKey: ["ai-providers"],
     queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"),
     retry: false,
     staleTime: 60_000,
+    enabled: assistant,
   })
-  const { data: investigations } = useInvestigations()
+  const { data: investigations } = useInvestigations(assistant)
   const key = subjectKey(subject)
   const earlier = (investigations ?? []).find((i) => i.subject_key === key)
 
@@ -110,6 +115,7 @@ export function InvestigateButton({
   const pad = icon ? { padding: "3px 6px" } : {}
   const tint = { ...pad, color: "var(--hold-ink)" }
 
+  if (!assistant) return null
   if (earlier) {
     const title = `View the investigation started ${shortAgo(earlier.created_at)} ago`
     return (

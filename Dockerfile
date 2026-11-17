@@ -16,7 +16,15 @@ COPY frontend/package*.json ./
 RUN npm ci --silent
 COPY frontend/ .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# WITH_ASSISTANT=0 builds an image without the AI assistant (C-026): its
+# two pages are not built, the Agent SDK is not installed, and the server
+# runs with [assistant] enabled = false. Nothing else imports from these
+# directories.
+ARG WITH_ASSISTANT=1
+RUN if [ "$WITH_ASSISTANT" = "0" ]; then \
+        rm -rf "app/(dashboard)/assistant" "app/(dashboard)/ai-providers"; \
+    fi \
+    && npm run build
 # Output: /app/out/
 
 # ── Stage 2: Build Python backend + install deps ──────────────────────
@@ -37,7 +45,9 @@ COPY VERSION .
 # app/ai/claude_code.py). The pin that download is checked against is
 # written from uv.lock by scripts/claude_code_pin.py.
 COPY backend/scripts/claude_code_pin.py /tmp/claude_code_pin.py
-RUN uv export --frozen --no-emit-project --extra agent --format requirements-txt -o /tmp/req.txt \
+ARG WITH_ASSISTANT=1
+RUN extra="--extra agent"; [ "$WITH_ASSISTANT" = "0" ] && extra=""; \
+    uv export --frozen --no-emit-project $extra --format requirements-txt -o /tmp/req.txt \
     && uv pip install --no-cache-dir --system -r /tmp/req.txt \
     && rm -rf /usr/local/lib/python3.12/site-packages/claude_agent_sdk/_bundled \
     && python /tmp/claude_code_pin.py --lock uv.lock --out /tmp/claude_code_pin.json
@@ -95,6 +105,11 @@ RUN rm -f /usr/local/bin/uv /usr/local/bin/uvx
 COPY --chown=unbork:unbork backend/app/ app/
 # The pin as the lock says it, in case the committed copy lags.
 COPY --from=backend-builder --chown=unbork:unbork /tmp/claude_code_pin.json app/ai/claude_code_pin.json
+# Without the assistant the server must not load it either (C-026). A
+# marker rather than ENV UNBORK_ASSISTANT__ENABLED: an environment
+# variable would outrank the operator's config file in every image.
+ARG WITH_ASSISTANT=1
+RUN if [ "$WITH_ASSISTANT" = "0" ]; then touch app/_built_without_assistant; fi
 COPY --chown=unbork:unbork backend/alembic/ alembic/
 COPY --chown=unbork:unbork backend/alembic.ini alembic.ini
 # The image runs from source with deps installed via --no-emit-project, so the

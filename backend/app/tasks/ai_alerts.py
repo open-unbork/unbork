@@ -1,22 +1,10 @@
-"""Alert intake tasks: the poller, and the investigation decision.
+"""The assistant's half of alert intake: the investigation decision.
 
-Two entry points, deliberately separate:
-
-* ``poll_alertmanager`` — the fallback producer. Asks the default Mimir
-  instance's Alertmanager API what is currently firing and records it.
-  Catches what happened while unbork was unreachable, which the webhook
-  by definition cannot. Only meaningful when alert rules live in Mimir's
-  ruler; Grafana-managed rules go to Grafana's own Alertmanager and are
-  invisible here. Off by default for that reason — see
-  :mod:`app.ai.alerts`.
-* ``investigate_alert`` — decides whether one recorded alert is worth a
-  session, and starts it if so.
-
-They are split because recording and spending are different risks. The
-poller catching up on a hundred alerts after an outage must not open a
-hundred sessions, so it records them all and asks about each one
-individually — where the policy, the budget, and the dedup state can say
-no cheaply.
+``investigate_alert`` and ``_decide_and_run`` decide whether one recorded
+alert is worth a session, and start it if so, where the policy, the budget
+and the dedup state can say no cheaply. The Alertmanager poll that used to
+live here is :mod:`app.tasks.alert_poll`, which is loaded with or without
+the assistant (C-026).
 """
 
 from __future__ import annotations
@@ -211,118 +199,11 @@ def investigate_alert(alert_event_id: int) -> dict:
     return asyncio.run(with_task_engine(_handle(alert_event_id)))
 
 
-async def _poll() -> dict:
-    """Read currently-firing alerts from every Mimir hosts ship to.
-
-    Reuses the registered Grafana instances' auth and TLS settings rather
-    than asking the operator for a second endpoint: the Alertmanager API
-    lives under the same Mimir deployment unbork already queries. That is
-    the default instance plus any instance a host resolves to through its
-    own or its groups' assignment, so alerts for hosts on a non-default
-    destination are not missed.
-    """
-    from app.ai.alerts import from_alertmanager_v2, record
-    from app.db import task_session
-    from app.grafana.models import GrafanaInstance
-    from app.grafana.service import client_for_instance, get_default_instance, resolve_all_hosts
-    from app.settings_service import get_setting_typed
-
-    async with task_session() as db:
-        if not int(await get_setting_typed("alerts.intake_enabled", db)):
-            return {"polled": 0, "reason": "alert intake disabled"}
-
-        default = await get_default_instance(db, "mimir")
-        instance_ids = {i for i in (await resolve_all_hosts(db, "mimir")).values() if i is not None}
-        if default is not None:
-            instance_ids.add(default.id)
-        if not instance_ids:
-            return {"polled": 0, "reason": "no default Mimir instance registered"}
-
-        from app.grafana.client import PrometheusError
-
-        raw: list = []
-        errors: list[str] = []
-        for instance_id in sorted(instance_ids):
-            inst = await db.get(GrafanaInstance, instance_id)
-            if inst is None:
-                continue
-            try:
-                raw.extend(await client_for_instance(inst).get_alertmanager_alerts())
-            except PrometheusError as exc:
-                logger.warning("ai_alerts: Alertmanager poll of %s failed: %s", inst.name, exc)
-                errors.append(f"{inst.name}: {exc}")
-        if errors and not raw:
-            return {"polled": 0, "error": "; ".join(errors)}
-
-        from app.notifications.service import notify_alert_fired
-
-        alerts = from_alertmanager_v2(raw)
-        created_ids: list[int] = []
-        for alert in alerts:
-            event, created = await record(db, alert, source="alertmanager_poll")
-            if created and alert.is_firing:
-                created_ids.append(event.id)
-                await notify_alert_fired(db, event)
-        await db.commit()
-
-    # Dispatched after the commit so the task cannot read a row that the
-    # transaction has not landed yet.
-    for event_id in created_ids:
-        celery_app.send_task(
-            "app.tasks.alert_handling.handle_alert", kwargs={"alert_event_id": event_id}
-        )
-
-    return {"polled": len(alerts), "new": len(created_ids)}
-
-
 @celery_app.task(name="app.tasks.ai_alerts.poll_alertmanager")
 def poll_alertmanager() -> dict:
-    """Fallback producer — see the module docstring."""
+    """Kept for messages queued before the poll moved to
+    :mod:`app.tasks.alert_poll`, which is loaded with or without the
+    assistant (C-026)."""
+    from app.tasks.alert_poll import _poll
+
     return asyncio.run(with_task_engine(_poll()))
-
-
-def _register_beat_schedule() -> None:
-    """Self-register the poll on RedBeat, matching the drift sweep.
-
-    The interval is read from the database-backed setting at worker
-    start, not from the config file, because it is a UI-tunable value.
-    A zero interval means "do not poll" — the entry is removed rather
-    than scheduled at some arbitrary floor, so turning it off in the UI
-    actually stops it.
-    """
-    import asyncio as _asyncio
-
-    from redbeat import RedBeatSchedulerEntry
-
-    from app.db import task_session
-    from app.settings_service import get_setting_typed
-
-    async def _interval() -> int:
-        async with task_session() as db:
-            return int(await get_setting_typed("alerts.poll_minutes", db))
-
-    minutes = _asyncio.run(with_task_engine(_interval()))
-    name = "poll-alertmanager"
-    if minutes <= 0:
-        try:
-            RedBeatSchedulerEntry.from_key(f"redbeat:{name}", app=celery_app).delete()
-        except KeyError:
-            # Nothing registered, which is the desired end state anyway.
-            logger.debug("ai_alerts: no %s entry to remove", name)
-        return
-
-    from app.tasks.beat_registry import ensure_entry
-
-    ensure_entry(
-        name=name,
-        task="app.tasks.ai_alerts.poll_alertmanager",
-        run_every_seconds=minutes * 60,
-        app=celery_app,
-    )
-    logger.info("ai_alerts: Alertmanager poll registered every %d minute(s)", minutes)
-
-
-# Registration happens from ``beat_init`` (app.tasks.beat_registry), not at
-# import. Calling it here rewrote the entry's ``due_at`` in every process
-# that imported this module — API included — so on a deployment that
-# restarts more than once a day, a daily job never fired at all (BUG-70).

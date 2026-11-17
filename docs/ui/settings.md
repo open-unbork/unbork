@@ -139,6 +139,10 @@ card — status, scrape URL and a config snippet — and [About](#about).
 
 ## AI
 
+On a server that leaves the assistant out (`[assistant] enabled = false`,
+see [Running without the assistant](assistant.md#running-without-the-assistant))
+this section is absent and the `ai.*` settings are not accepted.
+
 The AI section starts with the configured
 [AI providers](assistant.md#ai-providers) — **Manage providers…** opens their
 page — followed by these settings.

@@ -91,6 +91,27 @@ os.environ.setdefault(
 os.environ.setdefault("UNBORK_RATE_LIMIT__ENABLED", "false")
 
 
+_AI_TESTS = Path(__file__).resolve().parent / "ai"
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark the assistant's tests, and skip them when it is left out (C-026).
+
+    Everything under ``tests/ai/`` is marked ``needs_assistant``; tests
+    elsewhere that need it carry the marker by hand. CI runs the suite
+    once more with ``UNBORK_ASSISTANT__ENABLED=false``.
+    """
+    from app.features import assistant_enabled
+
+    with_assistant = assistant_enabled()
+    skip = pytest.mark.skip(reason="the assistant is left out ([assistant] enabled = false)")
+    for item in items:
+        if Path(str(item.fspath)).resolve().is_relative_to(_AI_TESTS):
+            item.add_marker(pytest.mark.needs_assistant)
+        if not with_assistant and item.get_closest_marker("needs_assistant"):
+            item.add_marker(skip)
+
+
 @pytest.fixture(scope="session")
 def pg_url():
     import subprocess

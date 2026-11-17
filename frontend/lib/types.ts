@@ -1095,6 +1095,13 @@ export interface VersionInfo {
   build_date: string | null
   license: string
   repo_url: string
+  /** Optional parts this server loads (C-026). Older servers omit it. */
+  features?: Features
+}
+
+export interface Features {
+  /** False when the server leaves the AI assistant out ([assistant] enabled = false). */
+  assistant: boolean
 }
 
 // ---------------------------------------------------------------------------

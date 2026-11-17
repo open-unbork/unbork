@@ -127,6 +127,19 @@ class MetricsConfig(BaseModel):
     broker_timeout_seconds: float = 0.2
 
 
+class AssistantConfig(BaseModel):
+    """Whether the AI assistant is loaded at all (C-026).
+
+    **File-level on purpose**, like ``MetricsConfig``: leaving a subsystem
+    out must need server access, not an admin session. Off means no AI
+    routes, pages, providers, tasks or settings; the tables stay, so
+    turning it back on loses nothing. The runtime switch ``ai.enabled``
+    keeps its meaning while the assistant is loaded.
+    """
+
+    enabled: bool = True
+
+
 class AlertsConfig(BaseModel):
     """Inbound alert webhook.
 
@@ -300,6 +313,7 @@ class Settings(BaseModel):
     tls: TLSConfig = TLSConfig()
     rate_limit: RateLimitConfig = RateLimitConfig()
     metrics: MetricsConfig = MetricsConfig()
+    assistant: AssistantConfig = AssistantConfig()
     alerts: AlertsConfig = AlertsConfig()
     logging: LoggingConfig = LoggingConfig()
     ssh: SSHConfig = SSHConfig()

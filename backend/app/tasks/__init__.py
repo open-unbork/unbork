@@ -4,6 +4,7 @@ from celery import Celery
 from celery.signals import beat_init, import_modules, worker_process_init, worker_ready
 
 from app.config import settings
+from app.features import assistant_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +71,6 @@ celery_app.conf.update(
         "app.tasks.builtin_dispatchers.*": {"queue": "actions"},
         "app.tasks.scheduled_action_schedule.*": {"queue": "long_running"},
         "app.tasks.facts.*": {"queue": "long_running"},
-        "app.tasks.ai_task.*": {"queue": "long_running"},
-        "app.tasks.ai_runtime.*": {"queue": "long_running"},
-        # The sweep is quick and stays on default; the check and a rollback
-        # wait on SSH and on Proxmox restarting a VM.
-        "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
-        "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
         "discovery.*": {"queue": "long_running"},
         "gitops.*": {"queue": "long_running"},
         "scans.check_scheduled": {"queue": "default"},
@@ -89,6 +84,20 @@ celery_app.conf.update(
     task_time_limit=1800,
     task_soft_time_limit=1500,
 )
+
+
+#: The assistant's routes, added only when it is loaded (C-026).
+AI_TASK_ROUTES = {
+    "app.tasks.ai_task.*": {"queue": "long_running"},
+    "app.tasks.ai_runtime.*": {"queue": "long_running"},
+    # The sweep is quick and stays on default; the check and a rollback
+    # wait on SSH and on Proxmox restarting a VM.
+    "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
+    "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
+}
+
+if assistant_enabled():
+    celery_app.conf.task_routes.update(AI_TASK_ROUTES)
 
 
 @worker_process_init.connect
@@ -300,7 +309,7 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
 
 
 # Auto-discover tasks
-celery_app.conf.include = [
+BASE_TASK_MODULES = [
     "app.tasks.discovery",
     "app.tasks.gitops",
     "app.tasks.sync",
@@ -336,14 +345,28 @@ celery_app.conf.include = [
     "app.tasks.audit_retention",
     "app.tasks.run_retention",
     "app.tasks.drift_retention",
+    "app.tasks.snapshot_reaper",
+    "app.tasks.alert_handling",
+    "app.tasks.alert_poll",
+    "app.tasks.notifications",
+]
+
+#: Loaded only with the assistant (C-026). With it off no ``app.tasks.ai_*``
+#: task is registered, and beat deletes their schedules
+#: (``beat_registry.remove_assistant_entries``).
+AI_TASK_MODULES = [
     "app.tasks.ai_task",
     "app.tasks.ai_runtime",
     "app.tasks.ai_approvals",
     "app.tasks.ai_snapshots",
-    "app.tasks.snapshot_reaper",
     "app.tasks.ai_sessions",
     "app.tasks.ai_alerts",
-    "app.tasks.alert_handling",
     "app.tasks.ai_remediation",
-    "app.tasks.notifications",
 ]
+
+
+def task_modules(with_assistant: bool) -> list[str]:
+    return BASE_TASK_MODULES + (AI_TASK_MODULES if with_assistant else [])
+
+
+celery_app.conf.include = task_modules(assistant_enabled())

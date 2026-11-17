@@ -198,7 +198,7 @@ class TestVersionEndpoint:
         assert resp.json()["version"] == ver._UNKNOWN_VERSION
 
     async def test_response_schema_has_all_required_keys(self, client, monkeypatch):
-        """Response always contains all six keys defined by the frontend contract."""
+        """Response always contains every key the frontend contract defines."""
         import app.api.version as ver
 
         monkeypatch.setattr(ver, "_COMMIT_SHA", None)
@@ -214,5 +214,6 @@ class TestVersionEndpoint:
             "build_date",
             "license",
             "repo_url",
+            "features",
         }
         assert expected_keys == set(data.keys())
