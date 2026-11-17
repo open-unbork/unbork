@@ -237,6 +237,38 @@ later and are unranked.
 - **Fix:** clear it on claim, or show it only while `pending`. Community,
   S. Status: accepted 2026-11-16 (D-52).
 
+## PR-31 Run the Claude Code install off the event loop
+- **Finding (stage 2 review):** `build_runner` → `ensure_installed` is
+  synchronous and runs inside async sessions and AI verify steps. Since
+  the review it never waits on another download and fails fast after a
+  recent failure, but the one session that does download blocks its event
+  loop (a group verify's other members) for the download.
+- **Fix:** `await asyncio.to_thread(...)`, or install before the loop
+  starts. Community, S. Status: open.
+
+## PR-32 Keep AI snapshot pruning when the assistant is off
+- **Finding (stage 2 review):** with `[assistant] enabled = false` beat
+  deletes `prune-ai-snapshots`, so Proxmox snapshots the assistant took
+  before it was turned off are never pruned.
+- **Fix:** move the pruning task to a base task module (the tables stay
+  anyway). Community, S. Status: open.
+
+## PR-33 Small tidy-ups from the stage 2 review
+- `AI_ENTRY_NAMES` in `beat_registry.py` copies four entry names by hand
+  and its test is true by construction; export each module's name and
+  build the list from them.
+- One helper for the program path (`runner._program_path`,
+  `claude_cli.program_path`, two inline `binary_path()` checks).
+- Names: `SUBSCRIPTION_BACKED_TYPES` / `uses_subscription()` now also mean
+  "needs the Claude Code program"; `_ensure_program` raises
+  `AIDisabledError` for a missing program.
+- `claude_code.status()` runs once per provider row of a list; compute it
+  once per request.
+- Dockerfile: copy and run `claude_code_pin.py` in a later layer so an
+  edit to it does not reinstall every Python dependency.
+- A shared docs base URL constant in the frontend.
+Community, S. Status: open.
+
 ## Other work Dennis asked to add
 
 Added 2026-11-14. These are normal items with `source: user`; they get
