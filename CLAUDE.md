@@ -231,7 +231,8 @@ schema. Drift sweeps fan out one `drift_sweep.check_host_module` task per
 host on the `drift` queue rather than walking hosts serially. An action
 run's children (`action_host`, `action_group`, `builtin_dispatchers`) go
 to `actions` (`CHILD_QUEUE`), so a bulk-sync backlog on `long_running`
-cannot hold them back.
+cannot hold them back. An extension's own tasks may use any of these
+queues except `orchestrator` (`app/tasks/extensions.py`).
 
 The orchestrator split is load-bearing, not tidiness. `run_action` dispatches per-host
 children to `actions` and then blocks in `result.join()` until they
@@ -292,12 +293,16 @@ either claims the host (status → `running`) or defers (status →
 pending op for that host (FIFO across both queues by `created_at`)
 and re-dispatches it. The advisory lock is held only for the
 check-and-flip — the actual "host is busy" state lives in the row
-statuses. Group-targeted actions acquire locks for all members in
-sorted-host-id order to avoid deadlock against overlapping group
-ops. The built-in `_builtin.sync` opts out of the outer lock (its
-inner `run_host_sync.apply()` already participates via the sync
-orchestrator) — see the comment on `with_lock=` in
-`builtin_dispatchers.py`.
+statuses. A row an extension's run gate deferred (`app/run_gate.py`) stays
+`pending` but *held* (`gate_retry_at` in the future): it is not a queue
+candidate until then, so it never stalls the host, and
+`app/tasks/run_gate_retry.py` sends it again when it is due. A gated
+op that does not start hands its hosts on, like a finishing one.
+Group-targeted actions acquire locks for all members in sorted-host-id
+order to avoid deadlock against overlapping group ops. The built-in
+`_builtin.sync` opts out of the outer lock (its inner
+`run_host_sync.apply()` already participates via the sync orchestrator)
+— see the comment on `with_lock=` in `builtin_dispatchers.py`.
 
 The seven periodic drift sweeps participate too, but as *readers*
 rather than claimants: `app/tasks/drift_sweep.py::sweep_module` asks
@@ -315,7 +320,9 @@ NULL means no role and grants nothing). Roles map onto a fixed permission
 catalog in `app/auth/permissions.py` (`hosts.view`, `config.edit`,
 `sync.run`, `actions.run`, `terminal.open`, `integrations.manage`,
 `settings.manage`, `users.manage`, ...), and that dict is the only place a
-role name means anything.
+role name means anything. An extension can add names of its own
+(`register_permission`), so `known_permissions()` is the full catalog,
+not the `Permission` enum alone.
 
 **Every new route declares one permission** with
 `Depends(require("sync.run"))`, which also returns the user, in place of
@@ -384,8 +391,9 @@ core's `upgrade head`, in the roles that migrate. Never put extension
 revisions in core's `alembic_version`: once the extension is uninstalled,
 core would meet a revision it cannot locate and refuse to start.
 
-The contract (1.2) is the permission hooks above plus three directory
-sign-in hooks, none of which Community uses itself:
+The contract (`PLUGIN_API`, whose comment lists each version) is the
+permission hooks above, three directory sign-in hooks and the hooks listed
+after them, none of which Community uses itself:
 
 - `app/auth/external.py`: `register_login_provider_source()` puts buttons
   on the login page through the public `GET /api/auth/providers`
@@ -402,6 +410,48 @@ sign-in hooks, none of which Community uses itself:
   like `/api/auth/jwt/login`. Exact paths only.
 - `users.hashed_password` is nullable: NULL is a directory-only account,
   which password login and `PATCH /api/users/me` refuse.
+- `app/audit` (1.3): `register_audit_subscriber(fn)` hands every
+  `log_action` row to `fn` as a frozen `AuditEntry` after its transaction
+  commits, in the API and in workers, and never a row whose transaction or
+  savepoint rolled back. At most once (a crash between commit and delivery
+  loses it; `AuditEntry.id` is the `audit_log` key, a catch-up cursor).
+  Subscribers are synchronous, must only enqueue, and one that raises is
+  logged and skipped. With none registered `log_action` does no extra work.
+- `app/run_gate.py` (1.4): `register_run_gate(gate)` is asked, with a
+  `RunRequest`, just before a sync (and a CA certificate deploy), an action
+  run, a schedule's fire, or a change the assistant is about to make.
+  It answers `allow`, `refuse(reason)` (the run
+  ends `failed` with "Refused: ..."; a schedule skips the fire and audits
+  it) or `defer(reason, retry_at)` (the run stays `pending`, held as
+  above; a schedule stays due; a full-auto assistant session parks for a
+  human; an approval session's call is asked when it is approved and about
+  to run). An action run is asked once, when its orchestrator picks it
+  up, not again after waiting for a busy host. A gate that raises
+  refuses. `register_run_end_listener(fn)` is
+  told, after commit, when each sync, action run and changing assistant
+  session ends. With nothing registered neither does any work.
+- `app/tasks/extensions.py` (1.5): `register_task_module(module, queue=)`
+  adds an extension's Celery task module to `conf.include` and routes
+  `<module>.*` to `queue`, which must be a consumed queue other than
+  `orchestrator` (a module under `app.` is refused);
+  `register_periodic_task(name, task, every_seconds)` (10 s minimum) has
+  beat keep a RedBeat entry `ext-<name>`. Extensions load once per Celery
+  process (`load_plugins_once`): in the worker parent and in beat from the
+  `import_modules` signal, before the task modules are imported, and in
+  each pool child. So `register()` may run in the worker parent before
+  the pool forks: start threads, sockets or connections lazily, or from
+  your own `worker_process_init` handler, never in `register()`. At beat
+  start `register_all` writes the `ext-` entries
+  and deletes every `ext-` entry no installed extension registers.
+  Extension tasks reach the database with `with_task_engine` and
+  `task_session`, as core tasks do.
+- `app/auth/permissions.py` (1.6): `register_permission(name, roles=)`
+  declares an `area.action` permission an extension's routes ask for with
+  `require()` / `require_on()`. `roles` are the fixed roles that hold it
+  under the Community resolver, admin always and by default admin only.
+  Call it in `register(app)` *before* importing the routes that use it:
+  `require()` checks the name at import. Repeating the same registration
+  is a no-op; a core name or other roles are refused.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise

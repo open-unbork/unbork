@@ -13,6 +13,7 @@ separators for nested keys.  E.g. LABDOG_SERVER__PORT=9000 overrides
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
@@ -22,7 +23,7 @@ from pathlib import Path
 from typing import Any, Literal, Union, get_args, get_origin
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from app.key_format import decode_master_key
 
@@ -139,9 +140,47 @@ class AlertsConfig(BaseModel):
     everything rather than accepting anything. An alert receiver that
     silently accepted unauthenticated POSTs would let anyone on the
     network write rows unbork might then spend money investigating.
+
+    Two more locks, both off until set (C-022):
+
+    - ``allowed_sources``: addresses or CIDRs a request must come from,
+      checked against the client address resolved through
+      ``server.trusted_proxies``. Empty means any source.
+    - ``webhook_hmac_secret``: when set, the request must carry an
+      HMAC-SHA256 of its body, hex-encoded, in ``webhook_hmac_header``, as
+      a Grafana webhook contact point with HMAC signing sends it. With
+      ``webhook_hmac_timestamp_header`` set, that header is required too,
+      the signed text is ``<timestamp>:<body>``, and a timestamp more than
+      ``webhook_hmac_max_skew_seconds`` away from now is refused. The token
+      is still required.
     """
 
     webhook_token: str = ""
+    allowed_sources: list[str] = []
+    webhook_hmac_secret: str = ""
+    webhook_hmac_header: str = "X-Grafana-Alerting-Signature"
+    webhook_hmac_timestamp_header: str = ""
+    webhook_hmac_max_skew_seconds: int = 300
+
+    @field_validator("allowed_sources")
+    @classmethod
+    def _parse_sources(cls, value: list[str]) -> list[str]:
+        # A typo must stop startup, not lock the webhook silently.
+        for entry in value:
+            try:
+                ipaddress.ip_network(entry.strip(), strict=False)
+            except ValueError:
+                raise ValueError(
+                    f"alerts.allowed_sources: {entry!r} is not an IP address or CIDR"
+                ) from None
+        return [entry.strip() for entry in value]
+
+    @field_validator("webhook_hmac_max_skew_seconds")
+    @classmethod
+    def _positive_skew(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("alerts.webhook_hmac_max_skew_seconds must be positive")
+        return value
 
 
 #: ``[logging]`` keys that look like settings here but are app settings,

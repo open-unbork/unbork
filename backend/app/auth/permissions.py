@@ -40,6 +40,7 @@ everything the user holds anywhere.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -68,7 +69,22 @@ logger = logging.getLogger(__name__)
 #:      body, ``set_visible_groups_resolver`` / :func:`visible_group_ids`,
 #:      :func:`visible_filter`, :func:`param_scope` for ``?host_id=`` style routes, and
 #:      ``GET /api/users/me/permissions`` for one host or group.
-PLUGIN_API = "1.2"
+#: 1.3  ``app.audit``: ``register_audit_subscriber``, ``AuditEntry`` (audit
+#:      entries delivered after commit, at most once; the id is a catch-up
+#:      cursor).
+#: 1.4  ``app.run_gate``: ``register_run_gate`` (allow, refuse or defer a
+#:      sync, action run, schedule dispatch or assistant change before it
+#:      starts) and ``register_run_end_listener`` (told after commit when
+#:      each ends); ``gate_retry_at`` on held ``sync_jobs``/``action_runs``.
+#: 1.5  ``app.tasks.extensions``: ``register_task_module``,
+#:      ``register_periodic_task``; extensions also load in the worker
+#:      parent and in beat (so ``register()`` may run before the pool
+#:      forks: start threads and connections lazily); ``app.db.task_session``
+#:      and ``with_task_engine`` may be used by extension tasks.
+#: 1.6  ``register_permission``, ``known_permissions`` (an extension
+#:      declares permissions of its own; register before importing the
+#:      routes that require them).
+PLUGIN_API = "1.6"
 
 
 class Role(StrEnum):
@@ -119,6 +135,73 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
     Role.OPERATOR: frozenset(str(p) for p in _OPERATOR),
     Role.ADMIN: frozenset(str(p) for p in _ADMIN),
 }
+
+_CORE_ROLE_PERMISSIONS: dict[Role, frozenset[str]] = dict(ROLE_PERMISSIONS)
+_CORE_NAMES: frozenset[str] = frozenset(str(p) for p in Permission)
+
+# ── Permissions an extension declares (PLUGIN_API 1.6) ──────────────────────
+
+#: ``area.action``, lower case, like the core names.
+_PERMISSION_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
+
+#: Extension permission → the fixed roles that hold it under the Community
+#: resolver. ``Permission`` stays the closed core catalog beside this.
+_extension_permissions: dict[str, frozenset[Role]] = {}
+
+
+def register_permission(name: str, *, roles: Iterable[Role | str] = (Role.ADMIN,)) -> None:
+    """Declare a permission an extension's routes ask for.
+
+    ``roles`` are the fixed roles that hold it while no other resolver is
+    installed; ``admin`` always does, so "admin holds everything" stays
+    true. Call it from ``register(app)`` *before* importing the module that
+    uses the name in ``require()``, which checks the name at import.
+    Registering the same name with the same roles again is a no-op (the API
+    and each worker load extensions); with other roles it is refused, as
+    are a core name and a name that is not ``area.action``.
+    """
+    if not isinstance(name, str) or not _PERMISSION_NAME.match(name):
+        raise ValueError(f"permission {name!r} is not of the form area.action (lower case)")
+    if name in _CORE_NAMES:
+        raise ValueError(f"permission {name!r} is a core permission")
+    try:
+        holders = frozenset({Role.ADMIN, *(Role(r) for r in roles)})
+    except ValueError as exc:
+        raise ValueError(f"permission {name!r}: {exc}") from None
+    known = _extension_permissions.get(name)
+    if known == holders:
+        return
+    if known is not None:
+        raise ValueError(
+            f"permission {name!r} is already registered for "
+            + ", ".join(sorted(str(r) for r in known))
+        )
+    _extension_permissions[name] = holders
+    for role in holders:
+        ROLE_PERMISSIONS[role] = ROLE_PERMISSIONS[role] | {name}
+
+
+def known_permissions() -> frozenset[str]:
+    """Every permission name: the core catalog and every registered one."""
+    return _CORE_NAMES | frozenset(_extension_permissions)
+
+
+def reset_extension_permissions() -> None:
+    """Forget every registered permission and restore the core mapping. For tests."""
+    _extension_permissions.clear()
+    ROLE_PERMISSIONS.clear()
+    ROLE_PERMISSIONS.update(_CORE_ROLE_PERMISSIONS)
+
+
+def _checked(permission: str | Permission) -> str:
+    """``permission`` as a string, when it is a known name; else ValueError."""
+    name = str(permission)
+    if name not in known_permissions():
+        raise ValueError(
+            f"unknown permission {name!r}. An extension must call "
+            "register_permission() before importing the module that uses it."
+        )
+    return name
 
 
 # ── Scope ───────────────────────────────────────────────────────────────────
@@ -338,7 +421,7 @@ async def require_on(
 
     With no targets this is a global check.
     """
-    perm = str(Permission(permission))
+    perm = _checked(permission)
     targets = [Scope("host", int(h)) for h in dict.fromkeys(hosts)] + [
         Scope("group", int(g)) for g in dict.fromkeys(groups)
     ]
@@ -364,7 +447,7 @@ def require(permission: str | Permission, *, scope: ScopeSpec | None = None):
 
     Returns the ``User`` so it drops in where ``current_active_user`` was.
     """
-    perm = str(Permission(permission))  # an unknown name fails at import
+    perm = _checked(permission)  # an unknown name fails at import
     spec = scope or path_scope
 
     async def dependency(

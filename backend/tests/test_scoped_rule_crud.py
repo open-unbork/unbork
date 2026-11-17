@@ -10,8 +10,8 @@ for a rule asked for through the wrong scope), the GitOps lock on the group
 side, and the 409 on a duplicate, so moving their shared body into helpers
 has something to answer to.
 
-Where a module differs, the table says so: firewall rules are not audited
-and their group create checks neither the group nor a duplicate; CA
+Where a module differs, the table says so: the firewall rules' group
+create checks neither the group nor a duplicate; CA
 certificates take no GitOps lock; package repositories exist only on the
 group side; cron jobs catch a duplicate their table does not forbid, so
 two identical jobs are both stored.
@@ -178,6 +178,22 @@ KINDS = [
         {"action": "allow", "protocol": "tcp", "direction": "input", "port_start": 22},
         {"port_start": 2222, "comment": None},
         "Rule not found",
+        "firewall_rule",
+        _fields(
+            "group_id",
+            "host_id",
+            "action",
+            "protocol",
+            "direction",
+            "source_cidr",
+            "destination_cidr",
+            "source_host_id",
+            "destination_host_id",
+            "port_start",
+            "port_end",
+            "priority",
+            "comment",
+        ),
         group_create_checks_group=False,
     ),
 ]

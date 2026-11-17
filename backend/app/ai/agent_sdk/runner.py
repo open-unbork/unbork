@@ -68,7 +68,7 @@ from app.ai import approvals, service
 from app.ai.agent_sdk.bridge import NO_BUILTIN_TOOLS, build_tool_server, local_tool_name
 from app.ai.agent_sdk.environment import build_sdk_env, ensure_state_dir
 from app.ai.alert_autonomy import busy_refusal
-from app.ai.gate import decide, target_host
+from app.ai.gate import decide, gate_mutation, target_host
 from app.ai.loop import LoopCaps, LoopOutcome, build_system_prompt
 from app.ai.models import AIApprovalRequest, AIProvider, AISession, AIToolCall
 from app.ai.providers.claude_cli import DEFAULT_CONFIG_DIR
@@ -412,6 +412,9 @@ class AgentSDKRunner:
             permitted=self._permitted,
             autonomy_level=self.session.autonomy_level,
         )
+        # An installed extension may refuse or hold a change (S-002).
+        async with self._db_lock:
+            verdict = await gate_mutation(self.db, self.session, name, arguments or {}, verdict)
 
         if verdict.allowed:
             tool_use_id = getattr(context, "tool_use_id", None)

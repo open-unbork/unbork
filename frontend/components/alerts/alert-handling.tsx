@@ -164,6 +164,12 @@ function IntakePanel({ s }: { s: AlertIntakeStatus | undefined }) {
           ) : (
             <span className="text-text-3">Send the token as a bearer token, or as either half of basic auth.</span>
           )}
+          {s.token_set && (
+            <span className="text-text-3">
+              {s.source_allowlist ? "Only the addresses in [alerts] allowed_sources may send." : "Any source address may send."}{" "}
+              {s.body_signature ? "Each request must carry an HMAC signature of its body." : "No body signature is required."}
+            </span>
+          )}
           <span className="text-text-3">
             {last ? `Last alert ${shortAgo(last)} ago.` : "No alert received yet."}
             {s.poll_minutes > 0 ? ` Polls Alertmanager every ${s.poll_minutes} min.` : ""}

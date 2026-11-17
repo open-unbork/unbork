@@ -39,7 +39,13 @@ async def _claim_or_defer(job_id: int, host_id: int) -> bool:
     from app.db import task_session
     from app.enum_utils import enum_str
     from app.models.sync_job import JobStatus, SyncJob
-    from app.tasks.host_lock import acquire_host_lock, check_host_busy, format_pending_reason
+    from app.tasks.host_lock import (
+        acquire_host_lock,
+        check_host_busy,
+        format_pending_reason,
+        release_host_queue,
+    )
+    from app.tasks.run_gate_points import gate_sync_job
 
     async with task_session() as db:
         await acquire_host_lock(db, host_id)
@@ -51,11 +57,18 @@ async def _claim_or_defer(job_id: int, host_id: int) -> bool:
             job.pending_reason = await format_pending_reason(db, blocker)
             await db.commit()
             return False
-        job.status = JobStatus.running
-        job.started_at = datetime.now(UTC)
-        job.pending_reason = None
-        await db.commit()
-        return True
+        gated = not await gate_sync_job(db, job_id, modules=("ca_certs",))
+        if not gated:
+            job.status = JobStatus.running
+            job.started_at = datetime.now(UTC)
+            job.pending_reason = None
+            await db.commit()
+    if gated:
+        # Refused or held by an extension's run gate (S-002): the host is
+        # free, so it goes to the next op in its queue.
+        await release_host_queue(host_id, after=f"job_id={job_id}", exclude_sync_job_id=job_id)
+        return False
+    return True
 
 
 @celery_app.task(

@@ -65,7 +65,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from sqlalchemy import exists, or_, select, text, update
+from sqlalchemy import exists, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -791,6 +791,14 @@ async def _oldest_pending_op(
     return min(candidates, key=lambda c: c.sort_key)
 
 
+def _not_held(column):
+    """A row an extension's run gate deferred (``app.run_gate``) is not a
+    queue candidate until its ``gate_retry_at`` has passed: a held row at
+    the head of a host's queue would stall every later op on that host.
+    """
+    return or_(column.is_(None), column <= func.now())
+
+
 async def _pending_sync_job(db: AsyncSession, host_id: int, exclude_sync_job_id: int | None):
     """SyncJob candidate: pending + host_id matches + not excluded, and
     a row this queue knows how to run: a sync, or a CA certificate
@@ -807,6 +815,7 @@ async def _pending_sync_job(db: AsyncSession, host_id: int, exclude_sync_job_id:
             SyncJob.host_id == host_id,
             SyncJob.status == JobStatus.pending,
             SyncJob.module_type.in_([*SYNC_MODULE_TYPES, CA_CERT_MODULE_TYPE]),
+            _not_held(SyncJob.gate_retry_at),
         )
         .order_by(SyncJob.created_at.asc())
         .limit(1)
@@ -849,6 +858,7 @@ async def _pending_action_run(db: AsyncSession, host_id: int, exclude_action_run
                 ActionRun.group_id.in_(group_member_subq),
             ),
             _has_no_host_runs(),
+            _not_held(ActionRun.gate_retry_at),
         )
         .order_by(ActionRun.created_at.asc())
         .limit(1)
@@ -891,6 +901,7 @@ async def _pending_host_run(db: AsyncSession, host_id: int, exclude_action_run_i
             ActionHostRun.host_id == host_id,
             ActionHostRun.status == "pending",
             ActionRun.status.in_(("queued", "running", "pending")),
+            _not_held(ActionRun.gate_retry_at),
             ~exists().where(
                 SyncJob.origin_action_host_run_id == ActionHostRun.id,
                 SyncJob.status.in_((JobStatus.pending, JobStatus.running)),

@@ -328,7 +328,16 @@ async def _claim_or_defer(
 
     blocker = await check_host_busy(db, host_id, exclude_action_run_id=exclude_action_run_id)
     if blocker is None:
-        return True
+        # The host is free: an installed extension may still refuse or
+        # hold the sync (S-002). Either way it is not taking the host, so
+        # the host goes to the next op in its queue.
+        from app.tasks.host_lock import release_host_queue
+        from app.tasks.run_gate_points import gate_sync_job
+
+        if await gate_sync_job(db, job_id, modules=()):
+            return True
+        await release_host_queue(host_id, after=f"job_id={job_id}", exclude_sync_job_id=job_id)
+        return False
 
     # Defer. The SyncJob row was created in ``status='pending'`` by the
     # API entry; we leave the status alone but stamp ``pending_reason``

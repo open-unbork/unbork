@@ -31,6 +31,9 @@ or a hand-picked set of hosts) and a set of modules.
 3. **Apply** — one coalesced playbook per selected host, queued through the
    per-host serialisation so a busy host waits its turn. The screen polls the
    jobs and shows each host's outcome; the global sync tray follows along.
+   A job (or an action run) can also wait, or end refused, because an
+   installed extension such as a change-window policy said so; its pending
+   reason or its error then gives that extension's reason.
 4. **Result** — applied / failed / excluded / unchanged / skipped, a card
    per failed host with the error and a jump to the host or the assistant,
    and **Plan the remaining** when hosts were excluded.
@@ -103,10 +106,23 @@ action packs, SSH keys, settings…), sync and action runs (ad-hoc and
 scheduled), discovery, assistant commands, and terminal sessions.
 
 Most entries are a plain verb on a typed object — `create`, `update` or
-`delete` of a `host`, a `host_group`, a `package_rule`, a `scan_config` —
+`delete` of a `host`, a `host_group`, a `package_rule`, a `firewall_rule`, a
+`scan_config` (plus `reorder` of a group's firewall rules and `update` of
+its `firewall_policy`) —
 and the rest name a domain event: `sync_triggered` / `sync_completed` /
-`sync_failed`, `scheduled_action.dispatched`, `gitops.import.firewall`,
-`ai_command`, `session_start` / `session_end`, `trust_host_key`.
+`sync_failed`, `scheduled_action.dispatched`, `action_run.started` /
+`action_run.cancelled`, `scheduled_action.gate_refused` /
+`sync_job.gate_refused` / `action_run.gate_refused` (an installed
+extension refused it, with its reason), `gitops.import.firewall`, `ai_command`,
+`session_start` / `session_end`, `trust_host_key`.
+
+Every action run has one `action_run.started` entry, written when the run
+is created, whose `origin` says where it came from (`api`, `run_now`,
+`schedule` or `alert`; `assistant` is reserved for runs the assistant
+will start) and whose user is whoever started it
+(a schedule's owner for a scheduled run, nobody for an alert). It records
+the action, the target and the names of the parameters, never their
+values. Cancelling a run writes `action_run.cancelled`.
 
 Sync events come in pairs: `sync_triggered` (at API entry — records the
 operator's intent and the requested `module_filter`) and `sync_completed` or
