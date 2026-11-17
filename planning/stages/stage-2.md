@@ -35,9 +35,9 @@ Enterprise items in this stage, in the Enterprise repository (listed for transpa
 
 Behaviours to verify:
 
-- [ ] `UNBORK_*` variables and `/etc/unbork/unbork.toml` work; the `LABDOG_*` names and old paths still work and log one deprecation warning.
-- [ ] A host last synced by 1.1.0 is recognised as managed, and its first sync removes the old chains, markers and files without a gap in firewall coverage. Proven on a host named "test".
-- [ ] Alert rules and dashboards using the old label and metric names keep working for the documented deprecation period.
+- [ ] `UNBORK_*` variables and `/etc/unbork/unbork.toml` work. Revised by D-29: the `LABDOG_*` names and old paths are not read, and the startup error lists any it finds.
+- [x] ~~A host last synced by 1.1.0 is recognised as managed, and its first sync removes the old chains, markers and files.~~ Dropped by D-29: no migration or cleanup code; Dennis cleans his hosts by hand (`docs/upgrade.md` lists what to remove).
+- [x] ~~Alert rules and dashboards using the old label and metric names keep working.~~ Dropped by D-29: `docs/upgrade.md` maps the old label and metric names to the new ones.
 - [ ] The Docker image contains no Claude Code binary; turning the provider on installs it, and a failed install reads as "provider unavailable".
 - [ ] A build or install made without the assistant has no AI routes, pages or providers, and the test suite passes in that configuration.
 - [ ] No provider label says "Claude Code", and there is no subscription token field.

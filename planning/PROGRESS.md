@@ -96,3 +96,17 @@ Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in p
 ## 2026-11-17 Stage 1 merged
 
 - Dennis approved merging (2026-11-17). #305 merged as `829ace2`; unbork-enterprise#10 merged as `5ff6890`. S-001, S-002, S-015 and S-016 done. Stage 1 done.
+
+## 2026-11-17 Stage 2 run
+
+Work branch: `claude/project-thread-1sra3u` (the session's assigned branch, in place of `roadmap/stage-2`). Base: `2e961d7` (dev after #306). Entry criterion met: stage 1 merged 2026-11-17. Dennis said to start ("Yes", 2026-11-17). Behaviours revised for D-29 (no old-name fallbacks).
+- 2026-11-17 C-048 review babde9b. No fallbacks (D-29): the startup error lists old variables and config files.
+- 2026-11-17 C-049 review e8e12f2.
+- 2026-11-17 C-050 review e97ec3c. No on-host cleanup (D-29); docs/upgrade.md lists what to remove by hand.
+- 2026-11-17 C-051 done a91d627. Old-name guard test with the `old-name-ok` marker.
+- 2026-11-17 S-008 done 68f9385.
+- 2026-11-17 S-014 review 31884e2.
+- 2026-11-17 S-017 review fdb8ed5. PLUGIN_API 1.7.
+- 2026-11-17 S-009 review 70a787b. Install on a running stack checked in the stage review.
+- 2026-11-17 C-026 review 9828765. Whole suite passes with the assistant off (AI tests skip). Assumptions A-05, A-06.
+- 2026-11-17 S-010 blocked 24ae507. Code done; D-31 (contact address and wording) open. Assumptions A-07, A-08.

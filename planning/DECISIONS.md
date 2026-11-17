@@ -54,6 +54,19 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 - A-04. Stage runs test on local Docker on lin-manager-2, and on hosts
   named "test" when a real host is needed. The live instance on
   lin-manager is semi-production and other hosts must never break.
+- A-05. (Stage 2, C-026) The Alertmanager poller moves from
+  `app.tasks.ai_alerts` to `app.tasks.alert_poll`, keeping an alias task
+  under the old name, so alerts are still polled without the assistant.
+  The spec did not name the poller.
+- A-06. (Stage 2, C-026) The `ai.*` setting definitions stay in the
+  settings registry and are filtered where they are served, rather than
+  moved into an assistant-only module.
+- A-07. (Stage 2, S-010) Until D-31 is answered, SOURCE-OFFER.md names
+  the GitHub issue tracker as the channel for source requests.
+- A-08. (Stage 2, S-010) The .deb, .rpm and tarball notices list Python
+  and npm components only: those packages carry no Debian packages of
+  their own. An entry in `packaging/licence-overrides.toml` corrects
+  metadata and cannot accept an incompatible licence.
 
 ## Log
 
