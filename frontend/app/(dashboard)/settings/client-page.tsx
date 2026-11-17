@@ -9,6 +9,7 @@ import { shortAgo } from "@/lib/fleet"
 import type { AIProvider, AIUsageSummary, AlertIntakeStatus, EmailSettings, GitRepository, GrafanaInstance, MetricsStatus, ProxmoxNode, SSHKey } from "@/lib/types"
 import { MetricsScrapeCard } from "@/components/metrics-scrape-card"
 import { settingsSections } from "@/lib/extensions"
+import { useFeatures } from "@/lib/features"
 import { Dot, PageHead, Panel, Tabs, type Tone } from "@/components/ld"
 
 import { SettingsEditor } from "./settings-editor"
@@ -38,7 +39,9 @@ export default function SettingsPage() {
   const setSection = (s: string) => router.push(s === "integrations" ? "/settings" : `/settings?section=${s}`)
   // Sections an extension (Enterprise) adds; Community has none.
   const extra = settingsSections.filter((x) => !x.permission || can(user, x.permission))
-  const tabs = [...SECTIONS, ...extra.map((x) => ({ k: x.key, label: x.label }))]
+  // No AI section on a server without the assistant (C-026).
+  const { assistant } = useFeatures()
+  const tabs = [...SECTIONS.filter((x) => assistant || x.k !== "ai"), ...extra.map((x) => ({ k: x.key, label: x.label }))]
   const ExtraSection = extra.find((x) => x.key === section)?.Component
 
   return (
@@ -49,7 +52,7 @@ export default function SettingsPage() {
       <div className="scroll flex-1 p-3.5">
         {ExtraSection && <ExtraSection />}
         {section === "integrations" && <Integrations />}
-        {section === "ai" && (
+        {section === "ai" && assistant && (
           <div className="flex flex-col gap-3">
             <Panel title="providers" meta="who answers the assistant">
               <ProvidersRow />
@@ -105,6 +108,7 @@ function Card({ name, state, status, detail, meta, href, action, more }: { name:
 
 function Integrations() {
   const { user } = useAuth()
+  const { assistant } = useFeatures()
   const q = { retry: false }
   // AI providers need ai.use, which a viewer lacks.
   const ai = { ...q, enabled: can(user, "ai.use") }
@@ -148,14 +152,16 @@ function Integrations() {
         href="/git-repos"
         action="Configure…"
       />
-      <Card
-        name="AI providers"
-        state={enabledProviders.length ? "ok" : "idle"}
-        detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
-        meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
-        href="/ai-providers"
-        action="Configure…"
-      />
+      {assistant && (
+        <Card
+          name="AI providers"
+          state={enabledProviders.length ? "ok" : "idle"}
+          detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
+          meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
+          href="/ai-providers"
+          action="Configure…"
+        />
+      )}
       <Card
         name="Email"
         state={email?.ready ? "ok" : email?.enabled ? "warn" : "idle"}
