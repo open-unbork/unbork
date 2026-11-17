@@ -8,7 +8,7 @@ VERSION      ?= $(shell grep '^version' ../backend/pyproject.toml 2>/dev/null | 
 ARCH         ?= amd64
 PYTHON       ?= python3.12
 DESTDIR      ?= $(CURDIR)/staging
-PREFIX       ?= /usr/lib/labdog
+PREFIX       ?= /usr/lib/unbork
 DIST         ?= $(CURDIR)/dist
 
 # Build metadata baked into backend/app/_build_info.py at package time
@@ -73,7 +73,7 @@ _build-venv:
 	@echo "[build-venv] Installing backend dependencies..."
 	@# setuptools' dynamic version reads a VERSION file relative to
 	@# backend/pyproject.toml, but the source of truth lives at the repo
-	@# root. Stage it in so the installed labdog-backend dist-metadata
+	@# root. Stage it in so the installed unbork-backend dist-metadata
 	@# carries the real version (otherwise it builds as 0.0.0 and
 	@# /api/version reports 0.0.0). backend/VERSION is gitignored.
 	cp ../VERSION ../backend/VERSION
@@ -153,18 +153,18 @@ clean:
 
 # --- Packaging targets ---
 
-TARBALL_NAME := labdog-$(VERSION)-linux-$(ARCH).tar.gz
-TARBALL_DIR  := labdog-$(VERSION)-linux-$(ARCH)
+TARBALL_NAME := unbork-$(VERSION)-linux-$(ARCH).tar.gz
+TARBALL_DIR  := unbork-$(VERSION)-linux-$(ARCH)
 
 deb: build
 	@mkdir -p $(DIST)
 	VERSION=$(VERSION) nfpm pkg --packager deb --config nfpm.yaml --target $(DIST)/
-	@echo "✓ .deb built: $$(ls $(DIST)/labdog_*.deb | tail -1)"
+	@echo "✓ .deb built: $$(ls $(DIST)/unbork_*.deb | tail -1)"
 
 rpm: build
 	@mkdir -p $(DIST)
 	VERSION=$(VERSION) nfpm pkg --packager rpm --config nfpm.yaml --target $(DIST)/
-	@echo "✓ .rpm built: $$(ls $(DIST)/labdog-*.rpm | tail -1)"
+	@echo "✓ .rpm built: $$(ls $(DIST)/unbork-*.rpm | tail -1)"
 
 tarball: build
 	@mkdir -p $(DIST)/$(TARBALL_DIR)
@@ -177,9 +177,9 @@ tarball: build
 	@# the .deb / .rpm directly via nfpm.yaml; the tarball has to
 	@# bundle them here.
 	@mkdir -p $(DIST)/$(TARBALL_DIR)/systemd $(DIST)/$(TARBALL_DIR)/tmpfiles.d $(DIST)/$(TARBALL_DIR)/etc
-	cp systemd/labdog.service $(DIST)/$(TARBALL_DIR)/systemd/
-	cp tmpfiles.d/labdog.conf $(DIST)/$(TARBALL_DIR)/tmpfiles.d/
-	cp etc/labdog.toml $(DIST)/$(TARBALL_DIR)/etc/
+	cp systemd/unbork.service $(DIST)/$(TARBALL_DIR)/systemd/
+	cp tmpfiles.d/unbork.conf $(DIST)/$(TARBALL_DIR)/tmpfiles.d/
+	cp etc/unbork.toml $(DIST)/$(TARBALL_DIR)/etc/
 	@echo "[tarball] Creating archive..."
 	tar -czf $(DIST)/$(TARBALL_NAME) -C $(DIST) $(TARBALL_DIR)
 	rm -rf $(DIST)/$(TARBALL_DIR)

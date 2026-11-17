@@ -11,15 +11,15 @@ installs it the way an operator would, then runs shared assertions:
 
 | Artifact | Image | Install |
 |----------|-------|---------|
-| `.deb` | `ubuntu:24.04` | `apt-get install ./labdog_*.deb` |
-| `.rpm` | `rockylinux:9` | `dnf install ./labdog-*.rpm` |
+| `.deb` | `ubuntu:24.04` | `apt-get install ./unbork_*.deb` |
+| `.rpm` | `rockylinux:9` | `dnf install ./unbork-*.rpm` |
 | tarball | `ubuntu:24.04` | extract + `./install.sh` |
 
 The assertions ([`smoke.sh`](smoke.sh)) check that the install:
 
 - landed the app code + a working venv and no in-package action pack,
-  the systemd unit, tmpfiles.d config, and `/etc/labdog/labdog.toml`;
-- created the `labdog` service account and data directories;
+  the systemd unit, tmpfiles.d config, and `/etc/unbork/unbork.toml`;
+- created the `unbork` service account and data directories;
 - produced a venv that imports the `app` package and every key runtime
   dependency (cross-distro — the venv is built on Ubuntu and must also run
   on Rocky);

@@ -80,16 +80,16 @@ OVERRIDING_CREDENTIAL_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 #: file left by an interactive ``claude login`` *also* outranks
 #: ``CLAUDE_CODE_OAUTH_TOKEN`` — verified against claude 2.1.220, where a
 #: stored login wins and the configured token is ignored with no warning
-#: and no difference in the output. So when a token is configured LabDog
-#: also points the CLI at a directory LabDog owns, where no interactive
+#: and no difference in the output. So when a token is configured unbork
+#: also points the CLI at a directory unbork owns, where no interactive
 #: session can leave a login behind to shadow it.
 #:
-#: ``/var/lib/labdog`` is already LabDog's state root — listed in the
+#: ``/var/lib/unbork`` is already unbork's state root — listed in the
 #: systemd unit's ``ReadWritePaths`` and the documented persistent-volume
 #: mount for container deploys — so the CLI's state travels with the rest
 #: of it and needs no extra configuration on either deployment shape.
 CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"
-DEFAULT_CONFIG_DIR = "/var/lib/labdog/claude-cli"
+DEFAULT_CONFIG_DIR = "/var/lib/unbork/claude-cli"
 
 #: Raised when the binary is absent. Names both deployment shapes because
 #: the cause differs entirely between them: on a package install the
@@ -154,7 +154,7 @@ class ClaudeCLIProvider:
         self.model = model
         self.timeout_seconds = timeout_seconds
         # A one-year subscription token from ``claude setup-token``, stored
-        # encrypted like every other LabDog credential. None means "use
+        # encrypted like every other unbork credential. None means "use
         # whatever the host is already authenticated with".
         self.oauth_token = oauth_token
         self.config_dir = config_dir
@@ -188,7 +188,7 @@ class ClaudeCLIProvider:
         argv = [CLI_BINARY, "-p", prompt]
         if self.model:
             argv += ["--model", self.model]
-        # Deny the CLI its own tools — host access belongs to LabDog's
+        # Deny the CLI its own tools — host access belongs to unbork's
         # classified tool layer, not to a second unaudited path.
         argv += ["--disallowedTools", "*"]
         return argv

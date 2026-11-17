@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# LabDog installer — run from inside extracted tarball
+# unbork installer — run from inside extracted tarball
 # Usage: sudo ./install.sh [--help]
 
 set -euo pipefail
 
-log() { echo "[labdog-install] $*" >&2; }
+log() { echo "[unbork-install] $*" >&2; }
 die() { echo "Error: $*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
 Usage: sudo ./install.sh [--help]
 
-Installs LabDog to standard FHS paths:
-  /usr/lib/labdog         — application code
-  /etc/labdog             — configuration
-  /var/lib/labdog         — persistent data
-  /var/log/labdog         — log files
+Installs unbork to standard FHS paths:
+  /usr/lib/unbork         — application code
+  /etc/unbork             — configuration
+  /var/lib/unbork         — persistent data
+  /var/log/unbork         — log files
   /usr/lib/systemd/system    — systemd unit files
 
 This script must be run as root from inside the extracted tarball directory.
@@ -40,19 +40,19 @@ fi
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # --- Verify tarball structure ---
-for required_dir in usr/lib/labdog systemd tmpfiles.d; do
+for required_dir in usr/lib/unbork systemd tmpfiles.d; do
     if [ ! -d "$SCRIPT_DIR/$required_dir" ]; then
         die "Expected directory '$required_dir' not found in $SCRIPT_DIR — are you running from the extracted tarball?"
     fi
 done
-if [ ! -f "$SCRIPT_DIR/etc/labdog.toml" ]; then
-    die "Expected file 'etc/labdog.toml' not found in $SCRIPT_DIR — are you running from the extracted tarball?"
+if [ ! -f "$SCRIPT_DIR/etc/unbork.toml" ]; then
+    die "Expected file 'etc/unbork.toml' not found in $SCRIPT_DIR — are you running from the extracted tarball?"
 fi
 
 # --- Create system user ---
-log "Creating labdog system user..."
-if id labdog >/dev/null 2>&1; then
-    log "User 'labdog' already exists, skipping"
+log "Creating unbork system user..."
+if id unbork >/dev/null 2>&1; then
+    log "User 'unbork' already exists, skipping"
 else
     # useradd is universally available on both Debian/Ubuntu (passwd
     # package) and RHEL/Rocky (shadow-utils) and accepts the same flags
@@ -61,30 +61,30 @@ else
     if ! command -v useradd >/dev/null 2>&1; then
         die "useradd not found — cannot create system user"
     fi
-    useradd --system --user-group --home-dir /var/lib/labdog --no-create-home --shell /usr/sbin/nologin --comment "LabDog service account" labdog
-    log "Created system user 'labdog'"
+    useradd --system --user-group --home-dir /var/lib/unbork --no-create-home --shell /usr/sbin/nologin --comment "unbork service account" unbork
+    log "Created system user 'unbork'"
 fi
 
 # --- Install application files ---
-log "Installing application to /usr/lib/labdog..."
-cp -r "$SCRIPT_DIR/usr/lib/labdog" /usr/lib/
+log "Installing application to /usr/lib/unbork..."
+cp -r "$SCRIPT_DIR/usr/lib/unbork" /usr/lib/
 
 # --- Install configuration (preserve existing) ---
-if [ -f /etc/labdog/labdog.toml ]; then
-    log "Existing /etc/labdog/labdog.toml found — preserving (not overwritten)"
+if [ -f /etc/unbork/unbork.toml ]; then
+    log "Existing /etc/unbork/unbork.toml found — preserving (not overwritten)"
 else
-    log "Installing default configuration to /etc/labdog..."
-    mkdir -p /etc/labdog
-    # The directory mode matters as much as the file's: labdog.toml holds
+    log "Installing default configuration to /etc/unbork..."
+    mkdir -p /etc/unbork
+    # The directory mode matters as much as the file's: unbork.toml holds
     # security.secret_key and security.encryption_key. mkdir uses the invoking
     # root's umask (usually 0755), so without this the tarball install ended up
-    # more permissive than the .deb/.rpm, which declare 0750 root:labdog for
+    # more permissive than the .deb/.rpm, which declare 0750 root:unbork for
     # this path in packaging/nfpm.yaml.
-    chmod 750 /etc/labdog
-    chown root:labdog /etc/labdog
-    cp "$SCRIPT_DIR/etc/labdog.toml" /etc/labdog/
-    chmod 640 /etc/labdog/labdog.toml
-    chown root:labdog /etc/labdog/labdog.toml
+    chmod 750 /etc/unbork
+    chown root:unbork /etc/unbork
+    cp "$SCRIPT_DIR/etc/unbork.toml" /etc/unbork/
+    chmod 640 /etc/unbork/unbork.toml
+    chown root:unbork /etc/unbork/unbork.toml
 fi
 
 # --- Detect systemd unit path ---
@@ -98,25 +98,25 @@ else
 fi
 
 log "Installing systemd unit to $SYSTEMD_DIR..."
-cp "$SCRIPT_DIR"/systemd/labdog.service "$SYSTEMD_DIR/"
+cp "$SCRIPT_DIR"/systemd/unbork.service "$SYSTEMD_DIR/"
 
 # --- Install tmpfiles.d ---
 log "Installing tmpfiles.d configuration..."
 mkdir -p /usr/lib/tmpfiles.d
-cp "$SCRIPT_DIR/tmpfiles.d/labdog.conf" /usr/lib/tmpfiles.d/
+cp "$SCRIPT_DIR/tmpfiles.d/unbork.conf" /usr/lib/tmpfiles.d/
 
 # --- Create data directories ---
 log "Creating data directories..."
-mkdir -p /var/lib/labdog /var/log/labdog
-chown -R labdog:labdog /var/lib/labdog /var/log/labdog
+mkdir -p /var/lib/unbork /var/log/unbork
+chown -R unbork:unbork /var/lib/unbork /var/log/unbork
 
 # --- Create runtime directory ---
 log "Creating runtime directory..."
 if command -v systemd-tmpfiles >/dev/null 2>&1; then
-    systemd-tmpfiles --create labdog.conf 2>/dev/null || true
+    systemd-tmpfiles --create unbork.conf 2>/dev/null || true
 else
-    mkdir -p /run/labdog
-    chown labdog:labdog /run/labdog
+    mkdir -p /run/unbork
+    chown unbork:unbork /run/unbork
 fi
 
 # --- Reload systemd ---
@@ -133,19 +133,19 @@ log "Installation complete."
 
 cat <<'EOF'
 
-LabDog installed to /usr/lib/labdog
+unbork installed to /usr/lib/unbork
 
 Next steps:
-  1. Edit /etc/labdog/labdog.toml with your settings:
+  1. Edit /etc/unbork/unbork.toml with your settings:
        - [security] secret_key and encryption_key: generate with: openssl rand -base64 32
        - [database] url: your PostgreSQL connection string
-       - [security] labdog_server_ip: this server's IP address
+       - [security] unbork_server_ip: this server's IP address
 
   2. Enable and start the service:
-       systemctl enable --now labdog.service
+       systemctl enable --now unbork.service
 
   3. Check status:
-       systemctl status labdog.service
-       journalctl -u labdog -f
+       systemctl status unbork.service
+       journalctl -u unbork -f
 
 EOF

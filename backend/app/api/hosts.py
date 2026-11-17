@@ -195,7 +195,7 @@ async def create_host(
         ssh_port=body.ssh_port,
         ssh_user=ssh_user,
         ssh_key_id=body.ssh_key_id,
-        labdog_source_ip=source_ip,
+        unbork_source_ip=source_ip,
         ssh_host_key_entry=captured_host_key_entry,
         drift_check_enabled=body.drift_check_enabled,
     )
@@ -287,7 +287,7 @@ async def list_hosts_summary(
                     "ssh_user": h.ssh_user,
                     "firewall_backend": enum_str(h.firewall_backend),
                     "sync_status": enum_str(h.sync_status),
-                    "labdog_source_ip": h.labdog_source_ip,
+                    "unbork_source_ip": h.unbork_source_ip,
                     "drift_check_enabled": h.drift_check_enabled,
                     "last_sync_at": h.last_sync_at.isoformat() if h.last_sync_at else None,
                     "last_drift_check_at": h.last_drift_check_at.isoformat()

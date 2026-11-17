@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Containerised packaging smoke harness for LabDog.
+# Containerised packaging smoke harness for unbork.
 #
 # For each built artifact in packaging/dist/, spin up a clean target-OS
 # container, install the artifact the way an operator would, and run the
 # in-container assertions (packaging/tests/smoke.sh):
 #
-#   .deb     → Ubuntu 24.04   (apt-get install ./labdog_*.deb)
-#   .rpm     → Rocky Linux 9  (dnf install ./labdog-*.rpm)
+#   .deb     → Ubuntu 24.04   (apt-get install ./unbork_*.deb)
+#   .rpm     → Rocky Linux 9  (dnf install ./unbork-*.rpm)
 #   tarball  → Ubuntu 24.04   (extract + ./install.sh)
 #
 # Requires Docker and the artifacts already built (packaging/build.sh).
@@ -35,9 +35,9 @@ DEB_IMAGE="${DEB_IMAGE:-ubuntu:24.04}"
 RPM_IMAGE="${RPM_IMAGE:-rockylinux:9}"
 TAR_IMAGE="${TAR_IMAGE:-ubuntu:24.04}"
 
-DEB="labdog_${VERSION}-1_amd64.deb"
-RPM="labdog-${VERSION}-1.x86_64.rpm"
-TARBALL="labdog-${VERSION}-linux-amd64.tar.gz"
+DEB="unbork_${VERSION}-1_amd64.deb"
+RPM="unbork-${VERSION}-1.x86_64.rpm"
+TARBALL="unbork-${VERSION}-linux-amd64.tar.gz"
 
 command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on PATH" >&2; exit 1; }
 
@@ -53,7 +53,7 @@ smoke_deb() {
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             # apt resolves the python3.12 runtime dependency from the local .deb.
-            apt-get install -y -qq "/dist/labdog_${V}-1_amd64.deb"
+            apt-get install -y -qq "/dist/unbork_${V}-1_amd64.deb"
             /tests/smoke.sh "$V"
         '
 }
@@ -64,7 +64,7 @@ smoke_rpm() {
     docker run --rm -v "$DIST":/dist:ro -v "$HERE":/tests:ro -e V="$VERSION" "$RPM_IMAGE" \
         bash -euo pipefail -c '
             # dnf resolves the python3.12 runtime dependency from AppStream.
-            dnf install -y -q "/dist/labdog-${V}-1.x86_64.rpm"
+            dnf install -y -q "/dist/unbork-${V}-1.x86_64.rpm"
             /tests/smoke.sh "$V"
         '
 }
@@ -79,14 +79,14 @@ smoke_tarball() {
             # The tarball bundles the venv but not the python3.12 runtime it
             # links against; an operator installs that themselves.
             apt-get install -y -qq python3.12 tar
-            tar -xzf "/dist/labdog-${V}-linux-amd64.tar.gz" -C /tmp
-            cd "/tmp/labdog-${V}-linux-amd64"
+            tar -xzf "/dist/unbork-${V}-linux-amd64.tar.gz" -C /tmp
+            cd "/tmp/unbork-${V}-linux-amd64"
             ./install.sh
             /tests/smoke.sh "$V"
         '
 }
 
-echo "LabDog packaging smoke — version $VERSION, targets: $TARGETS"
+echo "unbork packaging smoke — version $VERSION, targets: $TARGETS"
 for t in $TARGETS; do
     case "$t" in
         deb)     smoke_deb ;;

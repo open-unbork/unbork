@@ -957,7 +957,7 @@ def test_redact_path_strips_tmpfs_paths():
     """SEC-06 unit test for the redaction helper.
 
     Direct unit cover for the regex: the helper must strip
-    ``/dev/shm/labdog-sync-XXXXXXXX/...`` and the ``/tmp`` fallback
+    ``/dev/shm/unbork-sync-XXXXXXXX/...`` and the ``/tmp`` fallback
     while leaving unrelated text untouched.
     """
     from app.tasks.host_sync_orchestrator import _redact_path
@@ -966,17 +966,17 @@ def test_redact_path_strips_tmpfs_paths():
     # non-whitespace, so the trailing colon ends up consumed — the
     # important property is that no characters from the secret prefix
     # or path-suffix remain.
-    redacted = _redact_path("OSError: [Errno 2] /dev/shm/labdog-sync-abc12345/id_ssh: no such file")
-    assert "labdog-sync-abc12345" not in redacted
+    redacted = _redact_path("OSError: [Errno 2] /dev/shm/unbork-sync-abc12345/id_ssh: no such file")
+    assert "unbork-sync-abc12345" not in redacted
     assert "/dev/shm" not in redacted
     assert "<tmpfs>" in redacted
     # /tmp fallback form.
-    redacted = _redact_path("foo /tmp/labdog-sync-deadbeef/id_ssh bar")
-    assert "labdog-sync-deadbeef" not in redacted
-    assert "/tmp/labdog" not in redacted
+    redacted = _redact_path("foo /tmp/unbork-sync-deadbeef/id_ssh bar")
+    assert "unbork-sync-deadbeef" not in redacted
+    assert "/tmp/unbork" not in redacted
     assert "<tmpfs>" in redacted
     # Bare directory (no trailing path).
-    assert _redact_path("rmtree(/dev/shm/labdog-sync-deadbeef)") == "rmtree(<tmpfs>)"
+    assert _redact_path("rmtree(/dev/shm/unbork-sync-deadbeef)") == "rmtree(<tmpfs>)"
     # Path-less message round-trips unchanged.
     assert _redact_path("InvalidTag") == "InvalidTag"
     # None round-trips.
@@ -1000,7 +1000,7 @@ async def test_orchestrator_error_message_redacts_tmpfs_path(db: AsyncSession, t
     os.makedirs(private_data_dir)
     ssh_key_path = str(tmp_path / "id_ssh")
 
-    leaky = OSError("[Errno 13] Permission denied: '/dev/shm/labdog-sync-deadbeef/id_ssh'")
+    leaky = OSError("[Errno 13] Permission denied: '/dev/shm/unbork-sync-deadbeef/id_ssh'")
 
     with _patch_orchestrator_raising(leaky):
         with pytest.raises(RuntimeError) as exc_info:
@@ -1014,12 +1014,12 @@ async def test_orchestrator_error_message_redacts_tmpfs_path(db: AsyncSession, t
             )
 
     # The re-raised RuntimeError carries the redacted message too.
-    assert "labdog-sync-deadbeef" not in str(exc_info.value)
+    assert "unbork-sync-deadbeef" not in str(exc_info.value)
     assert "<tmpfs>" in str(exc_info.value)
 
     job = (await db.execute(select(SyncJob).where(SyncJob.id == job_id))).scalar_one()
     assert job.error_message
-    assert "labdog-sync-deadbeef" not in job.error_message
+    assert "unbork-sync-deadbeef" not in job.error_message
     assert "/dev/shm" not in job.error_message
     assert "<tmpfs>" in job.error_message
 
@@ -1031,7 +1031,7 @@ async def test_orchestrator_error_message_redacts_tmpfs_path(db: AsyncSession, t
     assert rows
     for row in rows:
         if row.error_message:
-            assert "labdog-sync-deadbeef" not in row.error_message
+            assert "unbork-sync-deadbeef" not in row.error_message
             assert "/dev/shm" not in row.error_message
             assert "<tmpfs>" in row.error_message
 

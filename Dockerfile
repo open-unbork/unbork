@@ -69,9 +69,9 @@ RUN echo "apt security refresh @ ${BUILD_DATE}" \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -u 1000 labdog \
-    && mkdir -p /var/lib/labdog/packs /var/lib/labdog/claude-cli \
-    && chown -R labdog:labdog /var/lib/labdog
+RUN useradd -m -u 1000 unbork \
+    && mkdir -p /var/lib/unbork/packs /var/lib/unbork/claude-cli \
+    && chown -R unbork:unbork /var/lib/unbork
 
 # Python packages from builder
 COPY --from=backend-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
@@ -96,7 +96,7 @@ RUN rm -f /usr/local/bin/uv /usr/local/bin/uvx
 # `claude` from PATH with no code change, while both backends stay on one
 # binary that uv.lock pins transitively.
 #
-# unbork points the CLI at /var/lib/labdog/claude-cli via
+# unbork points the CLI at /var/lib/unbork/claude-cli via
 # CLAUDE_CONFIG_DIR rather than letting it use $HOME, so a stored login
 # can never shadow the token configured in the UI — see
 # app/ai/providers/claude_cli.py and app/ai/agent_sdk/environment.py.
@@ -112,28 +112,28 @@ RUN set -eu; \
     /usr/local/bin/claude --version
 
 # Backend source (app + alembic). Action packs are not part of the image:
-# they are synced from git at runtime (the seeded labdog-playbooks pack).
-COPY --chown=labdog:labdog backend/app/ app/
-COPY --chown=labdog:labdog backend/alembic/ alembic/
-COPY --chown=labdog:labdog backend/alembic.ini alembic.ini
+# they are synced from git at runtime (the seeded unbork-playbooks pack).
+COPY --chown=unbork:unbork backend/app/ app/
+COPY --chown=unbork:unbork backend/alembic/ alembic/
+COPY --chown=unbork:unbork backend/alembic.ini alembic.ini
 # The image runs from source with deps installed via --no-emit-project, so the
-# labdog-backend .dist-info is absent and importlib.metadata can't report the
+# unbork-backend .dist-info is absent and importlib.metadata can't report the
 # version. Ship the VERSION file at the app root so /api/version (and thus the
 # healthcheck) resolves it — see app/api/version.py:_resolve_version().
-COPY --chown=labdog:labdog VERSION VERSION
+COPY --chown=unbork:unbork VERSION VERSION
 
 # Frontend static files
-COPY --from=frontend-builder --chown=labdog:labdog /app/out/ /usr/lib/labdog/frontend/out/
+COPY --from=frontend-builder --chown=unbork:unbork /app/out/ /usr/lib/unbork/frontend/out/
 
 # Build metadata. CI passes both via --build-arg in the build-image and
 # build-test-image jobs; a local `docker build` without them yields empty
 # values and /api/version reports a "dev build".
 ARG GIT_SHA=""
 ARG BUILD_DATE=""
-ENV LABDOG_COMMIT_SHA=$GIT_SHA \
-    LABDOG_BUILD_DATE=$BUILD_DATE
+ENV UNBORK_COMMIT_SHA=$GIT_SHA \
+    UNBORK_BUILD_DATE=$BUILD_DATE
 
-USER labdog
+USER unbork
 EXPOSE 8000
 
 # Lets container orchestrators (Docker, k8s, compose) detect a stuck
@@ -148,7 +148,7 @@ EXPOSE 8000
 # component in its body.
 # app.healthcheck does exactly that for the default "all" and the "api"
 # role, and the matching check for the split worker / beat roles
-# (LABDOG_ROLE), which serve no HTTP.
+# (UNBORK_ROLE), which serve no HTTP.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -m app.healthcheck || exit 1
 

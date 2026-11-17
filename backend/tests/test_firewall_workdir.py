@@ -9,7 +9,7 @@ Any local user on that host could pre-create or symlink those names and
 choose what root read back: which ruleset gets restored when the switch
 fires, or which process id gets signalled. ``fs.protected_regular``
 blunts the write side on modern kernels; it does nothing about the read
-side, and it is a kernel setting LabDog does not control on hosts it
+side, and it is a kernel setting unbork does not control on hosts it
 manages.
 
 The plays now register an ``ansible.builtin.tempfile`` directory — 0700,
@@ -75,7 +75,7 @@ class TestNoGuessablePathsRemain:
             assert kill_tasks, f"{backend}: expected a cancel-revert task"
             for task in kill_tasks:
                 shell = task["ansible.builtin.shell"]
-                assert "{{ labdog_fw_tmp.path }}" in shell
+                assert "{{ unbork_fw_tmp.path }}" in shell
                 assert "/tmp/" not in shell
 
 
@@ -87,7 +87,7 @@ class TestTheWorkingDirectoryIsCreatedFirst:
         for backend in BACKENDS:
             first = _tasks(backend)[0]
             assert "ansible.builtin.tempfile" in first
-            assert first["register"] == "labdog_fw_tmp"
+            assert first["register"] == "unbork_fw_tmp"
 
     def test_it_asks_for_a_directory_not_a_file(self):
         for backend in BACKENDS:
@@ -98,7 +98,7 @@ class TestTheWorkingDirectoryIsCreatedFirst:
         """An operator finding one left behind after a failed sync
         should be able to tell where it came from."""
         for backend in BACKENDS:
-            assert _tasks(backend)[0]["ansible.builtin.tempfile"]["prefix"].startswith("labdog")
+            assert _tasks(backend)[0]["ansible.builtin.tempfile"]["prefix"].startswith("unbork")
 
 
 class TestEveryReferenceUsesIt:
@@ -119,7 +119,7 @@ class TestEveryReferenceUsesIt:
                 if "deadman" in t["name"].lower() or "automatic revert in" in t["name"].lower()
             )
             shell = revert["ansible.builtin.shell"]
-            assert shell.count("{{ labdog_fw_tmp.path }}") >= 2
+            assert shell.count("{{ unbork_fw_tmp.path }}") >= 2
 
 
 class TestCleanupRemovesTheDirectory:
@@ -127,7 +127,7 @@ class TestCleanupRemovesTheDirectory:
         for backend in BACKENDS:
             cleanup = _tasks(backend)[-1]
             assert cleanup["ansible.builtin.file"]["state"] == "absent"
-            assert cleanup["ansible.builtin.file"]["path"] == "{{ labdog_fw_tmp.path }}"
+            assert cleanup["ansible.builtin.file"]["path"] == "{{ unbork_fw_tmp.path }}"
 
     def test_cleanup_happens_after_the_revert_is_cancelled(self):
         """Removing the backups while the deadman's switch could still
