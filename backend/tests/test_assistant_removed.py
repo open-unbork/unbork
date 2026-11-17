@@ -301,3 +301,30 @@ async def test_ai_verify_is_inconclusive_without_the_assistant(db, assistant_off
     assert outcome.verdict == "inconclusive"
     assert outcome.passed is False
     assert "not part of this install" in outcome.detail
+
+
+async def test_a_rollback_left_running_does_not_hold_the_host(db, assistant_off):
+    """Only the assistant's sweep closes a stale rollback; without it the
+    row must not block every later op on the host."""
+    from app.ai.models import AIRollback
+    from app.tasks.host_lock import check_host_busy
+    from tests.conftest import create_host
+
+    host = await create_host(db)
+    db.add(
+        AIRollback(
+            host_id=host.id,
+            hostname=host.hostname,
+            trigger="automatic",
+            status="running",
+            started_at=datetime.now(UTC),
+        )
+    )
+    await db.flush()
+    assert await check_host_busy(db, host.id) is None
+    settings.assistant.enabled = True
+    try:
+        busy = await check_host_busy(db, host.id)
+    finally:
+        settings.assistant.enabled = False
+    assert busy is not None and busy.kind == "ai_rollback"
