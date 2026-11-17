@@ -111,20 +111,17 @@ class TestStateDir:
 
 
 class TestWithoutAToken:
-    """The operator authenticated Claude Code on the host and wants
-    unbork to use that login. Touching anything here breaks exactly the
-    setup it is meant to serve."""
+    """The operator's own sign-in on the server is used (S-014). Only the
+    config directory is pinned, so that sign-in survives a restart."""
 
-    def test_the_overlay_is_empty(self) -> None:
-        assert build_sdk_env(None) == {}
+    def test_the_config_dir_is_pinned(self) -> None:
+        assert build_sdk_env(None, inherited={}) == {CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
 
     def test_an_empty_string_counts_as_no_token(self) -> None:
-        assert build_sdk_env("") == {}
+        assert build_sdk_env("", inherited={}) == {CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
 
-    def test_the_host_login_is_not_isolated_away(self) -> None:
-        """Pinning CLAUDE_CONFIG_DIR would point the CLI at an empty
-        directory and lose the very login being borrowed."""
-        assert CONFIG_DIR_ENV not in build_sdk_env(None)
+    def test_an_operator_config_dir_wins(self) -> None:
+        assert build_sdk_env(None, inherited={CONFIG_DIR_ENV: "/srv/claude"}) == {}
 
     def test_host_credentials_are_left_intact(self) -> None:
         env = build_sdk_env(None, inherited={"ANTHROPIC_API_KEY": "the-host-key"})

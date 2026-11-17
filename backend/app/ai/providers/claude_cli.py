@@ -115,16 +115,18 @@ def build_cli_env(
 
     With a token: inject it, drop the two variables that would silently
     take precedence over it, and isolate the config directory so a stored
-    login cannot do the same thing from disk.
+    login cannot do the same thing from disk. Only a provider saved by an
+    earlier version still holds a token (S-014): new ones take none.
 
-    Without one: pass the environment through untouched. That case is an
-    operator who authenticated the CLI on the host and wants unbork to use
-    it, so neither the credential variables nor the config directory may be
-    disturbed — isolating the config directory here would break exactly the
-    setup it is meant to serve.
+    Without one: the operator's own sign-in on the server is used. The
+    config directory is pinned to unbork's state directory, unless the
+    service environment already sets ``CLAUDE_CONFIG_DIR``, so a sign-in
+    made as the docs describe survives a restart or a replaced container.
+    The credential variables are left alone.
     """
     env = dict(os.environ if base is None else base)
     if not oauth_token:
+        env.setdefault(CONFIG_DIR_ENV, config_dir)
         return env
     env[OAUTH_TOKEN_ENV] = oauth_token
     env[CONFIG_DIR_ENV] = config_dir
@@ -166,13 +168,13 @@ class ClaudeCLIProvider:
     def _ensure_config_dir(self) -> None:
         """Create the isolated config directory, best effort.
 
-        Only relevant when a token is configured — that is the only case
-        where the directory is used at all. The CLI runs fine without it
-        (a missing directory just means no persisted state), so a failure
-        here must not stop a session from starting; it is logged and left
-        alone.
+        Only when the CLI's environment points at it: a ``CLAUDE_CONFIG_DIR``
+        the service environment sets is the operator's to create. The CLI
+        runs fine without it (a missing directory just means no persisted
+        state), so a failure here must not stop a session from starting; it
+        is logged and left alone.
         """
-        if not self.oauth_token:
+        if self.env.get(CONFIG_DIR_ENV) != self.config_dir:
             return
         try:
             os.makedirs(self.config_dir, exist_ok=True)

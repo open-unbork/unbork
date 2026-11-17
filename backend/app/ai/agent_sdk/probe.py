@@ -112,8 +112,8 @@ async def test_connection(provider: AIProvider) -> str:
         # silent-auth-failure took. Treat it as a failure, not a pass.
         raise LLMProviderError(
             f"The Claude Code program ({version}) started but returned nothing. That usually means "
-            "the subscription token was rejected — regenerate it with "
-            "'claude setup-token' and paste the value it prints last."
+            "the sign-in was rejected. Sign in to Claude Code on the server again "
+            "as docs/ui/assistant.md describes (Signing in)."
         )
 
     return (

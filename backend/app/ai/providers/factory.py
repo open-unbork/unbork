@@ -91,8 +91,10 @@ def runs_on_agent_sdk(provider: AIProvider) -> bool:
     return provider.provider_type in SDK_BACKED_TYPES
 
 
-#: Backends whose stored credential is a Claude subscription token from
-#: ``claude setup-token`` rather than an API key. Both drive Claude Code.
+#: Backends that run the Claude Code program and authenticate a Claude plan
+#: rather than an API key. Since S-014 they take no credential: they use the
+#: service account's own sign-in, and a token is only present on a provider
+#: saved by an earlier version.
 #:
 #: The distinction is not cosmetic: such a token lasts one year, so it has
 #: an expiry an API key does not, and it authenticates a *plan* whose usage
@@ -186,11 +188,10 @@ def build_provider(provider: AIProvider) -> LLMProvider:
         )
 
     if provider.provider_type == "claude_cli":
-        # The encrypted secret column carries a subscription OAuth token here
-        # (from `claude setup-token`) rather than an API key, so it reuses the
-        # same AES-256-GCM storage, redaction, and key rotation as every other
-        # unbork credential. Blank means "use whatever the host is already
-        # authenticated with".
+        # Legacy (S-014): a provider saved by an earlier version may still
+        # hold a subscription OAuth token in the encrypted secret column. It
+        # is used until the operator removes it; the API accepts no new one.
+        # Blank, the normal case, uses the service account's own sign-in.
         return ClaudeCLIProvider(model=provider.model or None, oauth_token=api_key)
 
     raise LLMProviderError(f"Unknown provider type {provider.provider_type!r}")

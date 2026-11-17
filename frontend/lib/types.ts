@@ -1175,8 +1175,9 @@ export interface AIProvider {
   uses_subscription: boolean
   /**
    * When the stored credential stops working, for backends whose credential
-   * expires. `claude setup-token` mints a one-year token; API-key providers
-   * get null because their keys do not expire on a schedule.
+   * expires: a one-year subscription token saved by an earlier version
+   * (S-014). Null otherwise, including API-key providers, whose keys do not
+   * expire on a schedule.
    */
   credential_expires_at: string | null
   input_cost_per_mtok: number

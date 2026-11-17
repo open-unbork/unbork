@@ -87,23 +87,23 @@ def build_sdk_env(
 ) -> dict[str, str]:
     """The ``ClaudeAgentOptions.env`` overlay for one session.
 
-    With a token: inject it, blank out the variables that would otherwise
+    With a token (only a provider saved by an earlier version still holds
+    one, S-014): inject it, blank out the variables that would otherwise
     take precedence, and pin the config directory so a stored login cannot
     shadow it from disk.
 
-    Without one: return an empty overlay. That case is an operator who
-    authenticated Claude Code on the host and wants unbork to use that
-    login, so neither the credential variables nor the config directory may
-    be disturbed — pinning the config directory here would break exactly
-    the setup it is meant to serve.
+    Without one: the operator's own sign-in on the server is used. Pin the
+    config directory to unbork's state directory, unless the service
+    environment already sets ``CLAUDE_CONFIG_DIR``, so that sign-in
+    survives a restart. The credential variables are left alone.
 
     ``inherited`` is only read to decide which variables actually need
     neutralising; it defaults to the real environment.
     """
-    if not oauth_token:
-        return {}
-
     source = os.environ if inherited is None else inherited
+    if not oauth_token:
+        return {} if source.get(CONFIG_DIR_ENV) else {CONFIG_DIR_ENV: config_dir}
+
     env: dict[str, str] = {
         OAUTH_TOKEN_ENV: oauth_token,
         CONFIG_DIR_ENV: config_dir,

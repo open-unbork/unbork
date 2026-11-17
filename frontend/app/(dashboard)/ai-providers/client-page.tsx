@@ -35,9 +35,10 @@ const TYPE_HELP: Record<AIProviderType, string> = {
 /**
  * Backends that run the Claude Code program rather than call an HTTP API.
  *
- * Both authenticate with a subscription token from `claude setup-token`,
- * neither has a base URL, and neither is billed per token — so the form
- * treats them alike everywhere except capability.
+ * Both use the Claude Code sign-in of the service account on the server
+ * and take no credential here (S-014), neither has a base URL, and neither
+ * is billed per token — so the form treats them alike everywhere except
+ * capability.
  */
 const CLAUDE_CODE_TYPES = new Set<AIProviderType>(["claude_cli", "claude_agent"])
 
@@ -112,21 +113,19 @@ function isCredentialUrgent(provider: AIProvider): boolean {
 }
 
 /**
- * When a subscription token runs out.
+ * When a subscription token saved by an earlier version runs out.
  *
- * `claude setup-token` mints a one-year token, and Anthropic's own docs
- * warn that an unattended session "stops making progress once the
- * credential expires and can't recover". unbork's scheduled checks are
- * exactly that, so the first sign of an expired token would otherwise be
- * nightly runs quietly failing. API-key providers get nothing here —
- * their keys do not expire on a schedule.
+ * New providers of these types hold no token (S-014); one saved before
+ * still works until it expires or is removed, and an unattended session
+ * on an expired one stops making progress. API-key providers get nothing
+ * here — their keys do not expire on a schedule.
  */
 function describeCredentialExpiry(provider: AIProvider): string | null {
   const days = daysUntilExpiry(provider)
   if (days === null) return null
-  if (days < 0) return "token expired — run claude setup-token again"
-  if (days <= CREDENTIAL_WARN_DAYS) return `token expires in ${days} day${days === 1 ? "" : "s"}`
-  return `token expires in ${Math.round(days / 30)} months`
+  if (days < 0) return "stored token expired — remove it to use the server sign-in"
+  if (days <= CREDENTIAL_WARN_DAYS) return `stored token expires in ${days} day${days === 1 ? "" : "s"}`
+  return `stored token expires in ${Math.round(days / 30)} months`
 }
 
 /**
@@ -302,7 +301,8 @@ export default function AIProvidersPage() {
         verify_ssl: form.verify_ssl,
       }
       // Omitting the key on edit keeps the stored one; sending "" clears it.
-      if (form.api_key || !editing) body.api_key = form.api_key || null
+      // The program-backed types take no credential (S-014).
+      if (!isClaudeProgramBacked(form.provider_type) && (form.api_key || !editing)) body.api_key = form.api_key || null
 
       return editing
         ? apiFetch<AIProvider>(`/api/ai/providers/${editing.id}`, {
@@ -326,6 +326,19 @@ export default function AIProvidersPage() {
     onSuccess: () => {
       setDeleting(null)
       queryClient.invalidateQueries({ queryKey: ["ai-providers"] })
+    },
+  })
+
+  // S-014: a token an earlier version stored is used until it is removed.
+  const clearToken = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<AIProvider>(`/api/ai/providers/${id}`, { method: "PATCH", json: { api_key: "" } }),
+    onSuccess: (updated) => {
+      setEditing(updated)
+      queryClient.invalidateQueries({ queryKey: ["ai-providers"] })
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof ApiError ? err.message : "Could not remove the stored token.")
     },
   })
 
@@ -528,45 +541,50 @@ export default function AIProvidersPage() {
             <Help>For Ollama the tag you pulled, for a hosted API the published model id. Pick a suggestion to fill this in, or type any name the endpoint serves.</Help>
           </Field>
 
-          <Field label={claude ? "subscription token" : "api key"} htmlFor="api_key" hint={form.provider_type === "anthropic" ? "required" : editing?.has_api_key ? "stored — blank keeps it" : undefined}>
-            <input
-              id="api_key"
-              type="password"
-              className="inp mono"
-              autoComplete="off"
-              value={form.api_key}
-              onChange={(e) => setField("api_key", e.target.value)}
-              placeholder={
-                editing?.has_api_key
-                  ? "stored — leave blank to keep it"
-                  : claude
-                    ? "sk-ant-oat01-… from `claude setup-token` — blank uses the host's own login"
+          {claude ? (
+            <>
+              <div className="text-[11.5px] text-text-3">
+                This type takes no credential. It uses the Claude Code sign-in of the unbork service account on this server, kept in unbork&apos;s state directory so it survives a restart. Sign in once from a
+                shell on the server as described in{" "}
+                <a href="https://open-unbork.github.io/unbork/ui/assistant/#signing-in" className="text-ld-accent" target="_blank" rel="noreferrer">
+                  the assistant guide, Signing in
+                </a>
+                . Sessions count against that account&apos;s plan, so use your own sign-in on your own instance.
+              </div>
+              {editing?.has_api_key && (
+                <Banner tone="warn">
+                  This provider still holds a subscription token saved by an earlier version. It is used until you remove it.{" "}
+                  <button type="button" className="btn btn-sm" onClick={() => clearToken.mutate(editing.id)} disabled={clearToken.isPending}>
+                    {clearToken.isPending ? "Removing…" : "Remove stored token"}
+                  </button>
+                </Banner>
+              )}
+            </>
+          ) : (
+            <Field label="api key" htmlFor="api_key" hint={form.provider_type === "anthropic" ? "required" : editing?.has_api_key ? "stored — blank keeps it" : undefined}>
+              <input
+                id="api_key"
+                type="password"
+                className="inp mono"
+                autoComplete="off"
+                value={form.api_key}
+                onChange={(e) => setField("api_key", e.target.value)}
+                placeholder={
+                  editing?.has_api_key
+                    ? "stored — leave blank to keep it"
                     : form.provider_type === "anthropic"
                       ? "sk-ant-… from platform.claude.com"
                       : "leave blank for an unauthenticated local server"
-              }
-            />
-            {form.provider_type === "anthropic" && (
-              <Help summary="where to get one">
-                Create one in the Claude Console at <span className="mono">platform.claude.com</span> under API keys. It starts with <span className="mono">sk-ant-</span> and is billed per token. A Pro or Max
-                subscription does not cover API usage — to spend against a subscription instead, use the Claude agent or Claude single-shot type.
-              </Help>
-            )}
-            {claude && (
-              <Help summary="how to get one, and what it authenticates as">
-                Run <span className="mono">claude setup-token</span> on your own machine, not the server. It shows three strings in turn, and only the last belongs here: an <strong>authorize URL</strong> to open in a
-                browser, an <strong>authorization code</strong> to paste back at the terminal, then the <strong>token</strong> starting <span className="mono">sk-ant-oat01-</span> — that is this field. It is stored
-                encrypted, like every other unbork credential, and injected only into the CLI process; leave it blank to use whatever the host is already logged in as. The token lasts a year, and sessions count against
-                your plan&apos;s usage limits — the same ones the Claude apps use. Anthropic&apos;s terms allow this for your own use but not for routing other people&apos;s requests through your plan, so use your own
-                token on your own instance and pick an API-key provider if you run unbork for someone else.
-                <br />
-                <br />
-                Two things outrank this token in Claude Code&apos;s own credential order, and both would quietly authenticate as a different account: the <span className="mono">ANTHROPIC_API_KEY</span> and{" "}
-                <span className="mono">ANTHROPIC_AUTH_TOKEN</span> environment variables, and a login left on disk by <span className="mono">claude login</span>. When a token is set unbork neutralises both variables and
-                points Claude Code at its own config directory, so neither can shadow what you enter here.
-              </Help>
-            )}
-          </Field>
+                }
+              />
+              {form.provider_type === "anthropic" && (
+                <Help summary="where to get one">
+                  Create one in the Claude Console at <span className="mono">platform.claude.com</span> under API keys. It starts with <span className="mono">sk-ant-</span> and is billed per token. A Pro or Max
+                  subscription does not cover API usage — to spend against a subscription instead, use the Claude agent or Claude single-shot type.
+                </Help>
+              )}
+            </Field>
+          )}
 
           {/*
             Every field below is inert on a subscription, and a Monthly
