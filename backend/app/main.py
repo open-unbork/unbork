@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from starlette.responses import FileResponse, RedirectResponse
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.api._repo_scan import router as repo_scan_router
 from app.api.action_packs import router as action_packs_router
@@ -935,7 +935,13 @@ def _add_spa_fallback(app: FastAPI) -> None:
 
         @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa_fallback(full_path: str):
-            """Serve static files; fall back to index.html for SPA routes."""
+            """Serve static files; fall back to index.html for SPA routes.
+
+            Not for ``/api/``: an API path no router has (a removed one,
+            such as the assistant's, or a typo) answers a JSON 404, not
+            the page shell with 200."""
+            if full_path == "api" or full_path.startswith("api/"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             file_path = static_dir / full_path
             if full_path and not file_path.resolve().is_relative_to(static_dir.resolve()):
                 return _serve(index_html)

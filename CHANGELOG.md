@@ -211,6 +211,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Fixed
 
+- An API path that no route serves (`GET /api/...`), such as the
+  assistant's on a server without it, now answers a JSON 404 instead of
+  the web page with status 200.
 - Firewall rule and chain policy changes are now written to the audit
   log, like every other module's: create, update, delete, reorder, and
   a group's input and output policy (BUG-147).

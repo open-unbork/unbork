@@ -324,3 +324,33 @@ class TestRealExportSegmentObjects:
         assert '{"n":"id","t":"d","k":"7"' in content
         assert '"c":["","hosts","7","actions","runs","377",""]' in content
         assert "placeholder" not in content
+
+
+class TestApiPathsAreNotTheShell:
+    """Stage 2 live check: with the assistant left out, ``GET
+    /api/ai/providers`` answered 200 with the page shell, because the
+    catch-all served index.html for every unmatched GET."""
+
+    @pytest.fixture
+    def client(self, export_dir, monkeypatch):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        import app.main as main
+
+        monkeypatch.setattr(main, "_resolve_static_dir", lambda: export_dir)
+        app = FastAPI()
+        main._add_spa_fallback(app)
+        return TestClient(app)
+
+    @pytest.mark.parametrize("path", ["/api", "/api/", "/api/ai/providers", "/api/nonexistent"])
+    def test_an_unknown_api_path_is_a_json_404(self, client, path):
+        r = client.get(path)
+        assert r.status_code == 404
+        assert r.json() == {"detail": "Not Found"}
+
+    @pytest.mark.parametrize("path", ["/", "/settings", "/apis-overview"])
+    def test_page_routes_still_get_the_shell(self, client, path):
+        r = client.get(path)
+        assert r.status_code == 200
+        assert "shell" in r.text
