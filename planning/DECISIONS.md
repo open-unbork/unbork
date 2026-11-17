@@ -20,58 +20,16 @@ GitHub account that is not on the allowlist, to prove the check on a pull
 request from a fork. Everything else is settled: see D-48 in the log.
 
 ### D-49 How to close the CLA allowlist's name loophole (contact address still open)
+Parked: Dennis put all CCLA work on hold on 2026-11-16.
 Item: S-011. The CCLA README tells a company to send the CCLA "to the
 maintainer" and has no address. Which contact address should it give
 (the same question as D-31's source-offer address)? The loophole half was
 answered 2026-11-16 (see the Log).
 
-### D-26 A destructive run on a host that cannot be snapshotted
-Item: C-005. Today it proceeds with a log line. Assumed: refuse by
-default, with a setting to get the old behaviour back. This will stop
-existing schedules on hosts without a VM mapping.
-
-### D-27 How far the rollback policy goes
-Item: C-004. Assumed: the two fields are per host only (the board also
-sketches them on groups), and the `confirm` mode is included, which makes
-the item larger than M. Alternative: split `confirm` into its own item.
-
-### D-28 What a protected host refuses
-Item: C-016. Assumed: config writes only (sync, CA certificates, post-run
-hooks). The board also wants actions refused unless the manifest opts in
-and the assistant held to read-only commands: see PR-12.
-
-### D-29 How long the old names keep working
-Items: C-048 to C-050. Assumed: old on-host markers are recognised with
-no end date; every other old name works for all of 2.x. The `labdog`
-system user is renamed in place.
-
-### D-30 Where Claude Code is installed from, and the new labels
-Items: S-009, S-008. Assumed: the binary comes from the pinned
-`claude-agent-sdk` wheel, hash-checked against the lock file; labels
-become "Claude agent" and "Claude single-shot".
-
 ### D-31 Source offer wording and contact address
+Parked with the CCLA work (2026-11-16), since it needs the same address.
 Blocks: finishing S-010. Dennis supplies the address and signs off the
 text.
-
-### D-32 Release details
-Items: C-002, C-024, C-064. A `2.0.0-rc.1` first, or straight to 2.0.0
-(assumed)? `planning/` reaches `main` with the release PR (assumed yes)?
-Delete the stale floating `:test` tag on Docker Hub (assumed: leave it)?
-
-### D-33 Who may create API tokens
-Item: C-030. May every role create tokens for itself, and are tokens
-without a user (service accounts) wanted? The spec states its assumption.
-
-### D-34 What a refused or deferred run looks like to the caller
-Item: S-002. Assumed: the request is accepted and the run then fails or
-waits with the reason shown; a gate that raises counts as a refusal.
-Alternative: ask the gate in the API as well and answer 409.
-
-### D-35 Verify while quiesced
-Items: C-014, C-015. Assumed: quiesce closes the service to everything
-but loopback, so verify still works. Alternative: let a pack ask for
-unquiesce before verify.
 
 ### D-36 kennel shape
 Parked with kennel (D-45). The questions to settle before it is taken up
@@ -101,6 +59,19 @@ summary in the project's shared files (`kennel/kennel-status.md`).
 
 | Date | Decision | By |
 |---|---|---|
+| 2026-11-16 | D-52: Open proposals taken as recommended. Accepted: PR-13, PR-16 (split out of C-033), PR-18, PR-20, PR-21 (its next step only: rerun the baseline in two-host mode and with more sync slots, then decide), and the stage 1 review's PR-22 to PR-30, bundled as one "run gate follow-ups" item (PR-22 to PR-25, before the first Enterprise gate ships) and one "stage 1 tidy-up" item (PR-26 to PR-30, PR-28 first; PR-26 caps a reorder at 1,000 ids). Deferred: PR-14 (until a user needs it), PR-15 (with kennel), PR-17 (to C-038's stage), Enterprise PR-18 (while D-16 is on hold). PR-12 is in C-016 (D-28). | Dennis (decision card) |
+| 2026-11-16 | D-35: Quiesce closes the service to everything but loopback, so verify still works (C-014, C-015). Packs cannot ask for unquiesce before verify. | Dennis (decision card) |
+| 2026-11-16 | D-34: A run a gate refuses or defers is accepted, then fails or waits with the reason shown; a gate that raises refuses. No 409 at the API. As built in S-002. | Dennis (decision card) |
+| 2026-11-16 | D-33: Every role may create API tokens for itself (`tokens.manage` on viewer, operator and admin); a token acts as its user. No service accounts (C-030). | Dennis (decision card) |
+| 2026-11-16 | D-30: Claude Code is installed from the pinned `claude-agent-sdk` wheel, hash-checked against the lock file; labels become "Claude agent" and "Claude single-shot" (S-009, S-008). | Dennis (decision card) |
+| 2026-11-16 | D-29: Revises D-02. No fallbacks for the old names: 2.0 uses only the new ones (env prefix, paths, packages, user, metrics, alert labels, on-host markers), with no code to migrate or clean up old names on hosts. Dennis cleans up his own install and hosts by hand, since nobody else runs LabDog. C-048 to C-050 shrink accordingly. | Dennis, in the open-decisions thread |
+| 2026-11-16 | D-28: A protected host refuses config writes (sync, CA certificates, post-run hooks), action runs unless the manifest opts in, and any assistant command that is not read-only. PR-12 is folded into C-016, which grows by about an M and adds a manifest field to the pack contract. Setting protection needs `config.edit`; lifting it needs an admin (a global check). | Dennis (decision cards) |
+| 2026-11-16 | D-27: The rollback policy (C-004) is per host only, with the `confirm` mode included, since `stateful` defaults to `confirm`. C-004 grows beyond M. | Dennis (decision card) |
+| 2026-11-16 | D-26: A destructive run on a host that cannot be snapshotted is refused by default, with a setting to restore the old behaviour (C-005). The release notes and an upgrade check list the schedules this stops. | Dennis (decision card) |
+| 2026-11-16 | D-51: Extension periodic jobs keep the 10-second minimum interval (S-015, as built). | Dennis (decision card) |
+| 2026-11-16 | D-50: A permission an extension registers goes to admin only unless the extension names more roles (S-016, as built). | Dennis, in the open-decisions thread |
+| 2026-11-16 | D-32: Release details. A `2.0.0-rc.1` comes before 2.0.0; `planning/` reaches `main` with the release PR; the stale floating `:test` tag on Docker Hub is left alone. | Dennis (decision cards) |
+| 2026-11-16 | CCLA work (D-49's contact address) and D-31 are parked. | Dennis |
 | 2026-11-16 | D-49: Close the CLA name loophole with option (b): a second job in `cla.yml` (both repositories) fails a pull request from a fork while any commit is linked to no GitHub account as author or committer. `Claude` stays in the allowlist for the maintainer's own branches; the job also fails fork commits attributed to an allowlisted account other than the PR author, since a git email is not proof of identity. The CCLA contact address is still open. | Dennis |
 | 2026-11-15 | D-48: For the CLA check (S-011): the private repository `open-unbork/cla-signatures` exists; the token is the organisation secret `PERSONAL_ACCESS_TOKEN`, scoped to `unbork` and `unbork-playbooks`; the suggested allowlist is accepted (Dennis's own login, the Dependabot and GitHub Actions bots, and the Claude app's bot); the CLA texts live in this repository under `legal/cla/v1/`. | Dennis |
 | 2026-11-15 | D-46: The Community hooks S-015 to S-020 and the Enterprise item that follows the rename stay scheduled items, not proposals. | Dennis (decision card) |

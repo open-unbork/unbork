@@ -17,16 +17,16 @@ later and are unranked.
 | PR-05 | Bring CLAUDE.md up to date | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-051 |
 | PR-06 | A unit-test harness for the frontend | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-061 |
 | PR-07 | Measure coverage in CI and record a load-test baseline | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-062, C-063 |
-| PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | open |
-| PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | open |
-| PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | open |
-| PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | open |
-| PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | open |
-| PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | open |
-| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | open |
+| PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | accepted 2026-11-16 (D-28), folded into C-016 |
+| PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | accepted 2026-11-16, to be scheduled |
+| PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | deferred 2026-11-16, until a user needs it |
+| PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | deferred 2026-11-16, with kennel |
+| PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | accepted 2026-11-16, split out of C-033, to be scheduled |
+| PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | deferred 2026-11-16, to C-038's stage |
+| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | accepted 2026-11-16, any stage |
 | PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16 (D-49 option b), done in S-011 |
-| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | open |
-| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | open |
+| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16, to be scheduled |
+| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | accepted 2026-11-16 for its next step only (rerun, then decide) |
 
 ## PR-01 Audit rows for firewall rule changes
 - **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has
@@ -161,7 +161,7 @@ later and are unranked.
   skips them for the tick.
 - **Fix:** ask the gate first, then lock and re-check the host, or commit
   and release the lock around the gate call. Also consider a timeout per
-  gate call in `check_run`. Community, S. Status: open.
+  gate call in `check_run`. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-23 Make a long run-gate hold cheap
 - **Finding (stage 1 review, medium):** each held sync or action run goes
@@ -172,7 +172,7 @@ later and are unranked.
 - **Fix:** ask the gate in `retry_held` before sending, and push
   `gate_retry_at` forward on a repeated deferral, so a still-held row
   costs no task; load due rows in one query; tell gate authors to return
-  a real `retry_at`. Community, S. Status: open.
+  a real `retry_at`. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-24 A deferred schedule asks the gate every tick
 - **Finding (stage 1 review, low):** `_gate_schedule` ignores
@@ -180,7 +180,7 @@ later and are unranked.
   serial walk over schedules. With many due schedules and a slow gate a
   tick can outlast its interval.
 - **Fix:** keep the hold on the schedule (or cache it per tick) and skip
-  the gate until it passes. Community, S. Status: open.
+  the gate until it passes. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-25 An action run is gated once, before it waits for a host
 - **Finding (stage 1 review, medium):** `gate_action_run` asks when the
@@ -190,14 +190,14 @@ later and are unranked.
   Documented in `CLAUDE.md` for now.
 - **Fix:** also ask in the per-host claim (`action_host`, `action_group`)
   when the run had to wait. Needs care with partial group runs (what a
-  refusal means for members already done). Community, M. Status: open.
+  refusal means for members already done). Community, M. Status: accepted 2026-11-16 (D-52).
 
 ## PR-26 Bound the firewall rule reorder
 - **Finding (stage 1 review, low):** `reorder_rules` loads one rule per
   id, and `RuleReorder.rule_ids` has no upper bound; the new audit row
   carries the whole list. 500 ids is 500 SELECTs and one ~50 KB row.
 - **Fix:** one `id.in_(rule_ids)` query and a `max_length` on the list
-  (an API change, so it needs a number). Community, S. Status: open.
+  (an API change, so it needs a number). Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-27 Small tidy-ups from the stage 1 review
 - **Finding (stage 1 review, low):** cross-module imports of underscore
@@ -209,7 +209,7 @@ later and are unranked.
   for one test; four copies of the contract-version test.
 - **Fix:** make the shared helpers public, share one small hook-registry
   helper, point the test at `app.client_ip`, keep one exact
-  `PLUGIN_API` test. Community, S. Status: open.
+  `PLUGIN_API` test. Community, S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-28 Audit host create, edit and delete
 - **Finding (stage 1 live check):** `POST /api/hosts` (and the host edit
@@ -219,7 +219,7 @@ later and are unranked.
   ... leaves an audit row") left short on the most basic object.
 - **Fix:** `log_action` create/update/delete on `host`, with the
   connection fields in before/after and no secrets. Community, S.
-  Status: open.
+  Status: accepted 2026-11-16 (D-52).
 
 ## PR-29 Log a successful plugin load in the Celery processes
 - **Finding (stage 1 live check):** core's "plugin ... loaded" line shows
@@ -228,14 +228,14 @@ later and are unranked.
   INFO line is dropped (failures, at ERROR, do show).
 - **Fix:** log the loaded plugins again at `worker_ready` / `beat_init`
   from `loaded_plugins`, or configure logging before the signal. Community,
-  S. Status: open.
+  S. Status: accepted 2026-11-16 (D-52).
 
 ## PR-30 Clear pending_reason when a run starts
 - **Finding (stage 1 live check):** a sync or action run that waited
   (host busy, or held by a gate) keeps its `pending_reason` after it ran
   and finished, so a finished row still says "test hold".
 - **Fix:** clear it on claim, or show it only while `pending`. Community,
-  S. Status: open.
+  S. Status: accepted 2026-11-16 (D-52).
 
 ## Other work Dennis asked to add
 
