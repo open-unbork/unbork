@@ -451,6 +451,14 @@ after them, none of which Community uses itself:
   Call it in `register(app)` *before* importing the routes that use it:
   `require()` checks the name at import. Repeating the same registration
   is a no-op; a core name or other roles are refused.
+- `app/ai/providers/policy.py` (1.7): `set_provider_type_policy(fn)`
+  limits which AI provider types the install accepts; `fn(type)` returns
+  `None` to allow or a sentence to refuse. A refused type is refused on
+  create, update and test (`app/api/ai.py`) and for every session in
+  `resolve_provider()` (`app/ai/service.py`), and the form leaves it out
+  (`GET /api/ai/provider-types`). A stored provider of that type is never
+  deleted or changed; it shows `refused_reason`. A policy that raises
+  refuses every type.
 
 The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
 sections and Users-page edit panels, empty in Community. The Enterprise

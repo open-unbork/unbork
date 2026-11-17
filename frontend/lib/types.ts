@@ -1180,12 +1180,21 @@ export interface AIProvider {
    * expire on a schedule.
    */
   credential_expires_at: string | null
+  /** Why an extension's provider policy refuses this type (S-017); null when allowed. */
+  refused_reason: string | null
   input_cost_per_mtok: number
   output_cost_per_mtok: number
   monthly_budget: number
   enabled: boolean
   created_at: string
   updated_at: string
+}
+
+/** One row of GET /api/ai/provider-types: whether this install accepts the type. */
+export interface AIProviderTypeInfo {
+  type: AIProviderType
+  allowed: boolean
+  reason: string | null
 }
 
 export interface AIProviderTestResult {

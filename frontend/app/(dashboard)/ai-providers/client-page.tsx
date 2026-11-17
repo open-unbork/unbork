@@ -8,7 +8,7 @@ import { UsagePanel } from "@/components/ai/usage-panel"
 import { Banner, Confirm, Field, Help, Modal, PageHead, Panel, Table, Tag } from "@/components/ld"
 import { MODEL_PRESETS, type ModelPreset } from "@/lib/ai-presets"
 import { apiFetch, ApiError } from "@/lib/api"
-import type { AIProvider, AIProviderTestResult, AIProviderType } from "@/lib/types"
+import type { AIProvider, AIProviderTestResult, AIProviderType, AIProviderTypeInfo } from "@/lib/types"
 
 const CRUMBS = [
   { label: "settings", href: "/settings" },
@@ -212,6 +212,17 @@ export default function AIProvidersPage() {
   })
   const currency = usage?.currency ?? "USD"
 
+  // An extension may refuse some provider types (S-017). Until the list
+  // arrives every type is offered; the API refuses a refused one anyway.
+  const { data: typeInfo } = useQuery<AIProviderTypeInfo[]>({
+    queryKey: ["ai-provider-types"],
+    queryFn: () => apiFetch<AIProviderTypeInfo[]>("/api/ai/provider-types"),
+    staleTime: 300_000,
+  })
+  const allowedTypes = (Object.keys(TYPE_LABEL) as AIProviderType[]).filter(
+    (t) => typeInfo?.find((i) => i.type === t)?.allowed !== false,
+  )
+
   const presets = MODEL_PRESETS[form.provider_type] ?? []
 
   /**
@@ -261,7 +272,8 @@ export default function AIProvidersPage() {
 
   function openCreate() {
     setEditing(null)
-    setForm(EMPTY_FORM)
+    const start = allowedTypes.includes(EMPTY_FORM.provider_type) ? EMPTY_FORM.provider_type : allowedTypes[0]
+    setForm(start && start !== EMPTY_FORM.provider_type ? { ...EMPTY_FORM, provider_type: start, base_url: BASE_URL_DEFAULT[start] } : EMPTY_FORM)
     setError(null)
     setDialogOpen(true)
   }
@@ -398,6 +410,7 @@ export default function AIProvidersPage() {
                         {provider.is_default && <Tag tone="accent">default</Tag>}
                         {!provider.enabled && <Tag>disabled</Tag>}
                       </span>
+                      {provider.refused_reason && <span className="text-[11px] text-warn">{provider.refused_reason}</span>}
                       {result && (
                         <span className="text-[11px]" style={{ color: result.ok ? "var(--ok)" : "var(--danger)" }}>
                           {result.message}
@@ -444,7 +457,7 @@ export default function AIProvidersPage() {
                 sortable: false,
                 cell: (provider) => (
                   <span className="flex gap-0.5">
-                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => test.mutate(provider.id)} disabled={test.isPending}>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => test.mutate(provider.id)} disabled={test.isPending || !!provider.refused_reason}>
                       test
                     </button>
                     <button type="button" className="btn btn-sm btn-ghost" onClick={() => openEdit(provider)}>
@@ -493,7 +506,9 @@ export default function AIProvidersPage() {
             </Field>
             <Field label="type" htmlFor="provider_type">
               <select id="provider_type" className="inp" value={form.provider_type} onChange={(e) => changeType(e.target.value as AIProviderType)}>
-                {(Object.keys(TYPE_LABEL) as AIProviderType[]).map((t) => (
+                {(Object.keys(TYPE_LABEL) as AIProviderType[])
+                  .filter((t) => allowedTypes.includes(t) || t === editing?.provider_type)
+                  .map((t) => (
                   <option key={t} value={t}>
                     {TYPE_LABEL[t]}
                   </option>

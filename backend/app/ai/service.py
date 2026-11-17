@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.models import AIMessage, AIProvider, AISession, AIUsageDay
 from app.ai.providers.factory import sends_data_offsite, supports_tools
+from app.ai.providers.policy import provider_type_refusal
 from app.settings_service import get_setting_typed
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,10 @@ async def resolve_provider(db: AsyncSession, provider_id: int | None) -> AIProvi
                 "No default AI provider is configured. Add one under Integrations "
                 "or mark an existing provider as the default."
             )
+
+    refusal = provider_type_refusal(provider.provider_type)
+    if refusal:
+        raise AIDisabledError(f"Provider {provider.name!r}: {refusal}")
 
     if sends_data_offsite(provider):
         # One gate, deliberately. This used to also require a per-provider

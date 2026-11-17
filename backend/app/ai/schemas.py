@@ -124,6 +124,10 @@ class AIProviderResponse(BaseModel):
     #: an expired one stops a scheduled session dead — so this is computed
     #: and surfaced rather than left for the operator to remember.
     credential_expires_at: datetime | None
+    #: Why an extension's provider type policy refuses this provider's type
+    #: (S-017); null when it is allowed. A refused provider cannot be tested
+    #: or used until its type is changed.
+    refused_reason: str | None = None
     input_cost_per_mtok: float
     output_cost_per_mtok: float
     monthly_budget: float
@@ -157,6 +161,7 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
     # Imported here: factory pulls in the provider backends, which the
     # schema module itself has no need for.
     from app.ai.providers.factory import sends_data_offsite, supports_tools, uses_subscription
+    from app.ai.providers.policy import provider_type_refusal
 
     return AIProviderResponse(
         id=provider.id,
@@ -176,6 +181,7 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         sends_data_offsite=sends_data_offsite(provider),
         uses_subscription=uses_subscription(provider),
         credential_expires_at=credential_expiry(provider),
+        refused_reason=provider_type_refusal(provider.provider_type),
         input_cost_per_mtok=provider.input_cost_per_mtok,
         output_cost_per_mtok=provider.output_cost_per_mtok,
         monthly_budget=provider.monthly_budget,
@@ -183,6 +189,14 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         created_at=provider.created_at,
         updated_at=provider.updated_at,
     )
+
+
+class AIProviderTypeInfo(BaseModel):
+    """One provider type and whether this install accepts it (S-017)."""
+
+    type: str
+    allowed: bool
+    reason: str | None = None
 
 
 class AIProviderTestResponse(BaseModel):

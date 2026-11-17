@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import service
 from app.ai.loop import LoopCaps
 from app.ai.models import (
+    PROVIDER_TYPES,
     TERMINAL_SESSION_STATUSES,
     AIApprovalRequest,
     AIMessage,
@@ -33,12 +34,14 @@ from app.ai.providers.factory import (
     build_provider,
     runs_on_agent_sdk,
 )
+from app.ai.providers.policy import provider_type_refusal
 from app.ai.schemas import (
     AIApprovalDecision,
     AIApprovalResponse,
     AIProviderCreate,
     AIProviderResponse,
     AIProviderTestResponse,
+    AIProviderTypeInfo,
     AIProviderUpdate,
     AIRollbackRequest,
     AIRollbackResponse,
@@ -106,6 +109,23 @@ def _refuse_credential(provider_type: str, api_key: str | None) -> None:
         )
 
 
+def _refuse_provider_type(provider_type: str) -> None:
+    """400 when an extension's policy refuses ``provider_type`` (S-017)."""
+    refusal = provider_type_refusal(provider_type)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
+
+
+@router.get("/provider-types", response_model=list[AIProviderTypeInfo])
+async def list_provider_types(_: User = Depends(require("ai.use"))):
+    """Every provider type, and whether this install accepts it (S-017)."""
+    rows = []
+    for provider_type in PROVIDER_TYPES:
+        reason = provider_type_refusal(provider_type)
+        rows.append(AIProviderTypeInfo(type=provider_type, allowed=reason is None, reason=reason))
+    return rows
+
+
 @router.get("/providers", response_model=list[AIProviderResponse])
 async def list_providers(
     _: User = Depends(require("ai.use")),
@@ -144,6 +164,7 @@ async def create_provider(
         )
 
     _refuse_credential(payload.provider_type, payload.api_key)
+    _refuse_provider_type(payload.provider_type)
 
     provider = AIProvider(
         name=payload.name,
@@ -211,6 +232,10 @@ async def update_provider(
         )
 
     _refuse_credential(provider.provider_type, api_key)
+    # Checked against the type the row has after this update: moving a
+    # refused provider to an allowed type passes, any other edit of it is
+    # refused (S-017).
+    _refuse_provider_type(provider.provider_type)
 
     # Tri-state: absent keeps, "" clears, a value replaces.
     if api_key is not None:
@@ -270,6 +295,9 @@ async def test_provider(
     provider = await db.get(AIProvider, provider_id)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
+    refusal = provider_type_refusal(provider.provider_type)
+    if refusal:
+        return AIProviderTestResponse(ok=False, message=refusal)
     try:
         if runs_on_agent_sdk(provider):
             # No LLMProvider exists for these — the SDK owns the loop — so
