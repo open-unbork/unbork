@@ -75,8 +75,6 @@ that used to work, in any release. Its upgrade notes say so.
 
 ### Upgrading to 2.0.0: the rename
 
-<!-- old-name-ok: this section maps the old names to the new ones. -->
-
 2.0.0 is the first release under the name unbork. Every name an operator
 types or sees changed with it, and **the old names are not read any
 more**: there are no fallbacks, and nothing renames or removes old names
