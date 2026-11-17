@@ -42,6 +42,7 @@ from app.ai.providers.claude_cli import (
     DEFAULT_CONFIG_DIR,
     OAUTH_TOKEN_ENV,
     OVERRIDING_CREDENTIAL_ENV,
+    keeps_home_sign_in,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,9 @@ def build_sdk_env(
     """
     source = os.environ if inherited is None else inherited
     if not oauth_token:
-        return {} if source.get(CONFIG_DIR_ENV) else {CONFIG_DIR_ENV: config_dir}
+        if source.get(CONFIG_DIR_ENV) or keeps_home_sign_in(source, config_dir):
+            return {}
+        return {CONFIG_DIR_ENV: config_dir}
 
     env: dict[str, str] = {
         OAUTH_TOKEN_ENV: oauth_token,

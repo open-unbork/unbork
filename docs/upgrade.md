@@ -164,8 +164,9 @@ and "Claude single-shot" providers. It no longer does: the first time
 such a provider is turned on, tested or used, a worker downloads the
 build that this release pins from `files.pythonhosted.org`, checks its
 checksum and keeps it in `/var/lib/unbork/claude-code`. Until that
-finishes, such a provider shows "installing" and its sessions wait for
-the download; it happens once while the directory is kept.
+finishes, such a provider shows "installing" and a session started
+meanwhile is refused with "being installed; try again in a few minutes".
+It happens once while the directory is kept.
 
 - Add a volume for `/var/lib/unbork/claude-code` (see the compose file in
   [production-deploy.md](production-deploy.md)), or the program is
@@ -176,7 +177,27 @@ the download; it happens once while the directory is kept.
   Install a `claude` program on PATH for the `unbork` user yourself
   (a derived image, or a package install's system-wide install), and
   unbork uses that.
+- When the API and the workers run in separate containers
+  ([scaling-out.md](scaling-out.md)), share the `claude-code` volume
+  between them, as the packs volume is. The providers page and Test read
+  the API's copy; a worker that has none downloads its own on its first
+  session.
 - API-key providers need no program and are not affected.
+
+#### Claude Code sign-in
+
+The "Claude agent" and "Claude single-shot" providers take no token any
+more; they use a Claude Code sign-in made on the server, kept in
+`/var/lib/unbork/claude-cli` (see
+[Signing in](ui/assistant.md#signing-in)). A provider that holds a token
+saved by an earlier version keeps using it until you clear it on the AI
+providers page.
+
+If you signed in earlier in the service user's home directory
+(`~/.claude`) instead, unbork keeps using that sign-in until one exists
+in `/var/lib/unbork/claude-cli`. On Docker the home directory is not on a
+volume, so sign in again as the docs describe before you replace the
+container.
 
 ### Upgrading to 1.0.0
 

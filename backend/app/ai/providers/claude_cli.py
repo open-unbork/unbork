@@ -44,7 +44,8 @@ import asyncio
 import json
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
+from pathlib import Path
 
 from app.ai.providers.base import (
     LLMProviderError,
@@ -116,6 +117,25 @@ def program_path() -> str:
     return str(found) if found is not None else CLI_BINARY
 
 
+#: The program's sign-in file inside its config directory.
+CREDENTIALS_FILE = ".credentials.json"
+
+
+def keeps_home_sign_in(env: Mapping[str, str], config_dir: str) -> bool:
+    """Whether to leave the config directory alone for an older sign-in.
+
+    Before 2.0 a provider without a token read the program's default
+    directory, ``~/.claude``, so an operator may have signed in there. Until
+    there is a sign-in in ``config_dir``, pinning would hide that one; it is
+    used instead (S-014). Signing in as the docs now say moves to
+    ``config_dir`` for good.
+    """
+    if (Path(config_dir) / CREDENTIALS_FILE).is_file():
+        return False
+    home = env.get("HOME")
+    return bool(home) and (Path(home) / ".claude" / CREDENTIALS_FILE).is_file()
+
+
 def build_cli_env(
     oauth_token: str | None,
     base: dict[str, str] | None = None,
@@ -136,7 +156,8 @@ def build_cli_env(
     """
     env = dict(os.environ if base is None else base)
     if not oauth_token:
-        env.setdefault(CONFIG_DIR_ENV, config_dir)
+        if not keeps_home_sign_in(env, config_dir):
+            env.setdefault(CONFIG_DIR_ENV, config_dir)
         return env
     env[OAUTH_TOKEN_ENV] = oauth_token
     env[CONFIG_DIR_ENV] = config_dir

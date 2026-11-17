@@ -93,3 +93,9 @@ front of Postgres once the total grows.
   keep running the old playbook, or fail a new action as "not found in
   registry", until they restarted. Concurrent syncs into the shared
   volume are safe: the checkout lock is a Postgres advisory lock.
+* **One Claude Code program, shared** (only with a "Claude agent" or
+  "Claude single-shot" provider). Mount the same volume at
+  `/var/lib/unbork/claude-code` in the `api` container and every worker.
+  The providers page and Test read the API's copy and a worker
+  downloads it; with a disk each, the page keeps saying "installing" and
+  each worker downloads its own copy on its first session.
