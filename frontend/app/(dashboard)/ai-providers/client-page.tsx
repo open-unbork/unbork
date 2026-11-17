@@ -18,8 +18,8 @@ const CRUMBS = [
 const TYPE_LABEL: Record<AIProviderType, string> = {
   openai_compat: "OpenAI-compatible",
   anthropic: "Anthropic",
-  claude_agent: "Claude Code (agentic)",
-  claude_cli: "Claude Code (single-shot)",
+  claude_agent: "Claude agent",
+  claude_cli: "Claude single-shot",
 }
 
 const TYPE_HELP: Record<AIProviderType, string> = {
@@ -27,13 +27,13 @@ const TYPE_HELP: Record<AIProviderType, string> = {
     "Any server speaking the OpenAI chat-completions API — Ollama, vLLM, LM Studio, OpenRouter, or OpenAI itself.",
   anthropic: "The Anthropic Messages API. Leave the base URL blank for the public API.",
   claude_agent:
-    "Claude Code driven through the Claude Agent SDK. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token. Bundled in the unbork container image.",
+    "Runs Claude as an agent through the Claude Agent SDK, using the Claude Code program on this server. Runs tools, so it can drive assistant sessions and scheduled checks — billed against your Claude subscription rather than per token.",
   claude_cli:
-    "Claude Code called once per prompt. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick the agentic option above.",
+    "Calls Claude once per prompt through the Claude Code program on this server. Cannot run tools. Kept for AI verify steps and written reports; for anything that has to look something up, pick Claude agent.",
 }
 
 /**
- * Backends that drive Claude Code rather than an HTTP API.
+ * Backends that run the Claude Code program rather than call an HTTP API.
  *
  * Both authenticate with a subscription token from `claude setup-token`,
  * neither has a base URL, and neither is billed per token — so the form
@@ -41,7 +41,7 @@ const TYPE_HELP: Record<AIProviderType, string> = {
  */
 const CLAUDE_CODE_TYPES = new Set<AIProviderType>(["claude_cli", "claude_agent"])
 
-function isClaudeCode(type: AIProviderType): boolean {
+function isClaudeProgramBacked(type: AIProviderType): boolean {
   return CLAUDE_CODE_TYPES.has(type)
 }
 
@@ -49,7 +49,7 @@ function isClaudeCode(type: AIProviderType): boolean {
  * A suggested name per type.
  *
  * A single placeholder cannot serve all of them: "ollama-local" suggested on
- * a Claude Code provider is exactly the kind of leftover that makes a form
+ * a Claude agent provider is exactly the kind of leftover that makes a form
  * look like it was not built for the option you picked.
  */
 const NAME_PLACEHOLDER: Record<AIProviderType, string> = {
@@ -89,7 +89,7 @@ const ALWAYS_SENDS_OFFSITE = new Set<AIProviderType>([
  * which the row already tells us — genuinely costs nothing per token.
  */
 function pricingLabel(provider: AIProvider, currency: string): string {
-  if (isClaudeCode(provider.provider_type)) return "subscription"
+  if (isClaudeProgramBacked(provider.provider_type)) return "subscription"
   const { input_cost_per_mtok: input, output_cost_per_mtok: output } = provider
   if (input === 0 && output === 0) {
     return provider.sends_data_offsite ? "rates not set" : "free"
@@ -138,7 +138,7 @@ function describeCredentialExpiry(provider: AIProvider): string | null {
  */
 const TYPE_LIMITATION: Partial<Record<AIProviderType, string>> = {
   claude_cli:
-    "Single-shot only — it cannot run tools, so it cannot drive an investigation. Use it for AI verify steps and written reports. For subscription billing that can also investigate, pick Claude Code (agentic) instead.",
+    "Single-shot only — it cannot run tools, so it cannot drive an investigation. Use it for AI verify steps and written reports. For subscription billing that can also investigate, pick Claude agent instead.",
 }
 
 /**
@@ -336,7 +336,7 @@ export default function AIProvidersPage() {
   })
 
   const all = providers ?? []
-  const claude = isClaudeCode(form.provider_type)
+  const claude = isClaudeProgramBacked(form.provider_type)
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((prev) => ({ ...prev, [k]: v }))
 
   return (
@@ -447,7 +447,7 @@ export default function AIProvidersPage() {
             rows={all}
             keyOf={(p) => p.id}
             loading={isLoading}
-            empty="No providers yet. Add a local Ollama, an Anthropic API key, or a Claude Code subscription token — the assistant cannot run without one."
+            empty="No providers yet. Add a local Ollama, an Anthropic API key, or a Claude agent that uses this server's Claude sign-in — the assistant cannot run without one."
           />
         </Panel>
       </div>
@@ -514,7 +514,7 @@ export default function AIProvidersPage() {
               className="inp mono"
               value={form.model}
               onChange={(e) => setField("model", e.target.value)}
-              placeholder={form.provider_type === "anthropic" ? "claude-opus-5" : claude ? "blank — uses Claude Code's own default model" : "llama3.1:8b"}
+              placeholder={form.provider_type === "anthropic" ? "claude-opus-5" : claude ? "blank — uses the Claude Code program's default model" : "llama3.1:8b"}
             />
             {presets.length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -549,7 +549,7 @@ export default function AIProvidersPage() {
             {form.provider_type === "anthropic" && (
               <Help summary="where to get one">
                 Create one in the Claude Console at <span className="mono">platform.claude.com</span> under API keys. It starts with <span className="mono">sk-ant-</span> and is billed per token. A Pro or Max
-                subscription does not cover API usage — to spend against a subscription instead, use a Claude Code provider type.
+                subscription does not cover API usage — to spend against a subscription instead, use the Claude agent or Claude single-shot type.
               </Help>
             )}
             {claude && (

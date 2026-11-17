@@ -94,7 +94,7 @@ async def test_connection(provider: AIProvider) -> str:
                         )
     except TimeoutError as exc:
         raise LLMProviderError(
-            f"Claude Code did not answer within {PROBE_TIMEOUT_SECONDS}s. "
+            f"The Claude Code program did not answer within {PROBE_TIMEOUT_SECONDS}s. "
             "Check that the container can reach api.anthropic.com."
         ) from exc
     except LLMProviderError:
@@ -102,21 +102,21 @@ async def test_connection(provider: AIProvider) -> str:
     except Exception as exc:
         logger.warning("agent sdk probe failed for provider %s", provider.id, exc_info=True)
         detail = str(exc).strip() or exc.__class__.__name__
-        raise LLMProviderError(f"Claude Code could not be started: {detail}") from exc
+        raise LLMProviderError(f"The Claude Code program could not be started: {detail}") from exc
 
     version = bundled_cli_version()
     if failure:
-        raise LLMProviderError(f"Claude Code {version} started, but the request failed: {failure}")
+        raise LLMProviderError(f"The Claude Code program ({version}) started, but the request failed: {failure}")
     if not text.strip():
         # Exit without output is the shape the single-shot backend's
         # silent-auth-failure took. Treat it as a failure, not a pass.
         raise LLMProviderError(
-            f"Claude Code {version} started but returned nothing. That usually means "
+            f"The Claude Code program ({version}) started but returned nothing. That usually means "
             "the subscription token was rejected — regenerate it with "
             "'claude setup-token' and paste the value it prints last."
         )
 
     return (
-        f"Claude Code {version} via the Agent SDK; authenticated; "
+        f"{provider.name}: Claude Code program {version} via the Agent SDK; authenticated; "
         f"tools enabled, so this provider can run investigations."
     )

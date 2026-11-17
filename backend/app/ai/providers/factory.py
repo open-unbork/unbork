@@ -154,7 +154,7 @@ def build_provider(provider: AIProvider) -> LLMProvider:
         # accurate for a developer and useless to the operator who saw it
         # in the providers table when the Test button reached here.
         raise LLMProviderError(
-            f"Provider {provider.name!r} runs through Claude Code, which handles the "
+            f"Provider {provider.name!r} runs through the Claude Code program, which handles the "
             "conversation itself, so unbork cannot drive it one turn at a time. This "
             "is an internal routing error rather than a problem with your settings — "
             "please report it."
