@@ -212,11 +212,16 @@ export default function AIProvidersPage() {
     queryKey: ["ai-providers"],
     queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"),
     // While the Claude Code program downloads (S-009), poll so the state
-    // turns to ready (or says why not) without a reload.
-    refetchInterval: (query) =>
-      query.state.data?.some((p) => p.runtime && (p.runtime.state === "installing" || p.runtime.state === "missing"))
-        ? 5000
-        : false,
+    // turns to ready (or says why not) without a reload. "missing" on an
+    // enabled provider means the install is queued but not started; give
+    // that two minutes, since a split deployment may install on its
+    // workers only, where this page cannot see it.
+    refetchInterval: (query) => {
+      const rows = query.state.data ?? []
+      if (rows.some((p) => p.runtime?.state === "installing")) return 5000
+      const queued = rows.some((p) => p.enabled && p.runtime?.state === "missing")
+      return queued && query.state.dataUpdateCount < 24 ? 5000 : false
+    },
   })
 
   // The display currency comes from the server (ai.currency) so the label on
