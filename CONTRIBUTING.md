@@ -170,6 +170,22 @@ once, by commenting on your first pull request:
 See [`legal/cla/`](legal/cla/README.md) for both texts, how to sign, and
 what is recorded when you do.
 
+### Dependencies
+
+A new dependency must be under a licence compatible with
+AGPL-3.0-or-later; name the licence in the commit message. The image and
+package builds run `backend/scripts/third_party_notices.py`, which writes
+`THIRD-PARTY-NOTICES` and fails on any Python or npm package whose
+licence it cannot read or does not know to be compatible. When a
+project's metadata is wrong or missing, check its real licence and add it
+to [`packaging/licence-overrides.toml`](packaging/licence-overrides.toml)
+with a `note` saying where you checked. An override states the real
+licence; it cannot make an incompatible one acceptable.
+`tests/test_third_party_notices.py` runs the generator against the test
+environment.
+
+### File headers
+
 Per-file AGPL headers are **not** required. The repository-level
 [LICENSE](LICENSE) covers the whole tree. Don't add headers to new
 files unless the file is a standalone utility that might be copied

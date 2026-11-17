@@ -1248,6 +1248,25 @@ jobs:
             exit 1
           fi
           echo "No Claude Code program in $IMAGE"
+      - name: Licence, notices and source offer (S-010)
+        env:
+          IMAGE: ${{ needs.build-test-image.outputs.image_ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh "$IMAGE" -c \
+            'test -s /usr/share/doc/unbork/THIRD-PARTY-NOTICES && test -s /usr/share/doc/unbork/SOURCE-OFFER.md && test -s /usr/share/doc/unbork/LICENSE'
+          notices="$(docker run --rm --entrypoint cat "$IMAGE" /usr/share/doc/unbork/THIRD-PARTY-NOTICES)"
+          for c in ansible-core fastapi git openssh-client tini next react; do
+            grep -q "^$c " <<<"$notices" || { echo "::error::$c is not in THIRD-PARTY-NOTICES"; exit 1; }
+          done
+          labels="$(docker inspect --format '{{ json .Config.Labels }}' "$IMAGE")"
+          for k in licenses source revision documentation; do
+            grep -q "\"org.opencontainers.image.$k\"" <<<"$labels" \
+              || { echo "::error::label org.opencontainers.image.$k missing"; exit 1; }
+          done
+          grep -q "\"org.opencontainers.image.revision\":\"$SHA\"" <<<"$labels" \
+            || { echo "::error::revision label is not this commit"; exit 1; }
 
   gitleaks:
     if: >-

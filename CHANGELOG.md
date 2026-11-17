@@ -18,6 +18,12 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Third-party notices and a source offer ship with every build.**
+  `/usr/share/doc/unbork/` holds `LICENSE`, `THIRD-PARTY-NOTICES` (every
+  Python, npm and Debian component, with version, licence and text) and
+  `SOURCE-OFFER.md`; the image carries the OCI `licenses`, `source` and
+  `revision` labels. The build fails on a dependency whose licence is
+  unknown or not compatible with the AGPL.
 - **The assistant can be left out.** `[assistant] enabled = false` on an
   install, or `--build-arg WITH_ASSISTANT=0` for an image (which then has
   no Agent SDK and no assistant pages). No AI routes, pages, providers,

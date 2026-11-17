@@ -15,6 +15,10 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci --silent
 COPY frontend/ .
+# The npm packages the pages ship, with their licences, for the notices
+# file the final stage writes (S-010). Read from node_modules, so it lists
+# exactly what this build installed.
+RUN node scripts/licences.mjs > /tmp/frontend-licences.json
 ENV NEXT_TELEMETRY_DISABLED=1
 # WITH_ASSISTANT=0 builds an image without the AI assistant (C-026): its
 # two pages are not built, the Agent SDK is not installed, and the server
@@ -121,6 +125,24 @@ COPY --chown=unbork:unbork VERSION VERSION
 # Frontend static files
 COPY --from=frontend-builder --chown=unbork:unbork /app/out/ /usr/lib/unbork/frontend/out/
 
+# Licence, third-party notices and the source offer (S-010), in
+# /usr/share/doc/unbork as Debian does it. The notices are written from
+# what this image actually holds: its Python packages, the npm packages
+# the pages ship, and its Debian packages. The build fails on a Python or
+# npm component whose licence is unknown or not compatible with
+# AGPL-3.0-or-later (packaging/licence-overrides.toml for reviewed
+# exceptions).
+COPY --from=frontend-builder /tmp/frontend-licences.json /tmp/frontend-licences.json
+COPY backend/scripts/third_party_notices.py /tmp/third_party_notices.py
+COPY packaging/licence-overrides.toml /tmp/licence-overrides.toml
+COPY LICENSE SOURCE-OFFER.md /usr/share/doc/unbork/
+RUN python /tmp/third_party_notices.py \
+        --frontend /tmp/frontend-licences.json \
+        --dpkg-status /var/lib/dpkg/status \
+        --overrides /tmp/licence-overrides.toml \
+        --out /usr/share/doc/unbork/THIRD-PARTY-NOTICES \
+    && rm /tmp/frontend-licences.json /tmp/third_party_notices.py /tmp/licence-overrides.toml
+
 # Build metadata. CI passes both via --build-arg in the build-image and
 # build-test-image jobs; a local `docker build` without them yields empty
 # values and /api/version reports a "dev build".
@@ -128,6 +150,10 @@ ARG GIT_SHA=""
 ARG BUILD_DATE=""
 ENV UNBORK_COMMIT_SHA=$GIT_SHA \
     UNBORK_BUILD_DATE=$BUILD_DATE
+LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.source="https://github.com/open-unbork/unbork" \
+      org.opencontainers.image.revision=$GIT_SHA \
+      org.opencontainers.image.documentation="https://github.com/open-unbork/unbork/tree/main/docs"
 
 USER unbork
 EXPOSE 8000

@@ -356,6 +356,17 @@ Redis holds only transient broker/schedule state, so
 
 ---
 
+## Licence and source
+
+unbork is AGPL-3.0-or-later. If you change it and let people use it over
+the network, offer them the source of your version (section 13 of the
+licence); unchanged, the image's `SOURCE-OFFER.md` already says where it
+is. The image lists every third-party component it ships, with its
+licence, in `/usr/share/doc/unbork/THIRD-PARTY-NOTICES`
+([details](./README.md#licence-and-third-party-notices)).
+
+---
+
 ## Differences from `dev/docker-compose.yml`
 
 The dev compose file is intentionally minimal — it is not a

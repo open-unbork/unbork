@@ -68,6 +68,9 @@ fi
 # --- Install application files ---
 log "Installing application to /usr/lib/unbork..."
 cp -r "$SCRIPT_DIR/usr/lib/unbork" /usr/lib/
+# Licence, third-party notices and source offer (S-010).
+mkdir -p /usr/share/doc/unbork
+cp -r "$SCRIPT_DIR/usr/share/doc/unbork/." /usr/share/doc/unbork/
 
 # --- Install configuration (preserve existing) ---
 if [ -f /etc/unbork/unbork.toml ]; then

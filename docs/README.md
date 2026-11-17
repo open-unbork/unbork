@@ -231,6 +231,25 @@ curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/SHA
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
+### Licence and third-party notices
+
+Every image and package carries, in `/usr/share/doc/unbork/` (and the
+tarball at its root too):
+
+- `LICENSE`: unbork's own licence, AGPL-3.0-or-later.
+- `THIRD-PARTY-NOTICES`: every third-party component it ships, Python,
+  npm and (in the image) Debian, with version, licence and licence text.
+- `SOURCE-OFFER.md`: where to get the source of unbork and of each of
+  those components.
+
+The image also carries the OCI labels `org.opencontainers.image.licenses`,
+`.source` and `.revision` (the commit it was built from):
+
+```bash
+docker run --rm --entrypoint cat unbork/unbork /usr/share/doc/unbork/THIRD-PARTY-NOTICES | less
+docker inspect --format '{{ json .Config.Labels }}' unbork/unbork
+```
+
 ### Post-install Configuration
 
 All three install methods place the default config at `/etc/unbork/unbork.toml`. Edit it before starting the service:

@@ -33,6 +33,14 @@ ok "application code + venv present"
 [ ! -e "$BACKEND/app/ansible" ] || fail "package ships an action pack at $BACKEND/app/ansible"
 ok "no action pack shipped in the package"
 
+# 2b. Licence, notices, source offer (S-010) --------------------------------
+for f in LICENSE SOURCE-OFFER.md THIRD-PARTY-NOTICES; do
+    [ -s "/usr/share/doc/unbork/$f" ] || fail "missing or empty: /usr/share/doc/unbork/$f"
+done
+grep -q '^ansible-core ' /usr/share/doc/unbork/THIRD-PARTY-NOTICES \
+    || fail "THIRD-PARTY-NOTICES does not list ansible-core"
+ok "licence, third-party notices and source offer present"
+
 # 3. System-integration files ----------------------------------------------
 [ -f "$UNIT" ] || fail "systemd unit missing: $UNIT"
 grep -q 'ExecStart=/usr/lib/unbork/venv/bin/python -m app' "$UNIT" \
