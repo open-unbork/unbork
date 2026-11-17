@@ -317,7 +317,7 @@ _CSP_TAIL = (
 
 #: The fallback ``script-src`` for responses that carry no nonce.
 #:
-#: Every HTML document LabDog serves goes through ``spa_fallback``, which
+#: Every HTML document unbork serves goes through ``spa_fallback``, which
 #: stamps a nonce and sends its own header, so in practice this applies to
 #: JSON and to redirects — responses with no scripts to govern. It stays
 #: strict rather than permissive precisely so that a future code path which
@@ -619,7 +619,7 @@ def create_app() -> FastAPI:
 def _new_fastapi_app() -> FastAPI:
     # SEC-34: the interactive docs enumerate every route and schema and
     # are served unauthenticated. Off by default; `server.expose_docs`
-    # turns them back on where that is wanted (dev/labdog.toml does).
+    # turns them back on where that is wanted (dev/unbork.toml does).
     _docs = settings.server.expose_docs
     return FastAPI(
         title="unbork",
@@ -1232,10 +1232,10 @@ def _resolve_dynamic_route(static_dir: Path, full_path: str) -> tuple[Path, tupl
 def _resolve_static_dir() -> Path | None:
     """Return the frontend static directory, or None if not available.
 
-    Skipped when LABDOG_DEV_MODE=1 (set by dev.sh) so the Next.js dev
+    Skipped when UNBORK_DEV_MODE=1 (set by dev.sh) so the Next.js dev
     server on :3000 is used instead of a stale static export.
     """
-    if os.environ.get("LABDOG_DEV_MODE"):
+    if os.environ.get("UNBORK_DEV_MODE"):
         return None
     configured = settings.server.static_dir
     if configured:
@@ -1250,7 +1250,7 @@ def _resolve_static_dir() -> Path | None:
         return dev_path
 
     # Auto-detect: production packaged install
-    prod_path = Path("/usr/lib/labdog/frontend/out")
+    prod_path = Path("/usr/lib/unbork/frontend/out")
     if prod_path.is_dir() and (prod_path / "index.html").is_file():
         return prod_path
 

@@ -28,7 +28,7 @@ class Api:
         raise SystemExit("unbork never became ready")
 
     def _csrf(self):
-        return next((c.value for c in self.jar if c.name == "labdog_csrf"), "")
+        return next((c.value for c in self.jar if c.name == "unbork_csrf"), "")
 
     def _req(self, method, path, data=None, form=False, ok=(200, 201, 202, 204)):
         hdrs = {"X-CSRF-Token": self._csrf()}

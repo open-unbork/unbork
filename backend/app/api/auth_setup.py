@@ -79,14 +79,14 @@ async def refresh_csrf_token(
 ):
     """Re-issue the CSRF double-submit cookie for an existing session.
 
-    Called by the frontend on mount when the labdog_csrf cookie is absent
+    Called by the frontend on mount when the unbork_csrf cookie is absent
     (e.g. sessions that predate the CSRF feature). GET is intentional —
     the CSRF middleware only guards mutating methods, so this works without
     a pre-existing token.
     """
     token = secrets.token_urlsafe(settings.security.csrf_token_bytes)
     response.set_cookie(
-        "labdog_csrf",
+        "unbork_csrf",
         token,
         max_age=settings.security.session_lifetime_seconds,
         path="/",

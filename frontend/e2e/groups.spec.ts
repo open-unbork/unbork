@@ -171,7 +171,7 @@ TjIIGPY0y9owejh0AiBZDQ3rkCgh7O9lkUGjPac4TmKyBVy5h9OBxBhBKeccGQ==
     await expect(dialog).toBeHidden()
     // The subject column is parsed from the PEM server-side.
     const row = page.getByRole("row").filter({ hasText: "e2e test CA" })
-    await expect(row).toContainText("CN=LabDog e2e test CA")
+    await expect(row).toContainText("CN=unbork e2e test CA")
   })
 
   test("Members tab adds and removes a host", async ({ request, page }) => {

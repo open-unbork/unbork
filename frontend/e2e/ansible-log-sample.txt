@@ -1,5 +1,5 @@
 [preflight] host reachable
-[snapshot] created labdog-242-1790857608 on pve1/200
+[snapshot] created unbork-242-1790857608 on pve1/200
 [playbook] exit=0 status=successful
 === Ansible output ===
 
@@ -18,7 +18,7 @@ ok: [web1] => {
 }
 
 TASK [role-apt-upgrade : Include upgrade tasks] ********************************
-included: /var/lib/labdog/packs/1/roles/role-apt-upgrade/tasks/upgrade.yml for web1
+included: /var/lib/unbork/packs/1/roles/role-apt-upgrade/tasks/upgrade.yml for web1
 
 TASK [role-apt-upgrade : Upgrade | Check available disk space] *****************
 ok: [web1]
@@ -45,7 +45,7 @@ TASK [role-apt-upgrade : Upgrade | Full-upgrade packages] **********************
 ok: [web1]
 
 TASK [role-apt-upgrade : Upgrade | Include cleanup tasks] **********************
-included: /var/lib/labdog/packs/1/roles/role-apt-upgrade/tasks/cleanup.yml for web1
+included: /var/lib/unbork/packs/1/roles/role-apt-upgrade/tasks/cleanup.yml for web1
 
 TASK [role-apt-upgrade : Remove unused dependencies] ***************************
 ok: [web1]
@@ -136,7 +136,7 @@ ok: [web1]
 
 TASK [Assert no unexpected systemd unit is in 'failed' state] ******************
 [ERROR]: Task failed: Action failed: One or more systemd units are failed: ['chronyd.service']
-Origin: /tmp/labdog-action-xxxxxxxx-verify/project/playbook.yml:106:7
+Origin: /tmp/unbork-action-xxxxxxxx-verify/project/playbook.yml:106:7
 
 104           {{ _failed_units | reject('in', _ignored_failed_units) | list }}
 105
@@ -153,6 +153,6 @@ fatal: [web1]: FAILED! => {
 PLAY RECAP *********************************************************************
 web1                      : ok=8    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
 
-[rollback] restoring labdog-242-1790857608
+[rollback] restoring unbork-242-1790857608
 [rollback] success=True
-[cleanup] snapshot labdog-242-1790857608 deleted after rollback
+[cleanup] snapshot unbork-242-1790857608 deleted after rollback

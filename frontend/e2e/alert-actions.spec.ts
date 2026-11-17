@@ -2,7 +2,7 @@ import { test, expect, API_BASE } from "./fixtures"
 import { mockRun } from "./run-mock"
 
 // Grafana labels choose what an alert does. Alerts › Handling holds the
-// actions an alert's labdog_action label may run; Received shows what each
+// actions an alert's unbork_action label may run; Received shows what each
 // alert's action came to; the run it started says which alert started it.
 
 const ALERT = {
@@ -12,7 +12,7 @@ const ALERT = {
   alertname: "NginxDown",
   severity: "critical",
   status: "resolved",
-  labels: { alertname: "NginxDown", labdog_action: "restart-nginx" },
+  labels: { alertname: "NginxDown", unbork_action: "restart-nginx" },
   annotations: { summary: "nginx is down" },
   starts_at: "2026-10-14T13:23:13Z",
   ends_at: null,
@@ -53,7 +53,7 @@ test("Alerts is under Operations, with Received and Handling", async ({ page }) 
   await expect(page.getByRole("tab", { name: /Received/ })).toHaveAttribute("aria-selected", "true")
   await page.getByRole("tab", { name: /Handling/ }).click()
   await expect(page).toHaveURL(/\/alerts\/?\?tab=handling$/)
-  await expect(page.getByTestId("alert-labels")).toContainText("labdog_ai_automate=true")
+  await expect(page.getByTestId("alert-labels")).toContainText("unbork_ai_automate=true")
   await expect(page.getByTestId("alert-intake")).toContainText("/api/webhooks/grafana-alerts")
   await expect(page.getByText(/No action is allowed yet/)).toBeVisible()
 })
@@ -68,7 +68,7 @@ test("an alert's row shows what its action came to", async ({ page }) => {
           id: 502,
           alertname: "DiskFull",
           investigation_outcome: "skipped_no_label",
-          investigation_detail: "not labelled labdog_ai=true or labdog_ai_automate=true",
+          investigation_detail: "not labelled unbork_ai=true or unbork_ai_automate=true",
           actions: [dispatch({ id: 2, alert_action_id: null, action_key: "linux-upgrade", action_name: null, outcome: "not_allowed", detail: "linux-upgrade is not on the list of actions alerts may run" })],
         },
       ],
@@ -100,7 +100,7 @@ test("allow an action, change it, and take it off the list", async ({ request, p
   await page.getByTestId("alert-action-new").click()
   const key = "_builtin.collect_state"
   await page.getByTestId("alert-action-picker").selectOption(key)
-  await expect(page.getByText(`labdog_action=${key}`)).toBeVisible()
+  await expect(page.getByText(`unbork_action=${key}`)).toBeVisible()
   await page.getByTestId("alert-action-where-host").check()
   await page.getByTestId("alert-action-host").fill(host.hostname)
   await page.getByRole("option", { name: new RegExp(`^${host.hostname}`) }).first().click()
@@ -144,7 +144,7 @@ test("the host page says when full auto is paused on it", async ({ request, page
         ai_enabled: true,
         auto_investigate_enabled: true,
         rules_enabled: false,
-        rules: ["labdog_ai_automate=true"],
+        rules: ["unbork_ai_automate=true"],
         blockers: ["an automatic fix made this host worse, so full auto is off it until 2026-10-16 16:13 UTC"],
         alert_actions: [],
       },

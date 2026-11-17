@@ -1,4 +1,4 @@
-"""Encryption-key rotation script for LabDog.
+"""Encryption-key rotation script for unbork.
 
 Re-encrypts every ``encrypted_*`` column in a single database transaction so
 there is no window in which some rows use the old key and others use the new
@@ -6,7 +6,7 @@ one.  If the process is interrupted mid-run the transaction rolls back and
 the database remains entirely under the old key.
 
 Usage (preferred — reads env vars if flags are absent):
-    LABDOG_OLD_KEY=<base64-32>  LABDOG_NEW_KEY=<base64-32> \\
+    UNBORK_OLD_KEY=<base64-32>  UNBORK_NEW_KEY=<base64-32> \\
         python -m scripts.rotate_encryption_key
 
 Usage (explicit flags):
@@ -190,8 +190,8 @@ async def rotate(
 
 
 async def _main(old_b64: str, new_b64: str) -> None:
-    old_key = _decode_key(old_b64, "old key (--old-key / LABDOG_OLD_KEY)")
-    new_key = _decode_key(new_b64, "new key (--new-key / LABDOG_NEW_KEY)")
+    old_key = _decode_key(old_b64, "old key (--old-key / UNBORK_OLD_KEY)")
+    new_key = _decode_key(new_b64, "new key (--new-key / UNBORK_NEW_KEY)")
 
     if old_key == new_key:
         print("No-op: old key and new key are identical.")
@@ -227,22 +227,22 @@ def _parse_args() -> tuple[str, str]:
     parser.add_argument(
         "--old-key",
         metavar="BASE64",
-        help="Current 32-byte key in base64.  Defaults to LABDOG_OLD_KEY env var.",
+        help="Current 32-byte key in base64.  Defaults to UNBORK_OLD_KEY env var.",
     )
     parser.add_argument(
         "--new-key",
         metavar="BASE64",
-        help="New 32-byte key in base64.  Defaults to LABDOG_NEW_KEY env var.",
+        help="New 32-byte key in base64.  Defaults to UNBORK_NEW_KEY env var.",
     )
     args = parser.parse_args()
 
-    old_b64 = args.old_key or os.environ.get("LABDOG_OLD_KEY", "")
-    new_b64 = args.new_key or os.environ.get("LABDOG_NEW_KEY", "")
+    old_b64 = args.old_key or os.environ.get("UNBORK_OLD_KEY", "")
+    new_b64 = args.new_key or os.environ.get("UNBORK_NEW_KEY", "")
 
     if not old_b64:
-        parser.error("old key is required: pass --old-key or set LABDOG_OLD_KEY")
+        parser.error("old key is required: pass --old-key or set UNBORK_OLD_KEY")
     if not new_b64:
-        parser.error("new key is required: pass --new-key or set LABDOG_NEW_KEY")
+        parser.error("new key is required: pass --new-key or set UNBORK_NEW_KEY")
 
     return old_b64, new_b64
 

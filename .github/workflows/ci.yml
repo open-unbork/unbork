@@ -22,7 +22,7 @@ name: CI
 #   * DOCKER_HUB_PAT  — Docker Hub personal access token (secret)
 #
 # Variables required (same screen, "Variables" tab):
-#   * DOCKER_HUB_REPO — full repo path in Docker Hub, e.g. "myuser/labdog".
+#   * DOCKER_HUB_REPO — full repo path in Docker Hub, e.g. "myuser/unbork".
 #     The username portion (first segment) is extracted automatically for
 #     login; the full value is used as the image name.
 
@@ -193,9 +193,9 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_test
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -214,7 +214,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_test
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
       REDIS_URL: redis://localhost:6379/0
       SECRET_KEY: ci-test-secret-key-not-for-production
       ENCRYPTION_KEY: Y2ktdGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
@@ -317,9 +317,9 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_e2e
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_e2e
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -337,16 +337,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_e2e
-      LABDOG_REDIS__URL: redis://localhost:6379/0
-      LABDOG_SECURITY__SECRET_KEY: ci-test-secret-key-not-for-production
+      UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_e2e
+      UNBORK_REDIS__URL: redis://localhost:6379/0
+      UNBORK_SECURITY__SECRET_KEY: ci-test-secret-key-not-for-production
       # Must decode to exactly 32 bytes, which is why this is the
       # conftest fixture key rather than backend-test's
-      # LABDOG_SECURITY__ENCRYPTION_KEY: that one decodes to 30 and gets
+      # UNBORK_SECURITY__ENCRYPTION_KEY: that one decodes to 30 and gets
       # away with it because pytest generates its own key at runtime.
       # This job boots the real app, which validates and refuses to start.
       # Both values are already in .gitleaks.toml's fixture allowlist.
-      LABDOG_SECURITY__ENCRYPTION_KEY: vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=
+      UNBORK_SECURITY__ENCRYPTION_KEY: vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=
       # The suite drives the app the way an install serves it: one origin,
       # backend on :8000 serving both /api and the static export. That
       # keeps the session cookie and the CSRF double-submit same-origin,
@@ -358,7 +358,7 @@ jobs:
       # an expired session and answers by redirecting to /login. That
       # failed 53 of 77 specs on the first run here. backend/tests
       # disables it for the same reason.
-      LABDOG_RATE_LIMIT__ENABLED: "false"
+      UNBORK_RATE_LIMIT__ENABLED: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -385,22 +385,22 @@ jobs:
         run: |
           npm ci --prefer-offline
           npm run build
-      - name: Start LabDog
+      - name: Start unbork
         working-directory: backend
         # `python -m app` is the real entrypoint: it migrates, starts the
         # Celery worker+beat subprocess, then serves the API and the
         # frontend/out export that the previous step produced.
         run: |
-          nohup python -m app > /tmp/labdog-server.log 2>&1 &
+          nohup python -m app > /tmp/unbork-server.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://localhost:8000/health > /dev/null; then
-              echo "LabDog is up after ${i}s"
+              echo "unbork is up after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "LabDog did not become healthy in 60s"
-          cat /tmp/labdog-server.log
+          echo "unbork did not become healthy in 60s"
+          cat /tmp/unbork-server.log
           exit 1
       - name: Install Playwright browsers
         working-directory: frontend
@@ -410,7 +410,7 @@ jobs:
         run: npx playwright test
       - name: Server log
         if: always()
-        run: tail -n 200 /tmp/labdog-server.log || true
+        run: tail -n 200 /tmp/unbork-server.log || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -714,13 +714,13 @@ jobs:
         run: |
           set -euo pipefail
           systemd-analyze security --offline=true --no-pager \
-            packaging/systemd/labdog.service | tail -40
+            packaging/systemd/unbork.service | tail -40
           SCORE=$(systemd-analyze security --offline=true --no-pager \
-            packaging/systemd/labdog.service \
+            packaging/systemd/unbork.service \
             | grep -oE 'Overall exposure level for [^:]+: [0-9.]+' \
             | grep -oE '[0-9.]+$')
           echo "Exposure level: ${SCORE}"
-          awk -v s="$SCORE" 'BEGIN { if (s+0 > 3.0) { print "::error::labdog.service exposure " s " exceeds the 3.0 ceiling"; exit 1 } }'
+          awk -v s="$SCORE" 'BEGIN { if (s+0 > 3.0) { print "::error::unbork.service exposure " s " exceeds the 3.0 ceiling"; exit 1 } }'
 
 
   # ---- RELEASE ARTIFACTS ------------------------------------------------
@@ -758,9 +758,9 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_test
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -778,7 +778,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_test
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
       REDIS_URL: redis://localhost:6379/0
       SECRET_KEY: ci-test-secret-key-not-for-production
       ENCRYPTION_KEY: Y2ktdGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
@@ -930,7 +930,7 @@ jobs:
         if: steps.ver.outputs.skip != 'true'
         working-directory: packaging/dist
         run: |
-          sha256sum labdog-* labdog_* > SHA256SUMS
+          sha256sum unbork-* unbork_* > SHA256SUMS
           echo "=== SHA256SUMS ==="
           cat SHA256SUMS
       - name: Attest build provenance
@@ -939,7 +939,7 @@ jobs:
         # the files match a list written by whoever wrote the files.
         # An attestation is signed by GitHub's OIDC identity for this
         # workflow run and verified with:
-        #   gh attestation verify labdog_X.Y.Z_amd64.deb --repo open-unbork/unbork
+        #   gh attestation verify unbork_X.Y.Z_amd64.deb --repo open-unbork/unbork
         if: steps.ver.outputs.skip != 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -1031,7 +1031,7 @@ jobs:
           args=()
           for t in $TAGS; do args+=(-t "${REPO}:${t}"); done
           docker buildx imagetools create "${args[@]}" "${REPO}:${GITHUB_SHA}"
-      # Installs from before the move to unbork pull openlabdog/labdog. Until
+      # Installs from before the move to unbork pull openlabdog/labdog. Until (old-name-ok)
       # the release lines they run reach end of life, every release is also
       # copied there (:latest plus the version tags). Set the variable
       # LEGACY_DOCKER_HUB_REPO and the secret LEGACY_DOCKER_HUB_PAT to turn
@@ -1148,7 +1148,7 @@ jobs:
         # Affects every pip release ≤ 26.0.1; upstream fix is in
         # https://github.com/pypa/pip/pull/13870 but no patched pip is
         # on PyPI yet. The vulnerability is in pip's archive handling
-        # during `pip install`; LabDog never invokes pip on user input,
+        # during `pip install`; unbork never invokes pip on user input,
         # so the attack surface is "the maintainer pip-installs a
         # malicious package while building" — same threat model as any
         # other supply-chain attack on the build host. Re-evaluate when

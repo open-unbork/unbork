@@ -84,7 +84,7 @@ export function Providers({ children }: { children: ReactNode }) {
       attribute="data-theme"
       defaultTheme="dark"
       enableSystem={false}
-      storageKey="labdog:theme"
+      storageKey="unbork:theme"
       themes={["dark", "light"]}
     >
       <QueryClientProvider client={queryClient}>

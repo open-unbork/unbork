@@ -77,8 +77,8 @@ class TestVersionEndpoint:
         monkeypatch.setitem(sys.modules, "app._build_info", fake_module)
 
         # Remove env vars so resolution falls through to the module
-        monkeypatch.delenv("LABDOG_COMMIT_SHA", raising=False)
-        monkeypatch.delenv("LABDOG_BUILD_DATE", raising=False)
+        monkeypatch.delenv("UNBORK_COMMIT_SHA", raising=False)
+        monkeypatch.delenv("UNBORK_BUILD_DATE", raising=False)
 
         import app.api.version as ver
 
@@ -107,8 +107,8 @@ class TestVersionEndpoint:
         fake_module.BUILD_DATE = file_date
         monkeypatch.setitem(sys.modules, "app._build_info", fake_module)
 
-        monkeypatch.setenv("LABDOG_COMMIT_SHA", env_sha)
-        monkeypatch.setenv("LABDOG_BUILD_DATE", env_date)
+        monkeypatch.setenv("UNBORK_COMMIT_SHA", env_sha)
+        monkeypatch.setenv("UNBORK_BUILD_DATE", env_date)
 
         import app.api.version as ver
 
@@ -116,13 +116,13 @@ class TestVersionEndpoint:
         assert ver._resolve_build_date() == env_date
 
     # ------------------------------------------------------------------
-    # Invalid LABDOG_BUILD_DATE → null, no 500
+    # Invalid UNBORK_BUILD_DATE → null, no 500
     # ------------------------------------------------------------------
 
     async def test_invalid_build_date_returns_null(self, client, monkeypatch):
-        """A non-ISO LABDOG_BUILD_DATE yields null build_date without crashing."""
-        monkeypatch.setenv("LABDOG_BUILD_DATE", "not-a-date")
-        monkeypatch.delenv("LABDOG_COMMIT_SHA", raising=False)
+        """A non-ISO UNBORK_BUILD_DATE yields null build_date without crashing."""
+        monkeypatch.setenv("UNBORK_BUILD_DATE", "not-a-date")
+        monkeypatch.delenv("UNBORK_COMMIT_SHA", raising=False)
 
         import app.api.version as ver
 
@@ -163,14 +163,14 @@ class TestVersionEndpoint:
         assert ver._resolve_version() == "9.9.9"
 
     def test_resolve_version_falls_back_to_env_when_metadata_missing(self, monkeypatch):
-        """No .dist-info (as in the from-source container image) → LABDOG_VERSION."""
+        """No .dist-info (as in the from-source container image) → UNBORK_VERSION."""
         import app.api.version as ver
 
         def _raise(name):
             raise ver.importlib.metadata.PackageNotFoundError(name)
 
         monkeypatch.setattr(ver.importlib.metadata, "version", _raise)
-        monkeypatch.setenv("LABDOG_VERSION", "1.2.3")
+        monkeypatch.setenv("UNBORK_VERSION", "1.2.3")
         assert ver._resolve_version() == "1.2.3"
 
     def test_resolve_version_returns_sentinel_not_error(self, monkeypatch):
@@ -181,7 +181,7 @@ class TestVersionEndpoint:
             raise ver.importlib.metadata.PackageNotFoundError(name)
 
         monkeypatch.setattr(ver.importlib.metadata, "version", _raise)
-        monkeypatch.delenv("LABDOG_VERSION", raising=False)
+        monkeypatch.delenv("UNBORK_VERSION", raising=False)
         result = ver._resolve_version()
         # Either a bundled VERSION file (if present in the tree) or the sentinel,
         # but always a non-empty string — never a raise.

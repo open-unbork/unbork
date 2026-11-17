@@ -47,7 +47,7 @@ def generate_multi_host_inventory(
     return json.dumps(inventory, indent=2)
 
 
-#: Environment for every ansible-playbook run LabDog starts.
+#: Environment for every ansible-playbook run unbork starts.
 #:
 #: Ansible output is captured into the DB and rendered in HTML, not a
 #: terminal. ansible-runner attaches a pty by default, which makes Ansible
@@ -144,7 +144,7 @@ def run_ansible(
         f.write(inventory_json)
 
     # Assemble roles path: caller-supplied dirs (e.g. a user pack's roles)
-    # take precedence, LabDog's own roles are the fallback. De-duplicate while
+    # take precedence, unbork's own roles are the fallback. De-duplicate while
     # preserving order.
     seen: set[str] = set()
     combined_roles: list[str] = []
@@ -171,7 +171,7 @@ def run_ansible(
         cmdline="--check" if check_mode else None,
         # Without it ansible-runner echoes every line of the playbook's
         # stdout, which Celery logs at WARNING: ~90 warning lines for one
-        # small run, burying LabDog's own. The output still reaches
+        # small run, burying unbork's own. The output still reaches
         # event_handler and the artifact's stdout file (BUG-176).
         quiet=True,
     )
@@ -181,7 +181,7 @@ def run_ansible(
 
 
 #: Inherited variables an ansible-playbook process may see. Everything else
-#: from LabDog's own environment is dropped (SEC-46).
+#: from unbork's own environment is dropped (SEC-46).
 _INHERITED_ENV_ALLOWLIST = frozenset(
     {
         "PATH",
@@ -211,19 +211,19 @@ def scrub_child_env(env: dict[str, str], inherited: dict[str, str] | None = None
     """The environment for an ansible-playbook child, minus unbork's secrets.
 
     SEC-46: ansible-runner seeds the child from ``os.environ.copy()``, so
-    every playbook process saw ``LABDOG_SECURITY__SECRET_KEY``,
-    ``LABDOG_SECURITY__ENCRYPTION_KEY`` and the database URL, and any
+    every playbook process saw ``UNBORK_SECURITY__SECRET_KEY``,
+    ``UNBORK_SECURITY__ENCRYPTION_KEY`` and the database URL, and any
     controller-side evaluation (SEC-39, SEC-40) could read them. The runner
     also writes the environment into the run's ``artifacts/…/command`` file.
 
     Kept: whatever ansible-runner or unbork set for this run (a value that
     differs from the inherited one), and inherited variables on an
-    allowlist. ``LABDOG_*`` is always dropped, even if set for the run.
+    allowlist. ``UNBORK_*`` is always dropped, even if set for the run.
     """
     inherited = os.environ if inherited is None else inherited
     out: dict[str, str] = {}
     for key, value in env.items():
-        if key.startswith("LABDOG_"):
+        if key.startswith("UNBORK_"):
             continue
         set_for_run = key not in inherited or inherited[key] != value
         if (

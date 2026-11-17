@@ -21,13 +21,13 @@ from app.config import settings
 from app.db import get_db
 from app.models.user import User
 
-_CSRF_COOKIE_NAME = "labdog_csrf"
+_CSRF_COOKIE_NAME = "unbork_csrf"
 
 logger = logging.getLogger(__name__)
 
 # ── Cookie transport — httpOnly for XSS protection ──────────────────────────
 cookie_transport = CookieTransport(
-    cookie_name="labdog_auth",
+    cookie_name="unbork_auth",
     cookie_max_age=settings.security.session_lifetime_seconds,
     cookie_secure=settings.security.cookie_secure,
     cookie_httponly=True,

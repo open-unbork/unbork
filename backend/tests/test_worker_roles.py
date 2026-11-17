@@ -1,6 +1,6 @@
 """Step 3 of the scaling plan: one image, several runtime roles.
 
-``python -m app --role ...`` (or ``LABDOG_ROLE``) picks which processes a
+``python -m app --role ...`` (or ``UNBORK_ROLE``) picks which processes a
 container runs. ``all`` must stay exactly the single-container install;
 the split roles must between them consume every queue a task can land on,
 or work is accepted by the broker and never run.
@@ -190,7 +190,7 @@ class TestTheManagerSpawnsThePlan:
         assert "--concurrency=9" in cmd
         assert cmd[cmd.index("-Q") + 1] == "drift"
         assert cmd[cmd.index("-n") + 1] == "drift@%h"
-        assert kw["env"]["LABDOG_ROLE"] == "worker-drift"
+        assert kw["env"]["UNBORK_ROLE"] == "worker-drift"
 
     def test_an_actions_worker_uses_actions_concurrency(self, popen, monkeypatch):
         from app.config import settings
@@ -202,11 +202,11 @@ class TestTheManagerSpawnsThePlan:
         assert "--concurrency=7" in cmd
         assert cmd[cmd.index("-Q") + 1] == "actions"
         assert cmd[cmd.index("-n") + 1] == "actions@%h"
-        assert kw["env"]["LABDOG_ROLE"] == "worker-actions"
+        assert kw["env"]["UNBORK_ROLE"] == "worker-actions"
 
     def test_the_default_manager_still_runs_everything(self, popen):
         CeleryManager().start()
-        names = [kw["env"]["LABDOG_ROLE"] for _cmd, kw in popen]
+        names = [kw["env"]["UNBORK_ROLE"] for _cmd, kw in popen]
         assert len(popen) == len(WORKER_QUEUES) + 1
         assert set(names) == {"all"}
 
@@ -219,7 +219,7 @@ class TestPerContainerBootWork:
     def test_an_orchestrator_alone_syncs_its_own_packs(self, monkeypatch, role, sibling):
         from app.tasks import _sibling_syncs_packs
 
-        monkeypatch.setenv("LABDOG_ROLE", role)
+        monkeypatch.setenv("UNBORK_ROLE", role)
         assert _sibling_syncs_packs() is sibling
 
     def test_only_one_booting_worker_enqueues_the_orphan_sweeps(self, monkeypatch):

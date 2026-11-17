@@ -192,14 +192,14 @@ class TestSession:
     async def test_sets_the_auth_and_csrf_cookies_and_last_login(self, db):
         user = await resolve_external_user(db, _identity(), provision=True, link_by_email=False)
         jar = await self._sign_in(db, user)
-        assert "labdog_auth" in jar
-        assert "labdog_csrf" in jar
+        assert "unbork_auth" in jar
+        assert "unbork_csrf" in jar
         assert user.last_login_at is not None
 
     async def test_the_cookie_is_a_normal_session(self, db, external_client):
         user = await resolve_external_user(db, _identity(), provision=True, link_by_email=False)
         jar = await self._sign_in(db, user)
-        external_client.cookies.set("labdog_auth", jar["labdog_auth"].value)
+        external_client.cookies.set("unbork_auth", jar["unbork_auth"].value)
 
         me = await external_client.get("/api/users/me")
         assert me.status_code == 200
@@ -217,12 +217,12 @@ class TestSession:
     async def test_an_sso_only_account_cannot_set_a_password_itself(self, db, external_client):
         user = await resolve_external_user(db, _identity(), provision=True, link_by_email=False)
         jar = await self._sign_in(db, user)
-        external_client.cookies.set("labdog_auth", jar["labdog_auth"].value)
-        external_client.cookies.set("labdog_csrf", jar["labdog_csrf"].value)
+        external_client.cookies.set("unbork_auth", jar["unbork_auth"].value)
+        external_client.cookies.set("unbork_csrf", jar["unbork_csrf"].value)
         resp = await external_client.patch(
             "/api/users/me",
             json={"password": "BrandNewPass1!", "current_password": ""},
-            headers={"X-CSRF-Token": jar["labdog_csrf"].value},
+            headers={"X-CSRF-Token": jar["unbork_csrf"].value},
         )
         assert resp.status_code == 400
 

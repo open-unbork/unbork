@@ -1,4 +1,4 @@
-"""SEC-24/SEC-25: a value LabDog writes into a config file must not end the line.
+"""SEC-24/SEC-25: a value unbork writes into a config file must not end the line.
 
 Two fields were interpolated into generated files with no check that they
 could not close the line they sat on:
@@ -7,7 +7,7 @@ could not close the line they sat on:
   ``/etc/hosts``. ``hostname`` and ``aliases`` were validated against
   HOSTNAME_RE; ``comment`` was validated not at all. A comment of
   ``"x\\n1.2.3.4 deb.debian.org"`` appended a working entry — a
-  package-mirror redirect on every host in the group, written by LabDog
+  package-mirror redirect on every host in the group, written by unbork
   itself, and invisible in a UI that renders the comment on one line.
 * ``sudo_rule`` → ``{username} {sudo_rule}\\n`` in
   ``/etc/sudoers.d/{username}``. The shell metacharacters were blocked;
@@ -182,7 +182,7 @@ class TestTheSudoersFileIsSafeRegardless:
         )
         content = tasks[0]["ansible.builtin.copy"]["content"]
         assert content == "deploy /usr/bin/systemctl restart nginx\n"
-        assert content.count("\n") == 1, "a sudoers drop-in LabDog writes is one line"
+        assert content.count("\n") == 1, "a sudoers drop-in unbork writes is one line"
 
     def test_removal_is_unaffected(self):
         from app.user_mgmt.generator import _sudoers_tasks

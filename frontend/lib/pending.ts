@@ -63,7 +63,7 @@ export interface PendingItem {
   driftHost?: { id: number; hostname: string }
 }
 
-const STORAGE_KEY = "labdog:pending-dismissed"
+const STORAGE_KEY = "unbork:pending-dismissed"
 
 function readDismissed(): Record<string, number> {
   try {

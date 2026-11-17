@@ -8,24 +8,24 @@
 # Exactly one "beat". Scale "worker" (syncs), "worker-drift" (drift
 # checks) and "worker-actions" (action runs' host runs) independently.
 
-x-labdog: &labdog
-  image: ${LABDOG_IMAGE:-labdog:latest}
-  environment: &labdog-env
-    LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:${POSTGRES_PASSWORD:-labdog_test_pw}@postgres:5432/labdog
-    LABDOG_REDIS__URL: redis://redis:6379/0
-    LABDOG_SECURITY__SECRET_KEY: "${LABDOG_SECURITY__SECRET_KEY}"
-    LABDOG_SECURITY__ENCRYPTION_KEY: "${LABDOG_SECURITY__ENCRYPTION_KEY}"
-    LABDOG_SECURITY__LABDOG_SERVER_IP: ${LABDOG_SECURITY__LABDOG_SERVER_IP:-127.0.0.1}
-    LABDOG_CELERY__CONCURRENCY: ${LABDOG_CELERY__CONCURRENCY:-4}
-    LABDOG_CELERY__DRIFT_CONCURRENCY: ${LABDOG_CELERY__DRIFT_CONCURRENCY:-4}
-    LABDOG_CELERY__ACTIONS_CONCURRENCY: ${LABDOG_CELERY__ACTIONS_CONCURRENCY:-4}
-    LABDOG_CELERY__ORCHESTRATOR_CONCURRENCY: ${LABDOG_CELERY__ORCHESTRATOR_CONCURRENCY:-4}
+x-unbork: &unbork
+  image: ${UNBORK_IMAGE:-unbork:latest}
+  environment: &unbork-env
+    UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:${POSTGRES_PASSWORD:-unbork_test_pw}@postgres:5432/unbork
+    UNBORK_REDIS__URL: redis://redis:6379/0
+    UNBORK_SECURITY__SECRET_KEY: "${UNBORK_SECURITY__SECRET_KEY}"
+    UNBORK_SECURITY__ENCRYPTION_KEY: "${UNBORK_SECURITY__ENCRYPTION_KEY}"
+    UNBORK_SECURITY__UNBORK_SERVER_IP: ${UNBORK_SECURITY__UNBORK_SERVER_IP:-127.0.0.1}
+    UNBORK_CELERY__CONCURRENCY: ${UNBORK_CELERY__CONCURRENCY:-4}
+    UNBORK_CELERY__DRIFT_CONCURRENCY: ${UNBORK_CELERY__DRIFT_CONCURRENCY:-4}
+    UNBORK_CELERY__ACTIONS_CONCURRENCY: ${UNBORK_CELERY__ACTIONS_CONCURRENCY:-4}
+    UNBORK_CELERY__ORCHESTRATOR_CONCURRENCY: ${UNBORK_CELERY__ORCHESTRATOR_CONCURRENCY:-4}
   # One pack checkout for every container. A pack added or synced in the UI
   # is synced by the api container only, and workers reload the action
   # registry from this disk, so separate disks would leave workers on old
   # playbooks (or "not found in registry") until they restarted.
   volumes:
-    - packs:/var/lib/labdog/packs
+    - packs:/var/lib/unbork/packs
   depends_on:
     postgres: { condition: service_healthy }
     redis: { condition: service_healthy }
@@ -37,13 +37,13 @@ services:
     # Budget about six connections per worker slot: see docs/scaling-out.md.
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
     environment:
-      POSTGRES_USER: labdog
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labdog_test_pw}
-      POSTGRES_DB: labdog
+      POSTGRES_USER: unbork
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unbork_test_pw}
+      POSTGRES_DB: unbork
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labdog"]
+      test: ["CMD-SHELL", "pg_isready -U unbork"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,30 +59,30 @@ services:
     restart: unless-stopped
 
   api:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: api }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: api }
     ports:
       - "8000:8000"
 
   beat:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: beat }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: beat }
 
   orchestrator:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: orchestrator }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: orchestrator }
 
   worker:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: worker }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker }
 
   worker-drift:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: worker-drift }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker-drift }
 
   worker-actions:
-    <<: *labdog
-    environment: { <<: *labdog-env, LABDOG_ROLE: worker-actions }
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker-actions }
 
 volumes:
   postgres_data:

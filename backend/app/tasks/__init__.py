@@ -8,7 +8,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 celery_app = Celery(
-    "labdog",
+    "unbork",
     broker=settings.redis.url,
     backend=settings.redis.url,
 )
@@ -183,7 +183,7 @@ def _is_orchestrator_worker(sender) -> bool:
 def _sibling_syncs_packs() -> bool:
     """True when another worker in this container syncs the pack checkouts.
 
-    ``LABDOG_ROLE`` is set by the CeleryManager that spawned this worker.
+    ``UNBORK_ROLE`` is set by the CeleryManager that spawned this worker.
     In the default ``all`` role (or with no role, e.g. a worker started by
     hand) the ``work`` sibling shares this disk and syncs. An
     ``orchestrator`` container of its own has no such sibling and must
@@ -194,7 +194,7 @@ def _sibling_syncs_packs() -> bool:
     """
     import os  # noqa: PLC0415
 
-    roles = {r.strip() for r in os.environ.get("LABDOG_ROLE", "all").split(",")}
+    roles = {r.strip() for r in os.environ.get("UNBORK_ROLE", "all").split(",")}
     return bool(roles & {"all", "worker", "worker-drift", "worker-actions"})
 
 
@@ -288,7 +288,7 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
         import redis as redis_lib  # noqa: PLC0415
 
         if not redis_lib.from_url(settings.redis.url).set(
-            "labdog:startup-orphan-sweep", "1", nx=True, ex=60
+            "unbork:startup-orphan-sweep", "1", nx=True, ex=60
         ):
             return
 

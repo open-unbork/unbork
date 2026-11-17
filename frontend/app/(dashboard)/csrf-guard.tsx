@@ -8,7 +8,7 @@ export function CsrfGuard() {
   useEffect(() => {
     const hasCsrf = document.cookie
       .split(";")
-      .some((c) => c.trim().startsWith("labdog_csrf="))
+      .some((c) => c.trim().startsWith("unbork_csrf="))
     if (!hasCsrf) {
       fetch(`${API_BASE}/api/auth/csrf-token`, { credentials: "include" }).catch(() => {})
     }

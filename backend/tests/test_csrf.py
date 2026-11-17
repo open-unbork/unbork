@@ -5,11 +5,11 @@ Coverage:
 - POST to a protected endpoint without X-CSRF-Token -> 403
 - POST with wrong X-CSRF-Token (cookie set, header has different value) -> 403
 - POST with cookie+header matching -> passes (200/201/204)
-- Login response sets both labdog_auth AND labdog_csrf cookies
+- Login response sets both unbork_auth AND unbork_csrf cookies
 - GET requests work without X-CSRF-Token (only mutating methods are gated)
 - Login endpoint accepts POST without X-CSRF-Token (exempt)
 - Logout endpoint accepts POST without X-CSRF-Token (exempt)
-  and clears the labdog_csrf cookie
+  and clears the unbork_csrf cookie
 - WebSocket connect does not require the header (upgrade is GET)
 """
 
@@ -62,7 +62,7 @@ class TestCsrfMiddleware:
             assert login_resp.status_code in (200, 204)
 
         # New client with only the auth cookie — no CSRF cookie, no header.
-        auth_cookies = {"labdog_auth": login_resp.cookies.get("labdog_auth", "")}
+        auth_cookies = {"unbork_auth": login_resp.cookies.get("unbork_auth", "")}
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",
@@ -111,10 +111,10 @@ class TestCsrfMiddleware:
 
     async def test_post_with_matching_csrf_token_passes(self, superuser_client, db):
         """Cookie and header with matching values -> request is forwarded."""
-        # superuser_client already has labdog_csrf set from login.
+        # superuser_client already has unbork_csrf set from login.
         # Extract the CSRF cookie value from the client's cookie jar.
-        csrf_token = superuser_client.cookies.get("labdog_csrf")
-        assert csrf_token, "labdog_csrf cookie should be set after login"
+        csrf_token = superuser_client.cookies.get("unbork_csrf")
+        assert csrf_token, "unbork_csrf cookie should be set after login"
 
         resp = await superuser_client.post(
             "/api/groups/",
@@ -125,15 +125,15 @@ class TestCsrfMiddleware:
         assert resp.status_code != 403
 
     async def test_login_sets_both_cookies(self, client, db):
-        """Successful login response includes labdog_auth AND labdog_csrf cookies."""
+        """Successful login response includes unbork_auth AND unbork_csrf cookies."""
         email, password, _ = _make_user_in_db(db)
         await db.flush()
         resp = await client.post(
             "/api/auth/jwt/login", data={"username": email, "password": password}
         )
         assert resp.status_code in (200, 204)
-        assert "labdog_auth" in resp.cookies, "labdog_auth cookie must be set on login"
-        assert "labdog_csrf" in resp.cookies, "labdog_csrf cookie must be set on login"
+        assert "unbork_auth" in resp.cookies, "unbork_auth cookie must be set on login"
+        assert "unbork_csrf" in resp.cookies, "unbork_csrf cookie must be set on login"
 
     async def test_get_request_does_not_require_csrf(self, superuser_client):
         """GET requests are never blocked by the CSRF middleware."""
@@ -176,14 +176,14 @@ class TestCsrfMiddleware:
             assert "CSRF" not in resp.json().get("detail", "")
 
     async def test_logout_exempt_and_clears_csrf_cookie(self, client, db):
-        """POST /api/auth/jwt/logout is exempt from CSRF and clears labdog_csrf."""
+        """POST /api/auth/jwt/logout is exempt from CSRF and clears unbork_csrf."""
         email, password, _ = _make_user_in_db(db)
         await db.flush()
         login_resp = await client.post(
             "/api/auth/jwt/login", data={"username": email, "password": password}
         )
         assert login_resp.status_code in (200, 204)
-        assert "labdog_csrf" in login_resp.cookies
+        assert "unbork_csrf" in login_resp.cookies
 
         # Logout without supplying X-CSRF-Token — should not be blocked.
         logout_resp = await client.post("/api/auth/jwt/logout")
@@ -191,13 +191,13 @@ class TestCsrfMiddleware:
             f"Logout should not be blocked by CSRF middleware: {logout_resp.text}"
         )
 
-        # The response should clear the labdog_csrf cookie (Max-Age=0).
+        # The response should clear the unbork_csrf cookie (Max-Age=0).
         set_cookie_headers = [
             v for k, v in logout_resp.headers.multi_items() if k.lower() == "set-cookie"
         ]
-        csrf_clear = any("labdog_csrf=" in h and "Max-Age=0" in h for h in set_cookie_headers)
+        csrf_clear = any("unbork_csrf=" in h and "Max-Age=0" in h for h in set_cookie_headers)
         assert csrf_clear, (
-            f"Logout should clear labdog_csrf cookie; got Set-Cookie headers: {set_cookie_headers}"
+            f"Logout should clear unbork_csrf cookie; got Set-Cookie headers: {set_cookie_headers}"
         )
 
     async def test_put_without_csrf_token_returns_403(self, app, db):
@@ -218,7 +218,7 @@ class TestCsrfMiddleware:
             )
             assert login_resp.status_code in (200, 204)
 
-        auth_cookies = {"labdog_auth": login_resp.cookies.get("labdog_auth", "")}
+        auth_cookies = {"unbork_auth": login_resp.cookies.get("unbork_auth", "")}
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",
@@ -247,7 +247,7 @@ class TestCsrfMiddleware:
             )
             assert login_resp.status_code in (200, 204)
 
-        auth_cookies = {"labdog_auth": login_resp.cookies.get("labdog_auth", "")}
+        auth_cookies = {"unbork_auth": login_resp.cookies.get("unbork_auth", "")}
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",

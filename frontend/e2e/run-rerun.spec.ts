@@ -21,7 +21,7 @@ const ACTION = {
     { key: "mode", label: "Mode", type: "choice", default: "safe", required: false, choices: ["safe", "full"], help_text: null },
     { key: "hold", label: "Hold packages", type: "string", default: null, required: false, choices: null, help_text: null },
   ],
-  pack_name: "labdog-playbooks",
+  pack_name: "unbork-playbooks",
   winning_pack_id: 1,
   unresolved: false,
   overridden_from: [],

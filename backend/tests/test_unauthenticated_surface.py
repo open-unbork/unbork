@@ -169,7 +169,7 @@ class TestTheTerminalHandshake:
 
         user = await _user(db, generation=3)
         ws = AsyncMock()
-        ws.cookies = {"labdog_auth": _token(user.id, generation=2)}
+        ws.cookies = {"unbork_auth": _token(user.id, generation=2)}
 
         with pytest.raises(RuntimeError, match="stale session generation"):
             await get_ws_user(ws, db)
@@ -180,7 +180,7 @@ class TestTheTerminalHandshake:
 
         user = await _user(db, generation=3)
         ws = AsyncMock()
-        ws.cookies = {"labdog_auth": _token(user.id, generation=3)}
+        ws.cookies = {"unbork_auth": _token(user.id, generation=3)}
 
         assert (await get_ws_user(ws, db)).id == user.id
 
@@ -189,7 +189,7 @@ class TestTheTerminalHandshake:
 
         user = await _user(db)
         ws = AsyncMock()
-        ws.cookies = {"labdog_auth": _token(user.id, generation=None)}
+        ws.cookies = {"unbork_auth": _token(user.id, generation=None)}
 
         with pytest.raises(RuntimeError, match="invalid token"):
             await get_ws_user(ws, db)
@@ -217,19 +217,19 @@ class TestTheTerminalHandshake:
         ("origin", "host", "allowed"),
         [
             # BUG-88: lin-manager, TLS ended at nginx, Host passed through.
-            ("https://labdog.lan.tyresson.se", "labdog.lan.tyresson.se", True),
-            ("https://LabDog.lan.tyresson.se", "labdog.lan.tyresson.se", True),
-            ("https://labdog.example.com", "labdog.example.com:443", True),
+            ("https://unbork.lan.tyresson.se", "unbork.lan.tyresson.se", True),
+            ("https://unbork.lan.tyresson.se", "unbork.lan.tyresson.se", True),
+            ("https://unbork.example.com", "unbork.example.com:443", True),
             ("http://10.0.0.5:8000", "10.0.0.5:8000", True),
             ("http://[::1]:8000", "[::1]:8000", True),
             # A cross-site page names its own origin, not ours.
-            ("https://evil.example.com", "labdog.lan.tyresson.se", False),
-            ("https://labdog.lan.tyresson.se.evil.com", "labdog.lan.tyresson.se", False),
+            ("https://evil.example.com", "unbork.lan.tyresson.se", False),
+            ("https://unbork.lan.tyresson.se.evil.com", "unbork.lan.tyresson.se", False),
             # Same name, different port: a different origin.
-            ("http://labdog.lan:8080", "labdog.lan:8000", False),
-            ("https://labdog.lan", None, False),
-            ("null", "labdog.lan", False),
-            ("https://labdog.lan:notaport", "labdog.lan", False),
+            ("http://unbork.lan:8080", "unbork.lan:8000", False),
+            ("https://unbork.lan", None, False),
+            ("null", "unbork.lan", False),
+            ("https://unbork.lan:notaport", "unbork.lan", False),
         ],
     )
     async def test_the_request_own_origin_is_allowed(self, origin, host, allowed):
@@ -249,14 +249,14 @@ class TestTheTerminalHandshake:
         from app.auth.ws_auth import check_ws_origin
 
         ws = MagicMock()
-        ws.headers = {"origin": "https://evil.example.com", "host": "labdog.lan"}
+        ws.headers = {"origin": "https://evil.example.com", "host": "unbork.lan"}
         ws.url.path = "/api/ssh-terminal/ws/1"
         with patch.object(settings.security, "allowed_origins", ["http://localhost:3000"]):
             with caplog.at_level("WARNING", logger="app.auth.ws_auth"):
                 assert await check_ws_origin(ws) is False
 
         assert "https://evil.example.com" in caplog.text
-        assert "labdog.lan" in caplog.text
+        assert "unbork.lan" in caplog.text
 
     async def test_an_unauthenticated_peer_never_gets_an_accepted_socket(self, app, db):
         """Accepting first meant an unauthenticated caller held an open
