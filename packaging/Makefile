@@ -162,6 +162,9 @@ notices: build-venv build-frontend
 		--frontend $(CURDIR)/frontend-licences.json \
 		--overrides licence-overrides.toml \
 		--out $(DOCDIR)/THIRD-PARTY-NOTICES
+	@# Also next to the code: minimal images and some sites exclude
+	@# /usr/share/doc from dpkg installs, and the notices must survive that.
+	cp $(DOCDIR)/LICENSE $(DOCDIR)/SOURCE-OFFER.md $(DOCDIR)/THIRD-PARTY-NOTICES $(DESTDIR)$(PREFIX)/
 	@rm -f $(CURDIR)/frontend-licences.json
 
 # --- clean ---

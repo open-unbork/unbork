@@ -233,8 +233,9 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ### Licence and third-party notices
 
-Every image and package carries, in `/usr/share/doc/unbork/` (and the
-tarball at its root too):
+Every image and package carries, in `/usr/share/doc/unbork/` (packages
+also in `/usr/lib/unbork/`, which a minimal system that drops
+`/usr/share/doc` keeps; the tarball at its root too):
 
 - `LICENSE`: unbork's own licence, AGPL-3.0-or-later.
 - `THIRD-PARTY-NOTICES`: every third-party component it ships, Python,

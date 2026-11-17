@@ -39,13 +39,14 @@ contents:
       mode: 0755
 
   # ── Licence, third-party notices, source offer (S-010) ────────────────
+  # No mode: on a tree it applies to the directory too, and 0644 would
+  # make /usr/share/doc/unbork unreadable to anyone but root.
   - src: staging/usr/share/doc/unbork/
     dst: /usr/share/doc/unbork/
     type: tree
     file_info:
       owner: root
       group: root
-      mode: 0644
 
   # ── Config file (config|noreplace — preserved on upgrade) ─────────────
   - src: etc/unbork.toml

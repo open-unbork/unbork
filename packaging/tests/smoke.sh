@@ -34,10 +34,12 @@ ok "application code + venv present"
 ok "no action pack shipped in the package"
 
 # 2b. Licence, notices, source offer (S-010) --------------------------------
+# Checked next to the code: these containers exclude /usr/share/doc from
+# dpkg installs. The package puts a copy in both places.
 for f in LICENSE SOURCE-OFFER.md THIRD-PARTY-NOTICES; do
-    [ -s "/usr/share/doc/unbork/$f" ] || fail "missing or empty: /usr/share/doc/unbork/$f"
+    [ -s "/usr/lib/unbork/$f" ] || fail "missing or empty: /usr/lib/unbork/$f"
 done
-grep -q '^ansible-core ' /usr/share/doc/unbork/THIRD-PARTY-NOTICES \
+grep -q '^ansible-core ' /usr/lib/unbork/THIRD-PARTY-NOTICES \
     || fail "THIRD-PARTY-NOTICES does not list ansible-core"
 ok "licence, third-party notices and source offer present"
 

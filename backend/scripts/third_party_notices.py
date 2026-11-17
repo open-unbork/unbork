@@ -38,8 +38,14 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-DEFAULT_OVERRIDES = REPO / "packaging" / "licence-overrides.toml"
+# The checkout's overrides when run from the repository; a build copies the
+# script elsewhere (/tmp in the image) and passes --overrides.
+_HERE = Path(__file__).resolve()
+DEFAULT_OVERRIDES = (
+    _HERE.parents[2] / "packaging" / "licence-overrides.toml"
+    if len(_HERE.parents) > 2
+    else Path("licence-overrides.toml")
+)
 
 #: unbork's own distribution names: not third-party.
 OWN = {"unbork-backend"}
