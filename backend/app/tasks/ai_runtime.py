@@ -21,7 +21,11 @@ def install_claude_code() -> dict:
     from app.ai import claude_code
 
     try:
-        path = claude_code.install()
+        # Never wait on another worker's download: a second click on Test
+        # must not hold a long_running slot for the whole of it.
+        path = claude_code.install(wait=False)
+    except claude_code.InstallInProgress:
+        return {"ok": False, "installing": True}
     except claude_code.ClaudeCodeUnavailable as exc:
         # install() has written the text to last_error, which the
         # providers page reads. A retry is the operator's call.

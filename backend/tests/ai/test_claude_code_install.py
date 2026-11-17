@@ -12,6 +12,7 @@ import io
 import os
 import stat
 import threading
+import time
 import uuid
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -359,3 +360,46 @@ def test_a_session_worker_installs_once_or_fails_with_the_reason(isolated, monke
     with pytest.raises(AIDisabledError) as err:
         _ensure_program()
     assert str(err.value).startswith("Provider unavailable:")
+
+
+def test_a_second_install_does_not_wait_on_a_running_one(isolated):
+    """A queued task or a session must not hold a worker for another's download."""
+    import fcntl
+
+    isolated.mkdir()
+    fd = os.open(isolated / claude_code.LOCK_NAME, os.O_RDWR | os.O_CREAT)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        with pytest.raises(claude_code.InstallInProgress):
+            claude_code.install(wait=False)
+        with pytest.raises(claude_code.InstallInProgress):
+            claude_code.ensure_installed()
+        from app.tasks.ai_runtime import install_claude_code
+
+        assert install_claude_code.run() == {"ok": False, "installing": True}
+    finally:
+        os.close(fd)
+
+
+def test_a_recent_failure_is_not_retried_by_every_session(isolated, server, pinned):
+    isolated.mkdir()
+    (isolated / claude_code.ERROR_NAME).write_text("Provider unavailable: no route\n")
+    with pytest.raises(ClaudeCodeUnavailable) as err:
+        claude_code.ensure_installed()
+    assert str(err.value) == "Provider unavailable: no route"
+    assert server.requests == 0
+
+    # Once it is old enough, the next session tries again.
+    old = time.time() - claude_code.RETRY_AFTER_SECONDS - 1
+    os.utime(isolated / claude_code.ERROR_NAME, (old, old))
+    assert claude_code.ensure_installed() == isolated / "0.0.1" / "claude"
+    assert server.requests == 1
+
+
+def test_a_killed_download_is_cleaned_up(isolated, server, pinned):
+    isolated.mkdir()
+    leftover = isolated / ".install-abc123"
+    leftover.mkdir()
+    (leftover / "sdk.whl").write_bytes(b"partial")
+    claude_code.install()
+    assert not leftover.exists()

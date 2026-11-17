@@ -63,6 +63,11 @@ WHEEL_MEMBER = "claude_agent_sdk/_bundled/claude"
 #: Whole download, connect to last byte. The wheel is about 90 MB.
 DOWNLOAD_TIMEOUT_SECONDS = 600
 
+#: How long a failed install answers sessions from its stored error before
+#: a session may try the download again. The providers page's Test always
+#: queues a fresh attempt.
+RETRY_AFTER_SECONDS = 15 * 60
+
 LOCK_NAME = ".lock"
 ERROR_NAME = "last_error"
 VERSION_NAME = "version"
@@ -184,7 +189,7 @@ def status(root: Path | None = None) -> RuntimeStatus:
     return RuntimeStatus("missing", "The Claude Code program is not installed yet.")
 
 
-def _pinned_wheel(pin: dict) -> tuple[str, str, str]:
+def _pinned_wheel(pin: dict) -> tuple[str, str]:
     machine = platform.machine().lower()
     arch = _ARCH_ALIASES.get(machine)
     wheel = pin["wheels"].get(arch) if arch else None
@@ -194,7 +199,7 @@ def _pinned_wheel(pin: dict) -> tuple[str, str, str]:
             f"({machine or 'unknown'}). Put a `claude` program on PATH for the unbork "
             "service user instead."
         )
-    return arch, wheel["url"], wheel["sha256"]
+    return wheel["url"], wheel["sha256"]
 
 
 def _download(url: str, dest: Path) -> str:
@@ -257,7 +262,11 @@ def _install_locked(root: Path, pin: dict) -> Path:
     if target.is_file() and os.access(target, os.X_OK):
         return target
 
-    _arch, url, sha256 = _pinned_wheel(pin)
+    # A download a killed worker left behind; nothing else holds the lock.
+    for stale in root.glob(".install-*"):
+        shutil.rmtree(stale, ignore_errors=True)
+
+    url, sha256 = _pinned_wheel(pin)
     work = Path(tempfile.mkdtemp(prefix=".install-", dir=root))
     try:
         wheel = work / "sdk.whl"
@@ -300,11 +309,20 @@ def _install_locked(root: Path, pin: dict) -> Path:
     return target
 
 
-def install(root: Path | None = None) -> Path:
+class InstallInProgress(ClaudeCodeUnavailable):
+    """Another process holds the install lock."""
+
+    def __init__(self) -> None:
+        super().__init__("the Claude Code program is being installed; try again in a few minutes.")
+
+
+def install(root: Path | None = None, *, wait: bool = True) -> Path:
     """Install the pinned program unless it is there; return its path.
 
     Safe to call from several processes at once: they queue on an
-    exclusive lock, and all but the first find it installed.
+    exclusive lock, and all but the first find it installed. With
+    ``wait=False`` a caller that finds the lock taken gets
+    :class:`InstallInProgress` at once instead of waiting out the download.
     """
     root = root or INSTALL_ROOT
     try:
@@ -317,7 +335,10 @@ def install(root: Path | None = None) -> Path:
         ) from exc
     error_file = root / ERROR_NAME
     try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise InstallInProgress() from None
         try:
             path = _install_locked(root, load_pin())
         except ClaudeCodeUnavailable as exc:
@@ -343,6 +364,24 @@ def ensure_installed(root: Path | None = None) -> Path:
 
     For workers about to start a session: a split deployment whose worker
     has its own volume gets the program the first time it needs it.
+
+    Never waits on another process's download, and does not retry a
+    failure younger than :data:`RETRY_AFTER_SECONDS`: a burst of sessions on
+    a server that cannot reach the download must not each hold a worker
+    for the timeout. Those get the stored error at once.
     """
+    root = root or INSTALL_ROOT
     found = binary_path(root)
-    return found if found is not None else install(root)
+    if found is not None:
+        return found
+    error_file = root / ERROR_NAME
+    try:
+        age = time.time() - error_file.stat().st_mtime
+    except OSError:
+        age = None
+    if age is not None and age < RETRY_AFTER_SECONDS:
+        with contextlib.suppress(OSError):
+            stored = error_file.read_text().strip()
+            if stored:
+                raise ClaudeCodeUnavailable(stored.removeprefix("Provider unavailable: "))
+    return install(root, wait=False)
