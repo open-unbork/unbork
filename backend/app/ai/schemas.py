@@ -100,6 +100,7 @@ class AIProviderUpdate(BaseModel):
 class AIProviderRuntime(BaseModel):
     """The Claude Code program's install state (S-009)."""
 
+    # Mirrors app.ai.claude_code.State, which is imported lazily here.
     state: Literal["ready", "missing", "installing", "failed"]
     detail: str
 
@@ -169,7 +170,7 @@ def credential_expiry(provider: AIProvider) -> datetime | None:
     return provider.credential_set_at + SUBSCRIPTION_TOKEN_LIFETIME
 
 
-def _runtime(provider: AIProvider) -> AIProviderRuntime:
+def _runtime() -> AIProviderRuntime:
     from app.ai import claude_code
 
     return AIProviderRuntime(**claude_code.status().as_dict())
@@ -200,7 +201,7 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         uses_subscription=uses_subscription(provider),
         credential_expires_at=credential_expiry(provider),
         refused_reason=provider_type_refusal(provider.provider_type),
-        runtime=_runtime(provider) if uses_subscription(provider) else None,
+        runtime=_runtime() if uses_subscription(provider) else None,
         input_cost_per_mtok=provider.input_cost_per_mtok,
         output_cost_per_mtok=provider.output_cost_per_mtok,
         monthly_budget=provider.monthly_budget,
