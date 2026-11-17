@@ -37,7 +37,7 @@ class TestTokenInjection:
     def test_the_rest_of_the_environment_survives(self) -> None:
         """Dropping unrelated variables would break PATH, HOME, and the
         proxy settings the CLI needs to reach the network at all."""
-        base = {"PATH": "/usr/bin", "HOME": "/var/lib/labdog", "HTTPS_PROXY": "http://p"}
+        base = {"PATH": "/usr/bin", "HOME": "/var/lib/unbork", "HTTPS_PROXY": "http://p"}
         env = build_cli_env("tok", base=base)
         for key, value in base.items():
             assert env[key] == value
@@ -84,7 +84,7 @@ class TestStoredCredentialTrap:
     With the *same* bogus token and a HOME containing a real
     `.claude/.credentials.json`, it succeeded — the stored login won and the
     configured token was ignored, with no warning and no visible difference
-    in the output. Identical failure signature to the env-var trap: LabDog
+    in the output. Identical failure signature to the env-var trap: unbork
     would silently authenticate as somebody else's account.
 
     `CLAUDE_CONFIG_DIR` is what closes it; pointing it at an empty directory
@@ -97,7 +97,7 @@ class TestStoredCredentialTrap:
 
     def test_isolation_overrides_an_inherited_config_dir(self) -> None:
         """An inherited value pointing at a home with a login would reopen
-        the trap, so LabDog's value has to win."""
+        the trap, so unbork's value has to win."""
         env = build_cli_env("tok", base={CONFIG_DIR_ENV: "/home/someone/.claude"})
         assert env[CONFIG_DIR_ENV] == DEFAULT_CONFIG_DIR
 
@@ -105,15 +105,15 @@ class TestStoredCredentialTrap:
         """Without a token the intended setup *is* the host's own login, so
         isolating the config directory would break the only thing that case
         can use to authenticate."""
-        base = {CONFIG_DIR_ENV: "/home/labdog/.claude"}
+        base = {CONFIG_DIR_ENV: "/home/unbork/.claude"}
         assert build_cli_env(None, base=base) == base
         assert CONFIG_DIR_ENV not in build_cli_env(None, base={})
 
-    def test_the_isolated_directory_lives_under_labdog_state(self) -> None:
+    def test_the_isolated_directory_lives_under_unbork_state(self) -> None:
         """It has to be somewhere both deployment shapes can write:
         `ReadWritePaths` in the systemd unit, and the documented volume
         mount in a container. Anywhere else and one of the two breaks."""
-        assert DEFAULT_CONFIG_DIR.startswith("/var/lib/labdog/")
+        assert DEFAULT_CONFIG_DIR.startswith("/var/lib/unbork/")
 
 
 class TestConfigDirCreation:

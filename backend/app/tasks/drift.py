@@ -63,7 +63,7 @@ async def _check_drift_for_one_host(host, db, hms=None) -> bool:
         from app.api.drift import _get_desired_state_for_host
 
         desired, desired_policies = await _get_desired_state_for_host(
-            host.id, db, host_source_ip=host.labdog_source_ip
+            host.id, db, host_source_ip=host.unbork_source_ip
         )
         _t0 = time.monotonic()
         current_fw_state = await fetch_current_firewall_state(host.id, db)
@@ -109,7 +109,7 @@ async def _check_drift_for_one_host(host, db, hms=None) -> bool:
 
         await refresh_host_sync_status(host, db)
 
-        if not host.labdog_source_ip and host.ssh_key_id:
+        if not host.unbork_source_ip and host.ssh_key_id:
             try:
                 key_result = await db.execute(select(SSHKey).where(SSHKey.id == host.ssh_key_id))
                 ssh_key = key_result.scalar_one_or_none()
@@ -123,7 +123,7 @@ async def _check_drift_for_one_host(host, db, hms=None) -> bool:
                         db,
                         client_keys=[imported_key],
                     ) as probe:
-                        host.labdog_source_ip = await get_source_ip(probe)
+                        host.unbork_source_ip = await get_source_ip(probe)
             except Exception:
                 # Best-effort: the drift verdict is the point, the source
                 # IP is an optimisation for the next merge. Logged at

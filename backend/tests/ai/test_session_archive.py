@@ -301,13 +301,13 @@ class TestDeletingInBulk:
 
     async def test_skips_a_session_whose_snapshot_is_kept(self, superuser_client, db, ai_provider):
         session = await _session(db, ai_provider, autonomy="approval")
-        await _changed_a_host(db, session, snapshot="labdog-ai-7-1")
+        await _changed_a_host(db, session, snapshot="unbork-ai-7-1")
         await db.commit()
 
         done, skipped = await self._delete(superuser_client, session.id)
 
         assert done == []
-        assert "labdog-ai-7-1" in skipped[session.id]
+        assert "unbork-ai-7-1" in skipped[session.id]
 
 
 class TestTheSingleDelete:
@@ -334,7 +334,7 @@ class TestTheSingleDelete:
         self, superuser_client, db, ai_provider
     ):
         session = await _session(db, ai_provider, autonomy="approval")
-        await _changed_a_host(db, session, snapshot="labdog-ai-7-2")
+        await _changed_a_host(db, session, snapshot="unbork-ai-7-2")
         await db.commit()
 
         resp = await superuser_client.delete(f"/api/ai/sessions/{session.id}")
@@ -347,7 +347,7 @@ class TestTheSingleDelete:
                 )
             )
         ).scalar_one()
-        assert row.before_state["snapshots_left_behind"] == ["labdog-ai-7-2"]
+        assert row.before_state["snapshots_left_behind"] == ["unbork-ai-7-2"]
 
 
 class TestArchivingOnASchedule:

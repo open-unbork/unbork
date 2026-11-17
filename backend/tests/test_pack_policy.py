@@ -1,14 +1,14 @@
 """SEC-21: a pack may not ship controller-side code unless it is trusted.
 
-An action pack is a git repository someone points LabDog at. Its playbooks
+An action pack is a git repository someone points unbork at. Its playbooks
 are meant to run against managed hosts — but ansible-core gives a repository
-several ways to run code on the *controller*, which is the LabDog host, as
-the labdog user: plugin directories it imports Python from, and plays that
+several ways to run code on the *controller*, which is the unbork host, as
+the unbork user: plugin directories it imports Python from, and plays that
 target localhost or set ``connection: local``.
 
 The loader validated the manifest's parameter declarations and never looked
 at the playbook body, so registering a pack was equivalent to handing over
-code execution on the LabDog host. Under the flat privilege model that is
+code execution on the unbork host. Under the flat privilege model that is
 reachable by any authenticated account, with nothing behind it.
 
 ``trusted`` is not a privilege boundary and these tests do not pretend it is
@@ -219,7 +219,7 @@ class TestOtherRoutesToTheControllerAreFound:
             (_TASKS, "- ansible.builtin.fetch: {src: /etc/x, dest: /tmp/x}\n"),
             (
                 _TASKS,
-                "- ansible.builtin.copy: {src: /etc/labdog/labdog.toml, dest: /tmp/x}\n",
+                "- ansible.builtin.copy: {src: /etc/unbork/unbork.toml, dest: /tmp/x}\n",
             ),
             (_TASKS, "- ansible.builtin.template: {src: ../../x.j2, dest: /x}\n"),
         ],

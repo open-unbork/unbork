@@ -58,7 +58,7 @@ def _defn(key: str, pack_name: str, winning_pack_id: int | None):
 @pytest.fixture
 def registry_with_linux_upgrade():
     """ACTION_REGISTRY with ``linux-upgrade`` won by pack 3."""
-    fake_defn = _defn("linux-upgrade", "labdog-playbooks", 3)
+    fake_defn = _defn("linux-upgrade", "unbork-playbooks", 3)
     with patch("app.actions.registry.ACTION_REGISTRY", {"linux-upgrade": fake_defn}):
         yield
 

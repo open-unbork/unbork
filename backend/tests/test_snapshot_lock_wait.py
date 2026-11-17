@@ -96,7 +96,7 @@ async def test_retries_until_the_lock_clears(clock):
         client, "pve", 101, 7, lock_wait_seconds=600, on_lock_wait=lines.append
     )
 
-    assert name.startswith("labdog-7-")
+    assert name.startswith("unbork-7-")
     assert client.posts == 3
     assert clock.sleeps == [30, 30]
     assert lines[0].startswith("VM 101 is locked (backup) — waiting for the lock to clear")

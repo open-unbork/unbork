@@ -67,7 +67,7 @@ DENYLIST_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
 )
 
-# Shutting these down takes the host — and possibly LabDog itself — off the
+# Shutting these down takes the host — and possibly unbork itself — off the
 # network. Always gated, never auto-run.
 _HALT_COMMANDS = frozenset({"shutdown", "reboot", "poweroff", "halt", "init", "telinit"})
 

@@ -8,7 +8,7 @@ on disk under ``settings.ansible.packs_root_dir/<id>`` by
 lifespan startup, Celery worker startup, and any mutation to the
 ``action_packs`` table (via the router's call to
 ``reload_registry_async``). Nothing pack-supplied ships in the image: a
-fresh install gets its actions from the seeded ``labdog-playbooks`` pack
+fresh install gets its actions from the seeded ``unbork-playbooks`` pack
 on first sync, and until then the registry holds the built-ins alone.
 
 Packs have **no inherent precedence**. Each rebuild reads

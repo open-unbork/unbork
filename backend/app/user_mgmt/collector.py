@@ -142,7 +142,7 @@ async def _read_user_files(
     refuses, adds an ``x-keys`` / ``x-sudo`` section, which the caller
     reports as an error (BUG-172).
     """
-    marker = f"LABDOG-{secrets.token_hex(8)}"
+    marker = f"UNBORK-{secrets.token_hex(8)}"
     # `test -e` exits 1 for a missing file; sudo exits 1 too when it
     # refuses, so the status alone cannot tell them apart. `sudo -n true`
     # once up front decides whether sudo works at all.

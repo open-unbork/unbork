@@ -285,8 +285,8 @@ Before the assistant changes a host that maps to a Proxmox VM, unbork
 takes a snapshot. It applies to both **Approval required** and **Full
 auto** — the second is where it matters most, since nobody was watching.
 
-They are named `labdog-ai-<session>-<timestamp>`, distinct from the
-`labdog-<run>-<timestamp>` an action pack takes, because the two have
+They are named `unbork-ai-<session>-<timestamp>`, distinct from the
+`unbork-<run>-<timestamp>` an action pack takes, because the two have
 different lifetimes and you need to know which is which before deleting
 one by hand.
 
@@ -351,7 +351,7 @@ the fix made the host worse — see
 
 One gap to know about: deleting a session removes the record of any
 snapshot it took, so the sweep can no longer find it. The names are
-recorded in the audit entry for the deletion, and the `labdog-ai-` prefix
+recorded in the audit entry for the deletion, and the `unbork-ai-` prefix
 makes strays identifiable in the Proxmox UI.
 
 ---
@@ -499,7 +499,7 @@ Setting it up takes three steps.
 
 **1. Install it where the service can see it.** *Container deploys can
 skip this step — the official image bundles the binary.* On a package
-install, unbork runs as the `labdog` system user with `ProtectHome=true`,
+install, unbork runs as the `unbork` system user with `ProtectHome=true`,
 so anything under a home directory is invisible to it and a per-user
 install will not be found. Use the apt repository, which puts the binary
 on the system path:
@@ -607,7 +607,7 @@ use an API-key provider there.
 The official image bundles the `claude` binary, so there is nothing to
 install. Paste your token into the provider form and it works.
 
-Mount a volume at `/var/lib/labdog/claude-cli`. Claude Code keeps its own
+Mount a volume at `/var/lib/unbork/claude-cli`. Claude Code keeps its own
 session files there, and a session paused waiting for your approval
 resumes from them — a pause that can last a day. Without the volume,
 upgrading the image mid-approval loses everything the assistant
@@ -634,8 +634,8 @@ Two things follow from unbork owning the process:
 - **The token never lives in the image.** It is stored encrypted in the
   database and injected into the CLI's environment at spawn time, so
   rebuilding or replacing the image does not disturb your credentials.
-- **The CLI's state is isolated to `/var/lib/labdog/claude-cli`,** not
-  `$HOME`. Mount a volume at `/var/lib/labdog` — you already need one for
+- **The CLI's state is isolated to `/var/lib/unbork/claude-cli`,** not
+  `$HOME`. Mount a volume at `/var/lib/unbork` — you already need one for
   action packs — and the CLI's session state persists with everything
   else. See the credential-precedence note below for why the location
   matters.
@@ -659,7 +659,7 @@ give up is subscription billing.
 > A stored login also outranks it from disk. If anyone has ever run
 > `claude login` as the unbork service user, the credentials file it wrote
 > wins over the token you pasted into the form. unbork therefore points the
-> CLI at `/var/lib/labdog/claude-cli` via `CLAUDE_CONFIG_DIR`, a directory
+> CLI at `/var/lib/unbork/claude-cli` via `CLAUDE_CONFIG_DIR`, a directory
 > it owns, so no interactive session can leave a login where it would
 > shadow your configuration.
 >

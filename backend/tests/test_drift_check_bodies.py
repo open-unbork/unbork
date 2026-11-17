@@ -3,7 +3,7 @@
 ``check_<module>_drift_for_one_host`` for cron, packages, services, Linux
 users and /etc/hosts each load the host's SSH key, collect and diff, write
 the verdict to the ``HostModuleStatus`` row, record a drift sample, probe
-LabDog's source IP, and record an unreachable host or an unexpected error.
+unbork's source IP, and record an unreachable host or an unexpected error.
 The sweep tests stub them out, so they were 14 to 19% covered. These drive
 each one with the collector, diff and merge replaced (the bodies import
 them at call time, so patching the source module reaches them) and pin
@@ -272,7 +272,7 @@ async def _run(db, spec: Spec, env: _Env, host, hms):
 async def _setup(db, spec: Spec, *, keyed=True, source_ip=None):
     key = await create_ssh_key(db) if keyed else None
     host = await create_host(db, ssh_key_id=key.id if key else None)
-    host.labdog_source_ip = source_ip
+    host.unbork_source_ip = source_ip
     hms = HostModuleStatus(host_id=host.id, module_type=spec.module_type, sync_status="unknown")
     db.add(hms)
     await db.flush()
@@ -343,7 +343,7 @@ async def test_a_verdict_is_written_with_its_sample(db, make, drifted):
     refresh = mocks["refresh_host_sync_status"]
     assert refresh.await_args_list == ([((host, db),)] if spec.refreshes else [])
     # The source IP was unknown, so every body probes for it.
-    assert host.labdog_source_ip == "192.0.2.7"
+    assert host.unbork_source_ip == "192.0.2.7"
     assert env.connects == 1
 
 
@@ -402,7 +402,7 @@ async def test_a_known_source_ip_is_not_probed_again(db, make):
 
     _, mocks = await _run(db, spec, env, host, hms)
 
-    assert host.labdog_source_ip == "198.51.100.1"
+    assert host.unbork_source_ip == "198.51.100.1"
     assert mocks["get_source_ip"].await_count == 0
     if spec.always_connects:
         # /etc/hosts still connects, to check the host's own primary IP.
@@ -425,7 +425,7 @@ async def test_a_failed_probe_does_not_change_the_verdict(db, make, caplog):
 
     assert ran is True
     assert hms.sync_status == "out_of_sync"
-    assert host.labdog_source_ip is None
+    assert host.unbork_source_ip is None
     records = [r for r in caplog.records if r.name == spec.module]
     assert [(r.levelno, r.getMessage()) for r in records] == [
         (logging.DEBUG, f"source-IP probe failed for host {host.id}")

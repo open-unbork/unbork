@@ -24,7 +24,7 @@ case is a snapshot we forget about, not one we destroy.
 That worst case is real and bounded: deleting a session cascades its tool
 calls away, so any snapshot it took becomes an orphan this sweep can no
 longer see. The delete endpoint records the names in its audit entry for
-exactly that reason, and the ``labdog-ai-`` prefix makes orphans
+exactly that reason, and the ``unbork-ai-`` prefix makes orphans
 identifiable in the Proxmox UI.
 """
 

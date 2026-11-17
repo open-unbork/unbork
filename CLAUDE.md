@@ -42,7 +42,7 @@ pytest tests/ -v -m "not integration"           # skip the git round-trip tests
 pytest tests/ -q --cov --cov-report=term        # with coverage (as CI measures it)
 ```
 
-Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`LABDOG_SECURITY__SECRET_KEY`, `LABDOG_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
+Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`UNBORK_SECURITY__SECRET_KEY`, `UNBORK_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
 
 **Test session architecture**: Each test gets a database session wrapped in a savepoint that rolls back after the test. The `get_db` dependency is overridden to return this test session. Any `session.commit()` in application code translates to savepoint release/create (not actual commit) via `join_transaction_mode="create_savepoint"`.
 
@@ -67,14 +67,14 @@ npx playwright test --ui     # interactive mode
 
 ## Configuration
 
-Settings are loaded from `dev/labdog.toml` (dev — set via `LABDOG_CONFIG` env var by `dev.sh`), or `/etc/labdog/labdog.toml` (production). Environment variables override TOML settings using `LABDOG_` prefix with `__` separators (e.g., `LABDOG_SECURITY__SECRET_KEY`).
+Settings are loaded from `dev/unbork.toml` (dev — set via `UNBORK_CONFIG` env var by `dev.sh`), or `/etc/unbork/unbork.toml` (production). Environment variables override TOML settings using `UNBORK_` prefix with `__` separators (e.g., `UNBORK_SECURITY__SECRET_KEY`).
 
-The product is called unbork, but code-level names still carry the old
-name LabDog: the `LABDOG_` env prefix, `labdog.toml`, `/etc/labdog` and
-`/var/lib/labdog`, the `labdog` package, service and user, the
-`labdog-backend` distribution, metric and alert-label names, and the
-on-host markers. Write them as they are in the code. Their rename, with
-the old names kept as fallbacks, is planned in `planning/` (C-048 to C-050).
+The names from before the rename are not read anywhere (D-29 in
+`planning/DECISIONS.md`): the startup error lists any old variable or
+config file it finds, and `docs/upgrade.md` maps old names to new.
+`backend/tests/test_old_name.py` fails when the old name reappears outside
+the changelog, the upgrade guide, old migrations and `planning/`; a line
+that needs it on purpose carries the marker `old-name-ok`.
 
 **Required secrets** (validated at startup — insecure defaults are rejected):
 - `security.secret_key` — JWT signing key
@@ -88,8 +88,8 @@ Each configuration module follows: **model → schemas → merge engine → API 
 ### Firewall backends
 Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app/models/host.py` defines: `nftables`, `iptables`, `unknown`.
 
-- **iptables** isolates unbork's rules in dedicated `LABDOG-INPUT` /
-  `LABDOG-OUTPUT` chains jumped from the base chains (so a reapply/flush never
+- **iptables** isolates unbork's rules in dedicated `UNBORK-INPUT` /
+  `UNBORK-OUTPUT` chains jumped from the base chains (so a reapply/flush never
   clobbers Docker's or other tools' base-chain rules). **nftables** instead owns
   the whole `inet filter` table (delete + recreate) — table-level isolation is
   the nftables-idiomatic equivalent, since tables are independent and every
@@ -101,7 +101,7 @@ Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app
   previously-detected value is authoritative (operator override + stickiness are
   enforced at that gate). Because both binaries are usually installed, the
   greenfield choice is a first-match ladder: single-installed → marker
-  stickiness (`LABDOG-*` chains, `Managed by LabDog` comments) →
+  stickiness (`UNBORK-*` chains, `Managed by unbork` comments) →
   container-runtime constraint (Docker/kube-proxy/nerdctl force iptables) →
   active-ruleset → default nftables.
 - **Dual-stack hosts:** every firewall sync tears down unbork's footprint in the
@@ -162,10 +162,9 @@ registry. **Nothing pack-supplied ships with unbork**: packs are
 local-filesystem. Until a pack has synced, the registry holds only the
 built-in pseudo-actions (`_builtin.*`, `app/actions/builtins.py`).
 
-A fresh install seeds one pack, `labdog-playbooks` (the pack row keeps the old
-name), pointing at
+A fresh install seeds one pack, `unbork-playbooks`, pointing at
 [`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
-`main` (git repo + pack rows in `alembic 0001`). It is an ordinary pack:
+`main` (git repo + pack rows in `alembic 0001`, renamed in `0062`). It is an ordinary pack:
 operators edit, disable or delete it like any other, and re-add it by
 hand. A site without GitHub access points that repository at an internal
 mirror, or adds a local-directory pack. There used to be a "bundled"
@@ -196,7 +195,7 @@ See `app/packs/` for the subsystem, the user guide at
 `docs/ui/actions.md`, and starter packs at `docs/examples/action-packs/`.
 Backend tests that need real actions use the `sample_pack` fixture
 (`tests/fixtures/packs/sample`, registered as a local pack). Dev:
-`LABDOG_PLAYBOOKS_LOCAL=/path/to/unbork-playbooks ./dev/dev.sh start`
+`UNBORK_PLAYBOOKS_LOCAL=/path/to/unbork-playbooks ./dev/dev.sh start`
 registers a working copy as a local pack (and disables the seeded git
 pack) for iterating on playbooks without pushing.
 
@@ -221,7 +220,7 @@ Three subprocesses, all children of the main process
   (BUG-83). As a peer it is under the same `poll()` as the workers.
 
 That is the default `all` role. `python -m app --role` (or
-`LABDOG_ROLE`) runs a subset instead — `api`, `beat`, `orchestrator`,
+`UNBORK_ROLE`) runs a subset instead — `api`, `beat`, `orchestrator`,
 `worker` (`default,long_running`), `worker-drift` (`drift`) or
 `worker-actions` (`actions`) — so a
 deployment can run each in its own container from the same image and
@@ -466,9 +465,9 @@ pages read extension UI from.
 repo_url}`. The frontend renders it in Settings › System
 (`/settings?section=system`). The
 backend reads `version` via
-`importlib.metadata.version("labdog-backend")`; `commit_sha` and
-`build_date` come from env vars `LABDOG_COMMIT_SHA` /
-`LABDOG_BUILD_DATE` (set in Docker via build args) or, for
+`importlib.metadata.version("unbork-backend")`; `commit_sha` and
+`build_date` come from env vars `UNBORK_COMMIT_SHA` /
+`UNBORK_BUILD_DATE` (set in Docker via build args) or, for
 `.deb` / `.rpm` / `.tar.gz` installs, from a build-time-generated
 `backend/app/_build_info.py` written by the `bake-build-info`
 target in `packaging/Makefile`.

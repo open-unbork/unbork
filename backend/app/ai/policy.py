@@ -916,5 +916,5 @@ def _check_gate_values(node: Node, options: Options) -> None:
                     )
 
 
-#: The policy LabDog ships, loaded once at import.
+#: The policy unbork ships, loaded once at import.
 DEFAULT = CommandPolicy.load()

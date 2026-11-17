@@ -85,15 +85,15 @@ def local_pack_dir(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-async def test_list_returns_seeded_labdog_playbooks_pack(superuser_client):
+async def test_list_returns_seeded_unbork_playbooks_pack(superuser_client):
     """A fresh install ships one seeded pack pointing at the canonical
-    labdog-playbooks repo. Operators that don't want it can delete it
+    unbork-playbooks repo. Operators that don't want it can delete it
     via the UI; the migration only inserts when missing."""
     resp = await superuser_client.get("/api/action-packs")
     assert resp.status_code == 200
     packs = resp.json()
     assert len(packs) == 1
-    assert packs[0]["name"] == "labdog-playbooks"
+    assert packs[0]["name"] == "unbork-playbooks"
     assert packs[0]["source_type"] == "git"
     # Pack rows no longer carry a ``position`` field — precedence is
     # per-key via ``action_resolution``.
@@ -514,7 +514,7 @@ async def test_create_git_pack_dotdot_path_rejected(superuser_client, git_repo_r
             "name": "traversal-attempt",
             "source_type": "git",
             "git_repository_id": git_repo_row.id,
-            "path": "../../../etc/labdog",
+            "path": "../../../etc/unbork",
         },
     )
     assert resp.status_code == 422
@@ -560,7 +560,7 @@ async def test_create_local_pack_etc_path_rejected(superuser_client):
         json={
             "name": "etc-pack",
             "source_type": "local",
-            "local_path": "/etc/labdog",
+            "local_path": "/etc/unbork",
         },
     )
     assert resp.status_code == 422

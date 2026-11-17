@@ -14,7 +14,7 @@ parameters:
   - key: marker_dir
     label: Marker directory
     type: string
-    default: /var/lib/labdog-example
+    default: /var/lib/unbork-example
   - key: fail_verify
     label: Intentionally fail verify
     type: bool

@@ -11,6 +11,7 @@ and how to back out cleanly when something goes wrong.
 
 - [Compatibility](#compatibility)
   - [Versioning](#versioning)
+  - [Upgrading to 2.0.0: the rename](#upgrading-to-200-the-rename)
 - [Pre-upgrade](#pre-upgrade)
   - [Docker: check the environment variables](#docker-check-the-environment-variables)
 - [Upgrading](#upgrading)
@@ -46,7 +47,7 @@ A change that breaks existing use of anything below comes only in a new
 major version (2.0.0). A minor release (1.1.0) only adds to them, and a
 patch release (1.0.1) only fixes bugs.
 
-- **Configuration**: the keys in `labdog.toml`, the `LABDOG_*`
+- **Configuration**: the keys in `unbork.toml`, the `UNBORK_*`
   environment variables, and the setting keys under **Settings**.
 - **The pack format**: the manifest a pack declares its actions in, and
   the action keys and parameters it can use (see
@@ -54,8 +55,8 @@ patch release (1.0.1) only fixes bugs.
 - **The GitOps file format** (see [the GitOps guide](examples/gitops/README.md)).
 - **The webhook endpoints** under `/api/webhooks/` (`github`, `gitlab`,
   `gitea`, `grafana-alerts`) and the payloads they accept, including the
-  alert labels unbork reads: `labdog_action`, `labdog_ai`,
-  `labdog_ai_automate`, `labdog_host_id` and `labdog_hostname` (see
+  alert labels unbork reads: `unbork_action`, `unbork_ai`,
+  `unbork_ai_automate`, `unbork_host_id` and `unbork_hostname` (see
   [Alerts](ui/alerts.md#labels)).
 - **The Prometheus metrics**: names and labels in
   [Metrics export](metrics-export.md).
@@ -71,6 +72,92 @@ told and allowed to run.
 
 One exception: a fix that closes a security hole may refuse something
 that used to work, in any release. Its upgrade notes say so.
+
+### Upgrading to 2.0.0: the rename
+
+<!-- old-name-ok: this section maps the old names to the new ones. -->
+
+2.0.0 is the first release under the name unbork. Every name an operator
+types or sees changed with it, and **the old names are not read any
+more**: there are no fallbacks, and nothing renames or removes old names
+for you, on the server or on managed hosts. Plan the upgrade as a short
+maintenance window and work through this list before you start the new
+version.
+
+| What | Before 2.0.0 | From 2.0.0 |
+|---|---|---|
+| Environment variables | `LABDOG_*` (`LABDOG_SECURITY__SECRET_KEY`, `LABDOG_CONFIG`, `LABDOG_ROLE`, …) | `UNBORK_*` |
+| Config file | `/etc/labdog/labdog.toml`, `<checkout>/labdog.toml` | `/etc/unbork/unbork.toml`, `<checkout>/unbork.toml` |
+| Config key | `[security] labdog_server_ip` | `[security] unbork_server_ip` |
+| Package, service, system user | `labdog`, `labdog.service`, user and group `labdog` | `unbork`, `unbork.service`, user and group `unbork` |
+| Directories | `/usr/lib/labdog`, `/var/lib/labdog`, `/var/log/labdog`, `/run/labdog` | `/usr/lib/unbork`, `/var/lib/unbork`, `/var/log/unbork`, `/run/unbork` |
+| Container volumes | `/var/lib/labdog/packs`, `/var/lib/labdog/claude-cli` | `/var/lib/unbork/packs`, `/var/lib/unbork/claude-cli` |
+| Python distribution | `labdog-backend`, `labdog-lint` | `unbork-backend`, `unbork-lint` |
+| Session cookies | `labdog_auth`, `labdog_csrf` | `unbork_auth`, `unbork_csrf` (everyone signs in again once) |
+| Prometheus metrics | `labdog_*` | `unbork_*` |
+| Alert labels | `labdog_action`, `labdog_ai`, `labdog_ai_automate`, `labdog_host_id`, `labdog_hostname` | `unbork_action`, `unbork_ai`, `unbork_ai_automate`, `unbork_host_id`, `unbork_hostname` |
+| Variables handed to packs | `labdog_host_id`, `labdog_hostname` | `unbork_host_id`, `unbork_hostname` |
+| iptables chains | `LABDOG-INPUT`, `LABDOG-OUTPUT` | `UNBORK-INPUT`, `UNBORK-OUTPUT` |
+| Rule comments | `Managed by LabDog` | `Managed by unbork` |
+| Files on hosts | `/etc/NetworkManager/conf.d/90-labdog-dns.conf`, `/etc/cloud/cloud.cfg.d/99-labdog-disable-network-config.cfg`, `/etc/systemd/system/<service>.service.d/labdog.conf`, CA files `labdog-<fingerprint>.crt` | the same with `unbork` |
+| Proxmox snapshots | `labdog-…`, `labdog-ai-…` | `unbork-…`, `unbork-ai-…` |
+| The seeded pack | `labdog-playbooks` | `unbork-playbooks` (renamed by a migration unless you renamed it yourself) |
+
+Unchanged: the Postgres database and role keep whatever names your
+`database.url` gives them (only the example defaults now say `unbork`),
+and all data in the database is kept.
+
+**On the server, before starting 2.0.0:**
+
+1. Docker: rename every `LABDOG_` variable in your compose file or `.env`
+   to `UNBORK_`, and move volume mount targets from `/var/lib/labdog/…`
+   to `/var/lib/unbork/…`. The data in the volumes needs no change.
+2. Packages: install the `unbork` package, then remove `labdog`. Copy
+   `/etc/labdog/labdog.toml` to `/etc/unbork/unbork.toml`
+   (`root:unbork`, mode 0640) and rename `labdog_server_ip` in it if set.
+   Move `/var/lib/labdog` to `/var/lib/unbork` and
+   `chown -R unbork:unbork` it, then `systemctl enable --now unbork`.
+   Remove the `labdog` user when nothing runs as it any more.
+3. A server whose secrets are set only under the old names refuses to
+   start, and its error lists the old variables and config file it found.
+
+**In Grafana and Prometheus:** rename the metric names in dashboards and
+alert rules (`labdog_` to `unbork_`), and the labels in alert rules that
+start actions or the assistant. Then rerun the `alloy-install` action
+from the updated `unbork-playbooks` pack on every monitored host, so new
+series carry `unbork_host_id`. History stored under the old names stays
+under them. On a host where `alloy-install` added its files to the
+operator's own Alloy directory (its `adopt_dir` mode), delete the old
+`labdog_*.alloy` files in that directory before rerunning it; the new run
+writes `unbork_*.alloy` next to them and does not remove the old ones.
+
+**On managed hosts, after the first 2.0.0 sync of each host:** the sync
+writes the new names but does not remove the old ones. Clean each host
+up by hand:
+
+```bash
+# iptables hosts: drop the old jumps and chains (IPv4 and IPv6).
+for t in iptables ip6tables; do
+  while $t -D INPUT -j LABDOG-INPUT 2>/dev/null; do :; done
+  while $t -D OUTPUT -j LABDOG-OUTPUT 2>/dev/null; do :; done
+  $t -F LABDOG-INPUT 2>/dev/null; $t -X LABDOG-INPUT 2>/dev/null
+  $t -F LABDOG-OUTPUT 2>/dev/null; $t -X LABDOG-OUTPUT 2>/dev/null
+done
+netfilter-persistent save 2>/dev/null || service iptables save
+
+# Files the old version wrote, if the new ones are in place.
+rm -f /etc/NetworkManager/conf.d/90-labdog-dns.conf \
+      /etc/cloud/cloud.cfg.d/99-labdog-disable-network-config.cfg \
+      /etc/systemd/system/*.service.d/labdog.conf
+rm -f /usr/local/share/ca-certificates/labdog-*.crt /etc/pki/ca-trust/source/anchors/labdog-*.crt
+update-ca-certificates 2>/dev/null || update-ca-trust
+systemctl daemon-reload
+```
+
+nftables hosts need nothing for the firewall: the sync replaces the
+whole `inet filter` table. Old Proxmox snapshots named `labdog-…` are no
+longer cleaned up by unbork; delete them in Proxmox when you no longer
+need them.
 
 ### Upgrading to 1.0.0
 
@@ -330,22 +417,22 @@ short form:
 
 ```bash
 # 1. Database
-pg_dump --dbname=labdog --format=custom \
-  --file=/var/backups/labdog/labdog-pre-upgrade-$(date +%Y%m%d-%H%M%S).dump
+pg_dump --dbname=unbork --format=custom \
+  --file=/var/backups/unbork/unbork-pre-upgrade-$(date +%Y%m%d-%H%M%S).dump
 
 # 2. Encryption key + config
-sudo install -m 0600 /etc/labdog/labdog.toml \
-  /var/backups/labdog/labdog.toml-pre-upgrade-$(date +%Y%m%d)
+sudo install -m 0600 /etc/unbork/unbork.toml \
+  /var/backups/unbork/unbork.toml-pre-upgrade-$(date +%Y%m%d)
 ```
 
-On Docker the keys are not in `labdog.toml`. They live in `LABDOG_*`
+On Docker the keys are not in `unbork.toml`. They live in `UNBORK_*`
 variables, usually in the `.env` file next to `compose.yaml` (see
 [production-deploy.md](production-deploy.md#secrets-via-env)). Back
-that file up too, along with any `labdog.toml` you mount:
+that file up too, along with any `unbork.toml` you mount:
 
 ```bash
-sudo install -m 0600 /etc/labdog/.env \
-  /var/backups/labdog/labdog.env-pre-upgrade-$(date +%Y%m%d)
+sudo install -m 0600 /etc/unbork/.env \
+  /var/backups/unbork/unbork.env-pre-upgrade-$(date +%Y%m%d)
 ```
 
 If the variables are written straight into `compose.yaml` or come from
@@ -357,35 +444,35 @@ one you're about to upgrade.
 
 ### Docker: check the environment variables
 
-The upgrade notes above name `labdog.toml` keys. A Docker install sets
-the same settings as `LABDOG_` variables, with the section and key
+The upgrade notes above name `unbork.toml` keys. A Docker install sets
+the same settings as `UNBORK_` variables, with the section and key
 joined by `__`: `[security] secret_key` is
-`LABDOG_SECURITY__SECRET_KEY`. A variable wins over the same key in a
-`labdog.toml`, so check the variables. The ones the upgrade notes
+`UNBORK_SECURITY__SECRET_KEY`. A variable wins over the same key in a
+`unbork.toml`, so check the variables. The ones the upgrade notes
 mention:
 
-| `labdog.toml` key | Variable | What to check |
+| `unbork.toml` key | Variable | What to check |
 |---|---|---|
-| `[security] secret_key` | `LABDOG_SECURITY__SECRET_KEY` | At least 32 characters, and not `CHANGE_ME`, `change-me-in-production` or `change-me-32-bytes-base64-encoded`. Otherwise unbork does not start (0.10.0). |
-| `[security] encryption_key` | `LABDOG_SECURITY__ENCRYPTION_KEY` | Set, not a placeholder, and the same key as before. A different key cannot decrypt the stored SSH keys. |
-| `[security] allowed_origins` | `LABDOG_SECURITY__ALLOWED_ORIGINS` | A JSON list of your real origins, without `"*"`, which is refused (0.10.0). From 1.0.0 it is only needed for a frontend served from another host. |
-| `[security] cookie_secure` | `LABDOG_SECURITY__COOKIE_SECURE` | `true` once unbork is behind TLS. With `true`, a `localhost` origin in the list is refused. |
-| `[security] labdog_server_ip` | `LABDOG_SECURITY__LABDOG_SERVER_IP` | The address your hosts see unbork connect from. The SSH lockout rule allows SSH from it when unbork has not recorded a host's own view of that address. Unset, it is `127.0.0.1`, which no remote host's firewall will match. |
-| `[logging] audit_retention_days`, `run_retention_days`, `drift_retention_days` | `LABDOG_LOGGING__AUDIT_RETENTION_DAYS` and so on | Never had an effect, and log a warning from 1.0.0. Set retention under **Settings › System** and delete the variables. |
+| `[security] secret_key` | `UNBORK_SECURITY__SECRET_KEY` | At least 32 characters, and not `CHANGE_ME`, `change-me-in-production` or `change-me-32-bytes-base64-encoded`. Otherwise unbork does not start (0.10.0). |
+| `[security] encryption_key` | `UNBORK_SECURITY__ENCRYPTION_KEY` | Set, not a placeholder, and the same key as before. A different key cannot decrypt the stored SSH keys. |
+| `[security] allowed_origins` | `UNBORK_SECURITY__ALLOWED_ORIGINS` | A JSON list of your real origins, without `"*"`, which is refused (0.10.0). From 1.0.0 it is only needed for a frontend served from another host. |
+| `[security] cookie_secure` | `UNBORK_SECURITY__COOKIE_SECURE` | `true` once unbork is behind TLS. With `true`, a `localhost` origin in the list is refused. |
+| `[security] unbork_server_ip` | `UNBORK_SECURITY__UNBORK_SERVER_IP` | The address your hosts see unbork connect from. The SSH lockout rule allows SSH from it when unbork has not recorded a host's own view of that address. Unset, it is `127.0.0.1`, which no remote host's firewall will match. |
+| `[logging] audit_retention_days`, `run_retention_days`, `drift_retention_days` | `UNBORK_LOGGING__AUDIT_RETENTION_DAYS` and so on | Never had an effect, and log a warning from 1.0.0. Set retention under **Settings › System** and delete the variables. |
 
-To list which `LABDOG_` variables the running container has, without
+To list which `UNBORK_` variables the running container has, without
 printing their values:
 
 ```bash
-docker compose -f /etc/labdog/compose.yaml exec labdog \
-  sh -c 'env | cut -d= -f1 | grep ^LABDOG_ | sort'
+docker compose -f /etc/unbork/compose.yaml exec unbork \
+  sh -c 'env | cut -d= -f1 | grep ^UNBORK_ | sort'
 ```
 
 To check the secret key's length without printing it:
 
 ```bash
-docker compose -f /etc/labdog/compose.yaml exec labdog \
-  sh -c 'printf %s "$LABDOG_SECURITY__SECRET_KEY" | wc -c'
+docker compose -f /etc/unbork/compose.yaml exec unbork \
+  sh -c 'printf %s "$UNBORK_SECURITY__SECRET_KEY" | wc -c'
 ```
 
 The thorough check is to let the new release validate your
@@ -395,7 +482,7 @@ configuration before you switch over. Set the new image tag in
 settings:
 
 ```bash
-docker compose -f /etc/labdog/compose.yaml run --rm --no-deps labdog \
+docker compose -f /etc/unbork/compose.yaml run --rm --no-deps unbork \
   python -c 'import app.config'
 ```
 
@@ -412,7 +499,7 @@ it again, and then go on with `up -d`.
 ## Upgrading
 
 Alembic migrations run automatically on container start (Docker) or
-on service start (`labdog.service` → `python -m app`). You do not
+on service start (`unbork.service` → `python -m app`). You do not
 run `alembic upgrade head` manually for a normal release upgrade.
 
 ### Docker
@@ -425,21 +512,21 @@ release, and the `dev-*` and `test-*` tags are unreleased builds.
 
 ```bash
 # 1. Note the version you're on, in case rollback is needed.
-docker inspect labdog | grep -i 'image\|labdog/labdog'
+docker inspect unbork | grep -i 'image\|unbork/unbork'
 
 # 2. Set the new tag in compose.yaml (see below) and pull it.
-docker compose -f /etc/labdog/compose.yaml pull labdog
+docker compose -f /etc/unbork/compose.yaml pull unbork
 
-# 3. Check the new release accepts your LABDOG_* variables
+# 3. Check the new release accepts your UNBORK_* variables
 #    (see "Docker: check the environment variables" above).
-docker compose -f /etc/labdog/compose.yaml run --rm --no-deps labdog \
+docker compose -f /etc/unbork/compose.yaml run --rm --no-deps unbork \
   python -c 'import app.config'
 
 # 4. Recreate the container.
-docker compose -f /etc/labdog/compose.yaml up -d labdog
+docker compose -f /etc/unbork/compose.yaml up -d unbork
 
 # 5. Watch the logs as alembic runs.
-docker compose -f /etc/labdog/compose.yaml logs -f labdog
+docker compose -f /etc/unbork/compose.yaml logs -f unbork
 ```
 
 Update the image tag in `compose.yaml` to the new version so the
@@ -448,7 +535,7 @@ points at:
 
 ```yaml
 services:
-  labdog:
+  unbork:
     image: unbork/unbork:1.0.0
 ```
 
@@ -456,23 +543,23 @@ services:
 
 ```bash
 VERSION=1.0.0
-curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/labdog_${VERSION}-1_amd64.deb
-sudo apt install ./labdog_${VERSION}-1_amd64.deb
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork_${VERSION}-1_amd64.deb
+sudo apt install ./unbork_${VERSION}-1_amd64.deb
 
-# systemd will restart labdog.service automatically; alembic runs
+# systemd will restart unbork.service automatically; alembic runs
 # at startup. Watch the logs:
-sudo journalctl -u labdog -f
+sudo journalctl -u unbork -f
 ```
 
 ### RHEL / Fedora / Rocky (.rpm)
 
 ```bash
 VERSION=1.0.0
-curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/labdog-${VERSION}-1.x86_64.rpm
-sudo dnf install ./labdog-${VERSION}-1.x86_64.rpm
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-1.x86_64.rpm
+sudo dnf install ./unbork-${VERSION}-1.x86_64.rpm
 
-sudo systemctl restart labdog.service
-sudo journalctl -u labdog -f
+sudo systemctl restart unbork.service
+sudo journalctl -u unbork -f
 ```
 
 ---
@@ -502,8 +589,8 @@ curl -fsS http://127.0.0.1:8000/health
 
 If `/api/version` reports an older `version` than the tag, the
 package install succeeded but the service didn't restart. `sudo systemctl restart
-labdog.service`. If `/health` returns 5xx, check
-`journalctl -u labdog -f` — the most common cause is an alembic
+unbork.service`. If `/health` returns 5xx, check
+`journalctl -u unbork -f` — the most common cause is an alembic
 failure on a column type change, which leaves the schema half-
 migrated. Stop the service and restore from the pre-upgrade backup
 before doing anything else.
@@ -524,7 +611,7 @@ faster — but verify against the new release's `CHANGELOG.md` first.
 
 ```bash
 # Update compose.yaml to the previous version, then:
-docker compose -f /etc/labdog/compose.yaml up -d labdog
+docker compose -f /etc/unbork/compose.yaml up -d unbork
 ```
 
 If alembic on the older binary refuses to start because the schema
@@ -535,12 +622,12 @@ backup — see [When alembic downgrade is not enough](#when-alembic-downgrade-is
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./labdog_0.1.0-1_amd64.deb
+sudo apt install ./unbork_0.1.0-1_amd64.deb
 
 # RHEL / Fedora / Rocky
-sudo dnf downgrade ./labdog-0.1.0-1.x86_64.rpm
+sudo dnf downgrade ./unbork-0.1.0-1.x86_64.rpm
 
-sudo systemctl restart labdog.service
+sudo systemctl restart unbork.service
 ```
 
 ### When alembic downgrade is not enough
@@ -551,17 +638,17 @@ always reversible without data loss. **Treat the pre-upgrade
 backup as the canonical rollback** and stop trying to be clever:
 
 ```bash
-sudo systemctl stop labdog.service
-sudo -u postgres dropdb labdog
-sudo -u postgres createdb labdog
-pg_restore --dbname=labdog --clean --if-exists --no-owner --no-acl \
-  /var/backups/labdog/labdog-pre-upgrade-YYYYMMDD-HHMMSS.dump
+sudo systemctl stop unbork.service
+sudo -u postgres dropdb unbork
+sudo -u postgres createdb unbork
+pg_restore --dbname=unbork --clean --if-exists --no-owner --no-acl \
+  /var/backups/unbork/unbork-pre-upgrade-YYYYMMDD-HHMMSS.dump
 
 # Reinstall the previous binary version (see above), then:
-sudo systemctl start labdog.service
+sudo systemctl start unbork.service
 ```
 
-The encryption key in `/etc/labdog/labdog.toml` did not change, so
+The encryption key in `/etc/unbork/unbork.toml` did not change, so
 encrypted columns decrypt correctly against the restored DB.
 
 ---

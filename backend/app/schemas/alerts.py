@@ -82,18 +82,18 @@ class AlertIntakeStatus(BaseModel):
     source_allowlist: bool = False
     #: ``[alerts] webhook_hmac_secret`` is set: a body signature is required.
     body_signature: bool = False
-    #: Whether an alert labelled labdog_ai / labdog_ai_automate starts an
+    #: Whether an alert labelled unbork_ai / unbork_ai_automate starts an
     #: investigation (ai.enabled and ai.auto_investigate_enabled).
     ai_enabled: bool
     auto_investigate_enabled: bool
-    #: Off: the labdog_ai_automate=true label decides full auto. On: the rules.
+    #: Off: the unbork_ai_automate=true label decides full auto. On: the rules.
     full_auto_rules_enabled: bool
     #: How many rules are in force: 1 (the label) while the rules are off.
     full_auto_rules: int
     #: Enabled entries on the list of actions alerts may run.
     allowed_actions: int
     poll_minutes: int
-    #: When the newest alert first reached LabDog by each route.
+    #: When the newest alert first reached unbork by each route.
     last_webhook_alert_at: datetime | None
     last_poll_alert_at: datetime | None
 

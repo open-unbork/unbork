@@ -445,7 +445,7 @@ class AIUsageSummary(BaseModel):
 
 
 class AlertDispatchOut(BaseModel):
-    """What one alert's ``labdog_action`` label came to — see
+    """What one alert's ``unbork_action`` label came to — see
     app.alerts.models.AlertActionDispatch."""
 
     id: int
@@ -503,7 +503,7 @@ class AlertEventResponse(BaseModel):
     #: whole transcript. Enough to see what it decided without leaving the
     #: page; the link is there for the reasoning.
     investigation_summary: str | None = None
-    #: Whether a full-auto fix worked, as LabDog checked it afterwards —
+    #: Whether a full-auto fix worked, as unbork checked it afterwards —
     #: see ``app.ai.models.REMEDIATION_OUTCOMES``. NULL when there was
     #: nothing to check.
     remediation_outcome: str | None = None
@@ -513,7 +513,7 @@ class AlertEventResponse(BaseModel):
     #: running, succeeded, failed, or refused, and what happened.
     rollback_status: str | None = None
     rollback_detail: str | None = None
-    #: What the alert's labdog_action label came to: at most one entry.
+    #: What the alert's unbork_action label came to: at most one entry.
     actions: list[AlertDispatchOut] = []
     created_at: datetime
 

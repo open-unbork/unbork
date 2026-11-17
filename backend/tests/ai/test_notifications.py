@@ -38,7 +38,7 @@ from app.notifications.urls import validate_public_url
 from app.settings_service import invalidate_cache
 from tests.conftest import create_host
 
-URL = "https://labdog.example.com"
+URL = "https://unbork.example.com"
 
 
 async def _set(db, key: str, value: str) -> None:
@@ -68,7 +68,7 @@ async def smtp_on(db):
         host="mail.home.arpa",
         port=587,
         tls_mode="starttls",
-        from_address="labdog@home.arpa",
+        from_address="unbork@home.arpa",
     )
     db.add(row)
     await db.flush()
@@ -134,12 +134,12 @@ def _session_cm(db):
 
 class TestPublicURL:
     def test_it_is_normalised(self) -> None:
-        assert validate_public_url(" https://labdog.example.com/ ") == URL
+        assert validate_public_url(" https://unbork.example.com/ ") == URL
 
     def test_empty_means_unset(self) -> None:
         assert validate_public_url("") == ""
 
-    @pytest.mark.parametrize("bad", ["labdog.example.com", "ftp://x", "https://x/?a=1", "https://"])
+    @pytest.mark.parametrize("bad", ["unbork.example.com", "ftp://x", "https://x/?a=1", "https://"])
     def test_anything_else_is_refused(self, bad: str) -> None:
         with pytest.raises(ValueError):
             validate_public_url(bad)
@@ -149,17 +149,17 @@ class TestAddresses:
     def test_a_home_network_domain_is_accepted(self) -> None:
         """RFC 8375's home.arpa is the domain a homelab relay is likeliest to
         use, and pydantic's EmailStr refuses it as special-use."""
-        body = EmailSettingsUpdate(enabled=True, host="mail", from_address="labdog@home.arpa")
-        assert body.from_address == "labdog@home.arpa"
+        body = EmailSettingsUpdate(enabled=True, host="mail", from_address="unbork@home.arpa")
+        assert body.from_address == "unbork@home.arpa"
 
-    @pytest.mark.parametrize("bad", ["unbork <labdog@x.org>", "labdog", "@x.org", "a b@x.org"])
+    @pytest.mark.parametrize("bad", ["unbork <unbork@x.org>", "unbork", "@x.org", "a b@x.org"])
     def test_anything_but_a_bare_address_is_refused(self, bad: str) -> None:
         with pytest.raises(ValueError):
             EmailSettingsUpdate(from_address=bad)
 
     def test_switching_on_without_a_server_is_refused(self) -> None:
         with pytest.raises(ValueError, match="server and a From address"):
-            EmailSettingsUpdate(enabled=True, host="", from_address="labdog@home.arpa")
+            EmailSettingsUpdate(enabled=True, host="", from_address="unbork@home.arpa")
 
 
 # ---------------------------------------------------------------------------
@@ -381,13 +381,13 @@ class TestRemediation:
     async def test_a_change_is_reported_with_its_snapshot(self, db, smtp_on, ai_provider) -> None:
         await _user(db, events=("alert_remediation",))
         host = await create_host(db, hostname="web1.home.arpa")
-        session = await self._session(db, ai_provider, host, snapshot="labdog-ai-7-0001")
+        session = await self._session(db, ai_provider, host, snapshot="unbork-ai-7-0001")
 
         assert await notify_remediation(db, session) == 1
         [row] = await _queued(db, "alert_remediation")
         assert row.subject == "[unbork] Automatic fix on web1.home.arpa: NginxDown"
         assert "systemctl restart nginx" in row.body
-        assert "labdog-ai-7-0001" in row.body
+        assert "unbork-ai-7-0001" in row.body
         assert "restarting it brought it back" in row.body
 
     async def test_nothing_is_sent_when_nothing_changed(self, db, smtp_on, ai_provider) -> None:
@@ -703,9 +703,9 @@ def _config(**over) -> smtp.SMTPConfig:
         host="mail",
         port=587,
         tls_mode="starttls",
-        username="labdog",
+        username="unbork",
         password="pw",
-        from_address="labdog@home.arpa",
+        from_address="unbork@home.arpa",
     )
     values.update(over)
     return smtp.SMTPConfig(**values)
@@ -716,8 +716,8 @@ class TestTransport:
         results = smtp.send(_config(), [smtp.OutgoingEmail("a@x", "hi", "body")])
         [server] = fake_smtp.instances
         assert results == [None]
-        assert server.calls == ["starttls", "login labdog", "quit"]
-        assert server.sent[0]["From"] == "labdog@home.arpa"
+        assert server.calls == ["starttls", "login unbork", "quit"]
+        assert server.sent[0]["From"] == "unbork@home.arpa"
 
     def test_a_refused_login_says_what_the_server_said(self, fake_smtp) -> None:
         with pytest.raises(
@@ -768,9 +768,9 @@ class TestAPI:
                 "host": "mail.home.arpa",
                 "port": 465,
                 "tls_mode": "tls",
-                "username": "labdog",
+                "username": "unbork",
                 "password": "s3cret-pass",
-                "from_address": "labdog@home.arpa",
+                "from_address": "unbork@home.arpa",
             },
         )
         assert response.status_code == 200, response.text
@@ -783,7 +783,7 @@ class TestAPI:
         assert decrypt_ssh_key(row.encrypted_password, get_master_key()) == "s3cret-pass"
 
     async def test_saving_without_a_password_keeps_it(self, db, superuser_client) -> None:
-        base = {"enabled": True, "host": "mail", "from_address": "labdog@home.arpa"}
+        base = {"enabled": True, "host": "mail", "from_address": "unbork@home.arpa"}
         await superuser_client.put("/api/notifications/email", json={**base, "password": "pw"})
         response = await superuser_client.put("/api/notifications/email", json=base)
         assert response.json()["password_set"] is True
@@ -793,7 +793,7 @@ class TestAPI:
         assert response.json()["password_set"] is False
 
     async def test_the_test_button_reports_the_servers_words(self, db, superuser_client) -> None:
-        draft = {"host": "mail", "from_address": "labdog@home.arpa"}
+        draft = {"host": "mail", "from_address": "unbork@home.arpa"}
         with patch(
             "app.notifications.email.send",
             side_effect=smtp.SMTPSendError("535 5.7.8 Username and Password not accepted"),

@@ -199,10 +199,10 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "Accept alerts from Grafana and Alertmanager.",
         "help": (
             "Recording alerts costs nothing and starts nothing on its own. What happens next is "
-            "up to the alert's Grafana labels: labdog_action runs an action from the Alerts › "
-            "Handling list, and labdog_ai or labdog_ai_automate asks for an AI investigation, "
+            "up to the alert's Grafana labels: unbork_action runs an action from the Alerts › "
+            "Handling list, and unbork_ai or unbork_ai_automate asks for an AI investigation, "
             "which is a separate switch, ai.auto_investigate_enabled. The webhook also needs "
-            "[alerts] webhook_token in labdog.toml."
+            "[alerts] webhook_token in unbork.toml."
         ),
     },
     "alerts.poll_minutes": {
@@ -227,7 +227,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         ),
         "help": (
             "If the alert has resolved by then, the action fixed it. If it is still firing, the "
-            "action did not, and an alert labelled labdog_ai or labdog_ai_automate goes to the AI. "
+            "action did not, and an alert labelled unbork_ai or unbork_ai_automate goes to the AI. "
             "Grafana must send resolved notifications for this to tell the two apart."
         ),
     },
@@ -368,12 +368,12 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "min": 0,
         "max": 1,
         "description": (
-            "Start an AI investigation when an alert labelled labdog_ai or labdog_ai_automate "
+            "Start an AI investigation when an alert labelled unbork_ai or unbork_ai_automate "
             "arrives."
         ),
         "help": (
-            "Grafana's labels decide which alerts ask for the AI: labdog_ai=true to investigate, "
-            "labdog_ai_automate=true to let it fix (see ai.alert_full_auto_rules_enabled). This "
+            "Grafana's labels decide which alerts ask for the AI: unbork_ai=true to investigate, "
+            "unbork_ai_automate=true to let it fix (see ai.alert_full_auto_rules_enabled). This "
             "spends money without anyone asking, so it is off by default and bounded by the AI "
             "budgets. What an investigation may change is ai.alert_autonomy_level."
         ),
@@ -401,7 +401,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
             "read_only: it only looks. approval: each change it wants to make waits in the "
             "approvals queue — unbork sends no notification yet, so a request nobody opens the "
             "page to see expires after ai.approval_expiry_hours. Alerts labelled "
-            "labdog_ai_automate=true in Grafana, or matching ai.alert_full_auto_rules when the "
+            "unbork_ai_automate=true in Grafana, or matching ai.alert_full_auto_rules when the "
             "rules are on, may go further."
         ),
     },
@@ -414,7 +414,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
             "Decide which alerts may change the host without asking by rules, not the label."
         ),
         "help": (
-            "Off: an alert may run at full auto when Grafana labels it labdog_ai_automate=true — "
+            "Off: an alert may run at full auto when Grafana labels it unbork_ai_automate=true — "
             "put the label on the alert rule, with a template if only some hosts should qualify. "
             "On: ai.alert_full_auto_rules decides, matching alert names, labels, and unbork "
             "hosts and groups. Either way an alert runs at full auto — changes made with nobody "
@@ -538,7 +538,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "validator": validate_public_url,
         "description": "unbork's address, for links in notifications.",
         "help": (
-            "Such as https://labdog.example.com. Every notification links back to the page "
+            "Such as https://unbork.example.com. Every notification links back to the page "
             "it is about, and none is sent while this is empty: unbork will not guess its "
             "own address from a request's Host header, which the client chooses."
         ),

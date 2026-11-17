@@ -50,7 +50,7 @@ export function PackFormDialog({
     >
       <div className="grid gap-[11px]" style={{ gridTemplateColumns: "1fr 160px" }}>
         <Field label="name" htmlFor="pack-name">
-          <input id="pack-name" className="inp mono" placeholder="labdog-default" value={form.name} onChange={(e) => setF("name", e.target.value)} />
+          <input id="pack-name" className="inp mono" placeholder="unbork-default" value={form.name} onChange={(e) => setF("name", e.target.value)} />
         </Field>
         <Field label="source" htmlFor="pack-source">
           <select id="pack-source" className="inp" value={form.source_type} onChange={(e) => setF("source_type", e.target.value as PackSourceType)}>
@@ -90,7 +90,7 @@ export function PackFormDialog({
 
       {form.source_type === "local" && (
         <Field label="filesystem path" htmlFor="pack-local-path" hint="absolute, on the unbork host — read in place, nothing is cloned">
-          <input id="pack-local-path" className="inp mono" placeholder="/var/lib/labdog/my-pack" value={form.local_path} onChange={(e) => setF("local_path", e.target.value)} />
+          <input id="pack-local-path" className="inp mono" placeholder="/var/lib/unbork/my-pack" value={form.local_path} onChange={(e) => setF("local_path", e.target.value)} />
         </Field>
       )}
 

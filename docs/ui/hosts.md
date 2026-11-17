@@ -214,7 +214,7 @@ in **current state** yet could still filter traffic.
 unbork handles this in two ways:
 
 - **Every firewall sync tears down unbork's footprint in the inactive
-  backend** — dropping the `LABDOG-INPUT`/`LABDOG-OUTPUT` iptables chains, or
+  backend** — dropping the `UNBORK-INPUT`/`UNBORK-OUTPUT` iptables chains, or
   deleting the unbork-owned nftables `inet filter` table — so there is a single
   source of truth. Only unbork's own rules are removed; Docker, kube-proxy, and
   firewalld rules are left intact.
@@ -222,7 +222,7 @@ unbork handles this in two ways:
   backend (e.g. *"nftables is the active backend, but unbork-managed iptables
   rules are still present"*). Run **sync rules** to clear it.
 
-> Note: flushing the iptables `LABDOG-INPUT` chain on a host unbork manages via
+> Note: flushing the iptables `UNBORK-INPUT` chain on a host unbork manages via
 > **nftables** does nothing to the live ruleset — the rules live in the
 > nftables `inet filter` table. Check the backend tag in the Firewall toolbar
 > if a manual firewall change isn't reflected after **collect**.
@@ -295,7 +295,7 @@ A one-off scan:
 
 1. Enter a CIDR (e.g. `192.168.1.0/24`). Ranges larger than `/20` are
    refused by default — the limit is `discovery.min_prefix` in
-   `labdog.toml` (`LABDOG_DISCOVERY__MIN_PREFIX`).
+   `unbork.toml` (`UNBORK_DISCOVERY__MIN_PREFIX`).
 2. **Scan network** probes every address for an open port 22, except the
    ones that are already hosts in unbork. A meter shows progress; results
    arrive as the scan runs. The result names the addresses it left out, so
@@ -334,6 +334,6 @@ and `less` need it — so leave a maximized terminal with **⤡**.
 - All terminal sessions are recorded in the [Audit Log](operations.md#audit)
   (session open/close events).
 - The SSH user and key are the same ones configured on the host.
-- Concurrent sessions per user and in total are capped in `labdog.toml`
+- Concurrent sessions per user and in total are capped in `unbork.toml`
   (`[ssh] max_sessions_per_user`, `max_total_sessions`) or the matching
-  `LABDOG_SSH__…` environment variables (see `.env.example`).
+  `UNBORK_SSH__…` environment variables (see `.env.example`).

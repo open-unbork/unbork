@@ -2,7 +2,7 @@
 
 On lin-manager, 2026-10-01 03:14, the nightly ``linux-upgrade`` (group
 "Default allow", 17 hosts, one at a time) reached lin-manager itself. Apt
-upgraded docker-ce, dockerd restarted, and the LabDog container — with the
+upgraded docker-ce, dockerd restarted, and the unbork container — with the
 orchestrator driving that run — went down mid-run. Nothing resumed the
 run. Its last two hosts stayed ``queued`` and it stayed ``running`` for
 eight and a half hours, until the whole-run deadline came within reach.

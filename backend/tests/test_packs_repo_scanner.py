@@ -145,7 +145,7 @@ def test_scan_broken_manifest_yields_error_findings_no_raise():
 
 def test_scan_invalid_gitops_yaml_extracts_group_name_with_errors():
     """A gitops YAML with valid ``group:`` but a body that fails
-    LabDogGroupYAML must still surface as a finding with the group_name
+    UnborkGroupYAML must still surface as a finding with the group_name
     populated and the validation error attached."""
     result = scan_repository(FIXTURES_ROOT / "broken")
     by_path = {g.path: g for g in result.gitops_files}

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-PLACEHOLDER = "[redacted by labdog]"
+PLACEHOLDER = "[redacted by unbork]"
 
 # Ordered most- to least-specific: the first match wins for a given span.
 _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

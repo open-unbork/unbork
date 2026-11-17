@@ -78,7 +78,7 @@ async def trigger_snapshot_cleanup(
     _: User = Depends(require("integrations.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Scan all Proxmox nodes for orphaned labdog snapshots and delete them."""
+    """Scan all Proxmox nodes for orphaned unbork snapshots and delete them."""
     return await cleanup_orphaned_snapshots(db)
 
 

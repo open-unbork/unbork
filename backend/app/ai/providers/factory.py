@@ -133,7 +133,7 @@ def supports_tools(provider: AIProvider) -> bool:
     session rather than running one whose output cannot be trusted.
     """
     if runs_on_agent_sdk(provider):
-        # The SDK runs LabDog's tools as an in-process MCP server. This is
+        # The SDK runs unbork's tools as an in-process MCP server. This is
         # the capability the single-shot CLI backend never had.
         return True
     cls = _PROVIDER_CLASSES.get(provider.provider_type)
@@ -189,7 +189,7 @@ def build_provider(provider: AIProvider) -> LLMProvider:
         # The encrypted secret column carries a subscription OAuth token here
         # (from `claude setup-token`) rather than an API key, so it reuses the
         # same AES-256-GCM storage, redaction, and key rotation as every other
-        # LabDog credential. Blank means "use whatever the host is already
+        # unbork credential. Blank means "use whatever the host is already
         # authenticated with".
         return ClaudeCLIProvider(model=provider.model or None, oauth_token=api_key)
 

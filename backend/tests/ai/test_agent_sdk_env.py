@@ -8,7 +8,7 @@ owns the whole environment it passes to ``subprocess_exec``.
 The SDK composes the child environment as ``{**os.environ, **options.env}``,
 so ``options.env`` is an *overlay* and a deletion from it deletes nothing —
 the inherited value survives, and it is exactly the value that would take
-precedence over the token LabDog configured. Verified against the real
+precedence over the token unbork configured. Verified against the real
 binary: with a bogus key inherited and no override the session never
 authenticated; with an empty-string override it authenticated normally.
 
@@ -112,7 +112,7 @@ class TestStateDir:
 
 class TestWithoutAToken:
     """The operator authenticated Claude Code on the host and wants
-    LabDog to use that login. Touching anything here breaks exactly the
+    unbork to use that login. Touching anything here breaks exactly the
     setup it is meant to serve."""
 
     def test_the_overlay_is_empty(self) -> None:

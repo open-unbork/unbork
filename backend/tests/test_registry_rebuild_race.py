@@ -263,7 +263,7 @@ class TestRefreshKeepsTheDbPacks:
     async def test_refresh_rebuilds_with_the_db_packs(
         self, superuser_client, db, tmp_path, monkeypatch
     ):
-        """It called a synchronous rebuild that needs psycopg2, which LabDog
+        """It called a synchronous rebuild that needs psycopg2, which unbork
         does not install, fell back to the bundled pack and installed that."""
         from app.actions.git_sync import GitSyncError
         from app.config import settings

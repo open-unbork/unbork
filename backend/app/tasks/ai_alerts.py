@@ -67,7 +67,7 @@ async def start_investigation(db, event, provider, *, user=None, already_tried=N
 
     mission = await build_mission(db, event)
     if already_tried:
-        # Appended rather than templated: it is LabDog's own account of
+        # Appended rather than templated: it is unbork's own account of
         # what it did, not part of the operator's prompt.
         mission = f"{mission}\n\n## What unbork already tried\n\n{already_tried}"
     autonomy = await resolve(db, event)
@@ -99,7 +99,7 @@ async def start_investigation(db, event, provider, *, user=None, already_tried=N
     event.investigation_autonomy_note = autonomy.note or None
 
     # A read-only investigation changes nothing and is already on the
-    # alert row. One that may change a host is a decision LabDog made on
+    # alert row. One that may change a host is a decision unbork made on
     # the operator's behalf, and belongs in the audit trail beside the
     # commands it goes on to run.
     if autonomy.level != "read_only":
@@ -124,10 +124,10 @@ async def start_investigation(db, event, provider, *, user=None, already_tried=N
 async def _decide_and_run(alert_event_id: int, *, already_tried: str | None = None) -> dict:
     """Apply the auto-investigation policy to one recorded alert.
 
-    The alert must ask for the AI with its labels — ``labdog_ai=true``,
+    The alert must ask for the AI with its labels — ``unbork_ai=true``,
     or full auto (:func:`app.alerts.labels.wants_ai`).
 
-    ``already_tried`` is set when the alert's ``labdog_action`` ran first
+    ``already_tried`` is set when the alert's ``unbork_action`` ran first
     and did not fix the alert, or could not run
     (:mod:`app.tasks.alert_handling`); it is added to the mission so the
     session starts from what was done.
@@ -171,7 +171,7 @@ async def _decide_and_run(alert_event_id: int, *, already_tried: str | None = No
                 db,
                 event,
                 "skipped_no_label",
-                "not labelled labdog_ai=true or labdog_ai_automate=true",
+                "not labelled unbork_ai=true or unbork_ai_automate=true",
             )
 
         try:
@@ -203,7 +203,7 @@ def investigate_alert(alert_event_id: int) -> dict:
     """Kept for messages queued before ``handle_alert`` existed.
 
     New alerts go to ``app.tasks.alert_handling.handle_alert``, which acts
-    on the alert's labdog_action label first; this does the same, so a message already in the
+    on the alert's unbork_action label first; this does the same, so a message already in the
     queue during an upgrade is not handled the old way.
     """
     from app.tasks.alert_handling import _handle

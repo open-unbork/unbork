@@ -11,7 +11,7 @@ the Operations zone.
 
 The credentials unbork connects to managed hosts with. Each key carries the
 user it logs in as. Private keys are encrypted at rest with AES-256-GCM
-using `LABDOG_SECURITY__ENCRYPTION_KEY`, and never shown again after upload.
+using `UNBORK_SECURITY__ENCRYPTION_KEY`, and never shown again after upload.
 
 ### Adding a key
 

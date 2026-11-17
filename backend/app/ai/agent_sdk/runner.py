@@ -83,7 +83,7 @@ logger = logging.getLogger(__name__)
 
 #: Where the CLI keeps its own session files. ``resume`` reads them, so a
 #: deployment that wants to park a session across a container restart has
-#: to persist this path — it is under LabDog's state root for that reason,
+#: to persist this path — it is under unbork's state root for that reason,
 #: and the shipped compose in ``docs/production-deploy.md`` mounts it.
 #:
 #: ``ClaudeAgentOptions.session_store`` would let this live in Postgres
@@ -536,7 +536,7 @@ class AgentSDKRunner:
             if name == "run_ssh_command":
                 self.session.command_count += 1
                 # Commands against managed hosts belong in the same audit
-                # trail as any other change LabDog makes to them.
+                # trail as any other change unbork makes to them.
                 await log_action(
                     self.db,
                     action="ai_command",
@@ -625,7 +625,7 @@ class AgentSDKRunner:
         # MCP server with nothing in it invites the model to go looking
         # for what it should have.
         servers = (
-            {"labdog": build_tool_server(self._handlers, self._execute_tool)}
+            {"unbork": build_tool_server(self._handlers, self._execute_tool)}
             if with_tools and self._handlers
             else {}
         )
@@ -633,13 +633,13 @@ class AgentSDKRunner:
 
         return ClaudeAgentOptions(
             mcp_servers=servers,
-            # Only the tools LabDog built. Omitting this hands the model
-            # Bash, Read, Write and Edit inside LabDog's container.
+            # Only the tools unbork built. Omitting this hands the model
+            # Bash, Read, Write and Edit inside unbork's container.
             tools=NO_BUILTIN_TOOLS,
             strict_mcp_config=True,
             # Do not read the host's own Claude Code configuration: a
             # CLAUDE.md or an MCP server belonging to whoever administers
-            # the box is not part of LabDog's threat model.
+            # the box is not part of unbork's threat model.
             setting_sources=[],
             # Deliberately empty. An entry here would auto-approve that
             # tool *before* can_use_tool is consulted, silently disabling

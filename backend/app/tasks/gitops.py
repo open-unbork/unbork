@@ -290,7 +290,7 @@ def _dispatch_syncs(pending_dispatches: list[tuple[int, int, list[str] | None]])
 
 
 #: GitOps importer module name → orchestrator module (CANONICAL_ORDER).
-#: Modules that configure LabDog itself (drift, discovery, schedules) have
+#: Modules that configure unbork itself (drift, discovery, schedules) have
 #: nothing to apply to a host.
 _IMPORT_MODULE_TO_SYNC = {
     "firewall": "firewall",

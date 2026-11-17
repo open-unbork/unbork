@@ -95,6 +95,21 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Changed
 
+- **Breaking: everything is renamed to unbork, and the old names are no
+  longer read.** Environment variables are `UNBORK_*`, the config file is
+  `/etc/unbork/unbork.toml` (key `security.unbork_server_ip`), the package,
+  service and system user are `unbork` with files under `/etc/unbork`,
+  `/usr/lib/unbork`, `/var/lib/unbork` and `/var/log/unbork`, the Python
+  distribution is `unbork-backend`. Metric names, alert labels, the host
+  variables handed to packs, iptables chains, rule comments, files written
+  to hosts and Proxmox snapshot names all use `unbork`. The session cookies
+  were renamed, so everyone signs in again once. Nothing renames or removes
+  the old names on the server or on managed hosts: follow
+  [Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
+  before starting this version. A server whose secrets are set only under the
+  old names refuses to start, and its error lists the old names it found. Sync run output
+  shows play names beginning "unbork".
+
 - CI no longer publishes a floating `:test` image tag. Test images are
   `:test-<short sha>`; follow `:dev-latest` to track `dev`.
 

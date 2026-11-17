@@ -178,7 +178,7 @@ function Integrations() {
 }
 
 /**
- * Grafana alerts coming in. The webhook token is in labdog.toml, not a
+ * Grafana alerts coming in. The webhook token is in unbork.toml, not a
  * setting, so this card is the one place the UI says that an intake which
  * is on is refusing every webhook for want of one. Git push webhooks are
  * on the Git remotes card, per repository.
@@ -188,7 +188,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   if (!s.intake_enabled) return { state: "idle", status: "off", detail: "intake off", meta: "turn on alerts.intake_enabled to record Grafana alerts" }
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   const last = [s.last_webhook_alert_at, s.last_poll_alert_at].filter((t): t is string => !!t).sort().at(-1)
-  // With the rules off, any alert Grafana labels labdog_ai_automate=true
+  // With the rules off, any alert Grafana labels unbork_ai_automate=true
   // may act, so a short token always costs something; with them on, only
   // when the list has rules. Actions on the list need the token too.
   const fullAutoPossible = !s.full_auto_rules_enabled || s.full_auto_rules > 0
@@ -196,7 +196,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   const meta = [
     last ? `last alert ${shortAgo(last)} ago` : "no alert received yet",
     s.poll_minutes > 0 && `polls Alertmanager every ${s.poll_minutes} min`,
-    !s.token_set && "set [alerts] webhook_token in labdog.toml",
+    !s.token_set && "set [alerts] webhook_token in unbork.toml",
     weak && (s.allowed_actions > 0 ? "token under 32 characters: no actions, no full auto" : "token under 32 characters: no full auto"),
   ].filter(Boolean).join(" · ")
   return {

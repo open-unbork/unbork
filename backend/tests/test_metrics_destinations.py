@@ -140,7 +140,7 @@ class TestDispatchVars:
             "alloy_loki_url": loki.url,
             "alloy_loki_tls_insecure_skip_verify": False,
         }
-        assert identity == {"labdog_host_id": str(host.id), "labdog_hostname": host.hostname}
+        assert identity == {"unbork_host_id": str(host.id), "unbork_hostname": host.hostname}
 
     async def test_each_host_gets_its_own_urls_and_tenants(self, db):
         await _instance(db, "mimir", default=True)
@@ -218,7 +218,7 @@ class TestDispatchVars:
         dest, identity = await build_metrics_extra_vars(host.id, host.hostname, None)
 
         assert dest == {}
-        assert identity["labdog_host_id"] == str(host.id)
+        assert identity["unbork_host_id"] == str(host.id)
 
 
 class TestApi:

@@ -69,7 +69,7 @@ class TestManifestPostRunRegister:
         # Defaults from the Create schemas are filled in -- the stored
         # dicts should be the full validated shape, not the raw input.
         # ServiceRuleCreate strips the ".service" suffix; that's
-        # labdog's internal convention.
+        # unbork's internal convention.
         assert m.post_run_register["packages"][0]["package_name"] == "alloy"
         assert m.post_run_register["packages"][0]["state"] == "present"
         assert m.post_run_register["services"][0]["service_name"] == "alloy"

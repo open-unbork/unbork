@@ -2,7 +2,7 @@
 
 Two tasks:
 
-* ``handle_alert`` — one new firing alert. Acts on its ``labdog_action``
+* ``handle_alert`` — one new firing alert. Acts on its ``unbork_action``
   label (:mod:`app.alerts.labels`). If that started a run, the AI waits
   for it: ``waiting_on_action`` when the labels also ask for the AI,
   ``handled_by_action`` when the action alone handles the alert. If no
@@ -74,7 +74,7 @@ async def _handle(alert_event_id: int) -> dict:
             event.investigation_detail = f"{dispatch.action_key}: {_why_not(dispatch)}"[:2000]
         elif dispatch is not None:
             already_tried = (
-                f"The alert's labdog_action label asked for the action {dispatch.action_key}, "
+                f"The alert's unbork_action label asked for the action {dispatch.action_key}, "
                 f"but unbork did not run it: {_why_not(dispatch)}."
             )
         await db.commit()
@@ -101,7 +101,7 @@ async def _handle(alert_event_id: int) -> dict:
 
 @celery_app.task(name="app.tasks.alert_handling.handle_alert")
 def handle_alert(alert_event_id: int) -> dict:
-    """Act on one alert's labdog_action label, then apply the AI policy."""
+    """Act on one alert's unbork_action label, then apply the AI policy."""
     return asyncio.run(with_task_engine(_handle(alert_event_id)))
 
 
@@ -133,7 +133,7 @@ async def _tried(db, dispatch, run, event, verdict: str, host: str) -> str:  # n
         ending = f"The run {run.status}{why}."
     text = [
         f"When this alert fired, unbork ran the action {name} on {host} as run #{run.id}, "
-        f"as the alert's labdog_action label asked. {ending}"
+        f"as the alert's unbork_action label asked. {ending}"
     ]
     tail = await _output_tail(db, run.id)
     if tail:

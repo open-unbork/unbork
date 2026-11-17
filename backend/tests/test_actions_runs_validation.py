@@ -215,10 +215,10 @@ class TestTemplateDelimitersAreRefused:
 
     Ansible does not mark extra-vars ``!unsafe``, so the moment a playbook
     templates one — a ``msg:``, a ``when:``, a ``template:`` src — the
-    value is evaluated **on the Ansible controller**, which is the LabDog
-    host itself, as the labdog user. Not on the target. So
+    value is evaluated **on the Ansible controller**, which is the unbork
+    host itself, as the unbork user. Not on the target. So
     ``{{ lookup('pipe', 'curl … | sh') }}`` in an ordinary run body was
-    code execution on LabDog, reachable by any authenticated account.
+    code execution on unbork, reachable by any authenticated account.
     """
 
     @pytest.mark.parametrize(
@@ -270,7 +270,7 @@ class TestExtraVarsAreRecheckedBeforeAnsible:
 
     Parameters can reach a run without passing ``build_param_model``: a row
     written before this validation existed, a ``choice`` whose permitted
-    values come from a pack manifest rather than from LabDog, or a future
+    values come from a pack manifest rather than from unbork, or a future
     caller assembling a run directly.
     """
 

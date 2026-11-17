@@ -26,7 +26,7 @@ class TestParse:
         are six lines painted as fatal."""
         lines = run_log.parse(SAMPLE)
         assert sum(1 for line in lines if line.kind == "fatal") == 6
-        assert [line.text for line in lines if line.kind == "labdog-failed"] == [
+        assert [line.text for line in lines if line.kind == "unbork-failed"] == [
             "[verify] pack playbook exit=2 status=failed passed=False"
         ]
         assert "\n".join(line.text for line in lines) == SAMPLE
@@ -46,7 +46,7 @@ class TestParse:
             "recap-row",
             "plain",
             "recap-row",
-            "labdog",
+            "unbork",
             "plain",
         ]
 
@@ -68,17 +68,17 @@ class TestReadable:
 
 
 class TestOutline:
-    def test_labdogs_steps_and_both_recaps(self):
+    def test_unborks_steps_and_both_recaps(self):
         steps = [line.text.split(" ***")[0] for line in run_log.outline(run_log.parse(SAMPLE))]
         assert steps[:4] == [
             "[preflight] host reachable",
-            "[snapshot] created labdog-242-1790857608 on pve1/200",
+            "[snapshot] created unbork-242-1790857608 on pve1/200",
             "[playbook] exit=0 status=successful",
             "=== Ansible output ===",
         ]
         assert steps.count("PLAY RECAP") == 2
         assert "[rollback] success=True" in steps
-        assert steps[-1] == "[cleanup] snapshot labdog-242-1790857608 deleted after rollback"
+        assert steps[-1] == "[cleanup] snapshot unbork-242-1790857608 deleted after rollback"
         assert not any(s.startswith(("ok:", "TASK", "[WARNING]")) for s in steps)
 
 

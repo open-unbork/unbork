@@ -68,7 +68,7 @@ function RemediationTags({ alert }: { alert: AlertEvent }) {
   )
 }
 
-/** Why the action the alert's labdog_action label named did not run. */
+/** Why the action the alert's unbork_action label named did not run. */
 const ACTION_SKIP: Record<string, string> = {
   not_allowed: "not allowed",
   unknown_action: "unknown action",
@@ -86,7 +86,7 @@ const ACTION_CHECK: Record<string, { label: string; tone: Tone }> = {
   run_failed: { label: "run failed", tone: "danger" },
 }
 
-/** What the alert's labdog_action label came to: the run it started and
+/** What the alert's unbork_action label came to: the run it started and
  *  how that went, or why it did not run. */
 function ActionTags({ actions }: { actions: AlertDispatch[] }) {
   if (actions.length === 0) return <span className="text-text-faint">—</span>

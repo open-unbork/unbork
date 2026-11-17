@@ -26,7 +26,7 @@ def validate_public_url(raw: str) -> str:
     parts = urlsplit(value)
     if parts.scheme not in ("http", "https") or not parts.netloc:
         raise ValueError(
-            "must be an http:// or https:// address, such as https://labdog.example.com"
+            "must be an http:// or https:// address, such as https://unbork.example.com"
         )
     if parts.query or parts.fragment:
         raise ValueError("must not have a query string or fragment")

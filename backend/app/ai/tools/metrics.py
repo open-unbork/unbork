@@ -45,7 +45,7 @@ MAX_SERIES = 25
     description=(
         "Run an instant PromQL query against the Mimir/Prometheus backend "
         "registered in unbork and return the current value of each matching "
-        "series. Host metrics carry a labdog_host_id label matching the ids "
+        "series. Host metrics carry an unbork_host_id label matching the ids "
         "from list_hosts. Use this for resource usage, uptime, and any alerting "
         "signal, rather than shelling into the host."
     ),
@@ -54,7 +54,7 @@ MAX_SERIES = 25
         "properties": {
             "promql": {
                 "type": "string",
-                "description": 'The PromQL expression, e.g. up{labdog_host_id="3"}',
+                "description": 'The PromQL expression, e.g. up{unbork_host_id="3"}',
             },
             "host_id": {
                 "type": "integer",

@@ -103,7 +103,7 @@ def _resolve_check(module_type: str) -> CheckOne:
 
 
 def _inflight_key(module_type: str, host_id: int) -> str:
-    return f"labdog:drift:inflight:{module_type}:{host_id}"
+    return f"unbork:drift:inflight:{module_type}:{host_id}"
 
 
 def _inflight_ttl_seconds() -> int:
@@ -372,7 +372,7 @@ def run_sweep(module_type: str) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 #
 # Every collect-and-diff body loads the host's key, writes its verdict the
-# same way, probes LabDog's source IP while it has a key in hand, and
+# same way, probes unbork's source IP while it has a key in hand, and
 # records an unreachable host or an unexpected error on the status row.
 # Each module keeps its own collect, diff, sample counts and log lines.
 
@@ -424,12 +424,12 @@ async def probe_source_ip_once(
 
     from app.ssh_utils import get_source_ip, ssh_connect_host
 
-    if host.labdog_source_ip:
+    if host.unbork_source_ip:
         return
     try:
         imported_key = asyncssh.import_private_key(private_key_pem)
         async with ssh_connect_host(host, db, client_keys=[imported_key]) as probe:
-            host.labdog_source_ip = await get_source_ip(probe)
+            host.unbork_source_ip = await get_source_ip(probe)
     except Exception:
         log.debug("source-IP probe failed for host %s", host.id, exc_info=True)
 

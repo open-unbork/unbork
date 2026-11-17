@@ -169,7 +169,7 @@ not, on every host in the group.
 The **Add service** / **edit** dialog can attach a unit file:
 
 - **Override existing** — a drop-in under
-  `/etc/systemd/system/<unit>.service.d/labdog.conf`, applied only on hosts where the
+  `/etc/systemd/system/<unit>.service.d/unbork.conf`, applied only on hosts where the
   unit already exists.
 - **New service (full file)** — deployed to
   `/etc/systemd/system/<unit>.service` on every host in the group.

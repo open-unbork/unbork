@@ -6,7 +6,7 @@ session. The list and the manual investigate button were under
 the life of 1.x (:mod:`app.api.ai`).
 
 The list of actions alerts may run (``/api/alerts/actions``) is unbork's
-half of the ``labdog_action`` label (:mod:`app.alerts.labels`): Grafana
+half of the ``unbork_action`` label (:mod:`app.alerts.labels`): Grafana
 says which action an alert asks for, and only an action on this list, on
 a host inside its scope, is started. The list starts empty.
 """
@@ -197,7 +197,7 @@ async def investigate_alert_now(
     """Start an investigation for one alert by hand.
 
     The manual path deliberately skips the labels — an operator asking
-    for this has already made the judgement labdog_ai exists to automate —
+    for this has already made the judgement unbork_ai exists to automate —
     but not the kill switch, the provider check, or
     the budget. Those are about whether unbork *may* spend, which a
     button press does not change. Nor does it change the autonomy level,
@@ -493,7 +493,7 @@ async def create_alert_action(
     user: User = Depends(require("alerts.manage")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Allow alerts to run an action: ``labdog_action=<key>`` then starts it."""
+    """Allow alerts to run an action: ``unbork_action=<key>`` then starts it."""
     await _require_run_on_target(user, body)
     await _validate_entry(db, body)
     if await db.scalar(select(AlertAction.id).where(AlertAction.action_key == body.action_key)):

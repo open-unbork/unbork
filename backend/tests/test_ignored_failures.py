@@ -14,7 +14,7 @@ from app.ansible_runtime.outcomes import aggregate_module_outcomes
 from app.sync.orchestrator import _runner_events_to_task_events
 from app.tasks.action_group import _HostCtx, _route_runner_events_to_hosts
 
-PLAY = "LabDog Package Management"
+PLAY = "unbork Package Management"
 
 
 def _event(kind: str, task: str, *, host: str = "h", ignore_errors=None, msg: str = "") -> dict:

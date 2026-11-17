@@ -5,7 +5,7 @@ Both git paths set ``StrictHostKeyChecking=accept-new`` *with*
 the sort: every invocation starts from an empty known-hosts file, so
 there is never a first use and therefore never a mismatch to detect.
 Anyone able to intercept the connection to the pack repository serves
-arbitrary playbooks, which LabDog then runs against the fleet as root.
+arbitrary playbooks, which unbork then runs against the fleet as root.
 
 The fix is a real known-hosts file with a real lifetime: pre-populated
 from ``GitRepository.ssh_host_key_entry`` and verified strictly when one

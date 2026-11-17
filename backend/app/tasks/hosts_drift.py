@@ -98,8 +98,8 @@ async def check_hosts_drift_for_one_host(host, hms, db) -> bool:
         try:
             imported_key = asyncssh.import_private_key(private_key_pem)
             async with ssh_connect_host(host, db, client_keys=[imported_key]) as probe:
-                if not host.labdog_source_ip:
-                    host.labdog_source_ip = await get_source_ip(probe)
+                if not host.unbork_source_ip:
+                    host.unbork_source_ip = await get_source_ip(probe)
                 await _maybe_update_host_ip(probe, host, db)
         except Exception:
             # Best-effort follow-up probes; the diff above is the verdict.

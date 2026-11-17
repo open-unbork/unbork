@@ -59,7 +59,7 @@ class TestTheGitCloneRunsInAThread:
             clone_mod.clone_to_thread(
                 "file:///nowhere",
                 "main",
-                "/tmp/labdog-test-clone",
+                "/tmp/unbork-test-clone",
                 ssh_key=None,
                 token=None,
                 host_key_entry=None,
@@ -91,7 +91,7 @@ class TestTheGitCloneRunsInAThread:
         sha, learned = await clone_mod.clone_to_thread(
             "ssh://git@git.example.com/x",
             "main",
-            "/tmp/labdog-test-clone",
+            "/tmp/unbork-test-clone",
             ssh_key=None,
             token=None,
             host_key_entry=None,

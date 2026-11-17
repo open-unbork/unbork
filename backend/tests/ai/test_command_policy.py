@@ -665,7 +665,7 @@ class TestThePolicyFile:
 
 
 class TestReadingOptions:
-    """Declaring an option with the wrong arity makes LabDog read a
+    """Declaring an option with the wrong arity makes unbork read a
     different subcommand from the one the tool runs. These pin the reading
     the declarations rely on."""
 

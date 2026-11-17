@@ -97,7 +97,7 @@ async def test_host_runs_include_group_runs_with_this_hosts_own_result(superuser
                 status="failed",
                 exit_code=2,
                 error_message="ansible-runner exited with status=failed, rc=2",
-                output=FAILED_LOG + "[rollback] restoring labdog-1\n[rollback] success=True\n",
+                output=FAILED_LOG + "[rollback] restoring unbork-1\n[rollback] success=True\n",
             ),
             ActionHostRun(
                 action_run_id=newer.id, host_id=other.id, hostname="other", status="succeeded"

@@ -1,7 +1,7 @@
 """Drift-sample retention must not make a Prometheus counter go backwards.
 
-``labdog_drift_checks_total``, ``labdog_drift_changes_total`` and
-``labdog_drift_check_duration_seconds`` are all derived from the whole of
+``unbork_drift_checks_total``, ``unbork_drift_changes_total`` and
+``unbork_drift_check_duration_seconds`` are all derived from the whole of
 ``drift_samples`` with no time window, and all three are counters. Deleting
 old rows makes them decrease, which Prometheus reads as a process restart:
 ``rate()`` copes, ``increase()`` across the deletion silently under-reports,
@@ -235,7 +235,7 @@ class TestTheFoldAndTheDeleteShareATransaction:
     async def test_it_groups_by_module_and_status(self, db, monkeypatch, host_id):
         """The rollup grain has to be the finest any consumer needs.
 
-        ``labdog_drift_checks_total`` is per module_type+status; the change
+        ``unbork_drift_checks_total`` is per module_type+status; the change
         sums and the histogram are per module_type and recover their totals
         by summing across statuses.
         """

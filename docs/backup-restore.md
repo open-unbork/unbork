@@ -35,13 +35,13 @@ a release artifact.
 | State | Back up? | Where | Notes |
 |---|---|---|---|
 | PostgreSQL database | **Yes — critical** | `postgresql+asyncpg://…` from `[database] url` | Holds every host, group, rule, audit entry, and all encrypted credentials. |
-| `security.encryption_key` | **Yes — critical** | `labdog.toml` (`/etc/labdog/labdog.toml` on package installs) | 32-byte AES-256-GCM key in base64. Without it, the encrypted columns in the DB are unrecoverable. |
+| `security.encryption_key` | **Yes — critical** | `unbork.toml` (`/etc/unbork/unbork.toml` on package installs) | 32-byte AES-256-GCM key in base64. Without it, the encrypted columns in the DB are unrecoverable. |
 | `security.secret_key` | Recommended | same file | JWT signing key. Losing it invalidates all existing sessions but doesn't lose data — users re-login. |
-| Ansible pack checkouts | **No** | `/var/lib/labdog/packs/<id>/` | Re-cloned from the pack's linked `GitRepository` on next sync. |
-| Claude Code session state | Optional — but **must persist across restarts** | `/var/lib/labdog/claude-cli/` | Only relevant to the `claude_agent` and `claude_cli` providers. Holds the stored subscription login and the CLI's own session files. An AI session parked awaiting approval keeps only its `sdk_session_id` in the database — the conversation it resumes into lives here, so a container without this path on a volume loses parked sessions on restart. Not worth backing up (a lost login is re-entered, a lost parked session is re-run), but it does need to survive a restart: the shipped compose in [production-deploy.md](production-deploy.md) mounts it. |
-| Logs | Optional | `/var/log/labdog/` or `journalctl -u labdog` | Only for incident forensics; not required for service restoration. |
-| Frontend build | **No** | `/usr/lib/labdog/frontend/out/` | Comes from the release artifact. |
-| Backend venv | **No** | `/usr/lib/labdog/venv/` | Comes from the release artifact. |
+| Ansible pack checkouts | **No** | `/var/lib/unbork/packs/<id>/` | Re-cloned from the pack's linked `GitRepository` on next sync. |
+| Claude Code session state | Optional — but **must persist across restarts** | `/var/lib/unbork/claude-cli/` | Only relevant to the `claude_agent` and `claude_cli` providers. Holds the stored subscription login and the CLI's own session files. An AI session parked awaiting approval keeps only its `sdk_session_id` in the database — the conversation it resumes into lives here, so a container without this path on a volume loses parked sessions on restart. Not worth backing up (a lost login is re-entered, a lost parked session is re-run), but it does need to survive a restart: the shipped compose in [production-deploy.md](production-deploy.md) mounts it. |
+| Logs | Optional | `/var/log/unbork/` or `journalctl -u unbork` | Only for incident forensics; not required for service restoration. |
+| Frontend build | **No** | `/usr/lib/unbork/frontend/out/` | Comes from the release artifact. |
+| Backend venv | **No** | `/usr/lib/unbork/venv/` | Comes from the release artifact. |
 
 ---
 
@@ -53,20 +53,20 @@ Use `pg_dump` in custom format (faster restore, built-in compression,
 lets you restore individual objects):
 
 ```bash
-# As the labdog DB user, or any role with read access to the labdog db
+# As the unbork DB user, or any role with read access to the unbork db
 pg_dump \
   --host=localhost \
-  --username=labdog \
-  --dbname=labdog \
+  --username=unbork \
+  --dbname=unbork \
   --format=custom \
-  --file=/var/backups/labdog/labdog-$(date +%Y%m%d-%H%M%S).dump
+  --file=/var/backups/unbork/unbork-$(date +%Y%m%d-%H%M%S).dump
 ```
 
 For a plain SQL dump (human-readable, easier to inspect and
 diff, but larger on disk):
 
 ```bash
-pg_dump --format=plain --clean --if-exists --dbname=labdog > labdog.sql
+pg_dump --format=plain --clean --if-exists --dbname=unbork > unbork.sql
 ```
 
 **What's inside:** every unbork table, including `ssh_keys`,
@@ -78,7 +78,7 @@ both.
 
 ### The encryption key
 
-The key lives in `labdog.toml` under `[security]`:
+The key lives in `unbork.toml` under `[security]`:
 
 ```toml
 [security]
@@ -92,8 +92,8 @@ absolutely must survive is `encryption_key`.
 Simplest snapshot:
 
 ```bash
-sudo cp /etc/labdog/labdog.toml /var/backups/labdog/labdog.toml-$(date +%Y%m%d)
-sudo chmod 600 /var/backups/labdog/labdog.toml-*
+sudo cp /etc/unbork/unbork.toml /var/backups/unbork/unbork.toml-$(date +%Y%m%d)
+sudo chmod 600 /var/backups/unbork/unbork.toml-*
 ```
 
 For an encrypted offsite copy, encrypt the file with `age` or
@@ -106,9 +106,9 @@ screenshot by accident.
 A restorable snapshot at time `T`:
 
 ```
-/var/backups/labdog/
-├── labdog-YYYYMMDD-HHMMSS.dump           (pg_dump custom format)
-└── labdog.toml-YYYYMMDD                   (config with encryption_key)
+/var/backups/unbork/
+├── unbork-YYYYMMDD-HHMMSS.dump           (pg_dump custom format)
+└── unbork.toml-YYYYMMDD                   (config with encryption_key)
 ```
 
 If you only have the first, you have unreadable ciphertext.
@@ -117,11 +117,11 @@ If you only have the second, you have a key and no data.
 ### Automating daily backups
 
 systemd timer is the usual choice on the packaged install. Drop
-this at `/etc/systemd/system/labdog-backup.service` and
-`labdog-backup.timer`:
+this at `/etc/systemd/system/unbork-backup.service` and
+`unbork-backup.timer`:
 
 ```ini
-# labdog-backup.service
+# unbork-backup.service
 [Unit]
 Description=Nightly unbork backup
 Requires=postgresql.service
@@ -129,14 +129,14 @@ After=postgresql.service
 
 [Service]
 Type=oneshot
-User=labdog
-Group=labdog
+User=unbork
+Group=unbork
 UMask=0077
-ExecStart=/usr/local/bin/labdog-backup.sh
+ExecStart=/usr/local/bin/unbork-backup.sh
 ```
 
 ```ini
-# labdog-backup.timer
+# unbork-backup.timer
 [Unit]
 Description=Run unbork backup nightly
 
@@ -149,32 +149,32 @@ RandomizedDelaySec=15m
 WantedBy=timers.target
 ```
 
-And the script at `/usr/local/bin/labdog-backup.sh`:
+And the script at `/usr/local/bin/unbork-backup.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKUP_DIR=/var/backups/labdog
+BACKUP_DIR=/var/backups/unbork
 KEEP_DAYS=14
 STAMP=$(date +%Y%m%d-%H%M%S)
 
-install -d -m 0700 -o labdog -g labdog "$BACKUP_DIR"
+install -d -m 0700 -o unbork -g unbork "$BACKUP_DIR"
 
 # Database
-pg_dump --dbname=labdog --format=custom \
-  --file="$BACKUP_DIR/labdog-$STAMP.dump"
+pg_dump --dbname=unbork --format=custom \
+  --file="$BACKUP_DIR/unbork-$STAMP.dump"
 
 # Config (includes encryption_key)
-install -m 0600 -o labdog -g labdog \
-  /etc/labdog/labdog.toml "$BACKUP_DIR/labdog.toml-$STAMP"
+install -m 0600 -o unbork -g unbork \
+  /etc/unbork/unbork.toml "$BACKUP_DIR/unbork.toml-$STAMP"
 
 # Prune anything older than KEEP_DAYS
 find "$BACKUP_DIR" -mtime +$KEEP_DAYS -type f -delete
 ```
 
 ```bash
-sudo systemctl enable --now labdog-backup.timer
+sudo systemctl enable --now unbork-backup.timer
 ```
 
 Then push `$BACKUP_DIR` offsite (rclone to S3 / restic to B2 /
@@ -193,28 +193,28 @@ restore data from the backup set.
 # 1. Install unbork from the same version you backed up from
 #    (newer minor versions work, but pick the same version first
 #    then upgrade afterwards to keep the trail clear).
-sudo apt install ./labdog_0.2.0-1_amd64.deb
+sudo apt install ./unbork_0.2.0-1_amd64.deb
 
 # 2. Restore the config BEFORE starting the service so the
 #    encryption_key is in place when migrations run.
-sudo install -m 0640 -o root -g labdog \
-  labdog.toml-20260425 /etc/labdog/labdog.toml
+sudo install -m 0640 -o root -g unbork \
+  unbork.toml-20260425 /etc/unbork/unbork.toml
 
 # 3. Create the target database (empty) and restore.
-sudo -u postgres createdb labdog
+sudo -u postgres createdb unbork
 pg_restore \
-  --dbname=labdog \
+  --dbname=unbork \
   --clean --if-exists --no-owner --no-acl \
-  labdog-20260425-030000.dump
+  unbork-20260425-030000.dump
 
 # 4. Apply any pending migrations (safe on a restored-from-older-
 #    version dump; noop if the dump already had the latest schema).
-sudo -u labdog /usr/lib/labdog/venv/bin/alembic \
-  -c /usr/lib/labdog/backend/alembic.ini upgrade head
+sudo -u unbork /usr/lib/unbork/venv/bin/alembic \
+  -c /usr/lib/unbork/backend/alembic.ini upgrade head
 
 # 5. Start the service.
-sudo systemctl enable --now labdog.service
-sudo journalctl -u labdog -f
+sudo systemctl enable --now unbork.service
+sudo journalctl -u unbork -f
 ```
 
 Then hit the UI, log in with an existing account (passwords
@@ -228,30 +228,30 @@ without wiping the rest of the machine:
 
 ```bash
 # Stop the service so nothing writes during restore
-sudo systemctl stop labdog.service
+sudo systemctl stop unbork.service
 
 # Drop the corrupt DB, recreate, restore
-sudo -u postgres dropdb labdog
-sudo -u postgres createdb labdog
-pg_restore --dbname=labdog --clean --if-exists --no-owner --no-acl \
-  /var/backups/labdog/labdog-20260425-030000.dump
+sudo -u postgres dropdb unbork
+sudo -u postgres createdb unbork
+pg_restore --dbname=unbork --clean --if-exists --no-owner --no-acl \
+  /var/backups/unbork/unbork-20260425-030000.dump
 
 # Migrations (idempotent)
-sudo -u labdog /usr/lib/labdog/venv/bin/alembic \
-  -c /usr/lib/labdog/backend/alembic.ini upgrade head
+sudo -u unbork /usr/lib/unbork/venv/bin/alembic \
+  -c /usr/lib/unbork/backend/alembic.ini upgrade head
 
 # Back up
-sudo systemctl start labdog.service
+sudo systemctl start unbork.service
 ```
 
-The `encryption_key` in `/etc/labdog/labdog.toml` did not change,
+The `encryption_key` in `/etc/unbork/unbork.toml` did not change,
 so encrypted columns decrypt correctly against the restored DB.
 
 ### After restore: what to verify
 
 1. **Log in and list hosts** — `/hosts` should show every host
    from the backup. If you see "Failed to load hosts" or an
-   empty list, check `journalctl -u labdog` for the real error;
+   empty list, check `journalctl -u unbork` for the real error;
    a corrupt restore will usually throw during row
    materialisation.
 2. **Hit an encrypted field** — open one of your SSH keys at
@@ -273,7 +273,7 @@ You have the DB but not the key. Every encrypted column is
 cryptographically opaque — by design. **You cannot decrypt
 existing credentials without the key.** Recovery path:
 
-1. Generate a new key and put it in `labdog.toml`:
+1. Generate a new key and put it in `unbork.toml`:
    ```bash
    python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
    ```
@@ -287,7 +287,7 @@ existing credentials without the key.** Recovery path:
    you'll need to reattach SSH keys to them:
 
    ```sql
-   -- Run as the labdog DB user; adjust to your situation
+   -- Run as the unbork DB user; adjust to your situation
    DELETE FROM ssh_keys;
    DELETE FROM proxmox_nodes;
    UPDATE git_repositories
@@ -345,7 +345,7 @@ Fresh install. See `docs/README.md` installation section.
   old and new keys until every live row has been re-encrypted
   under the new key. Otherwise a mid-rotation restore can't
   read rows that were still ciphertext-under-old-key.
-- Never commit `/etc/labdog/labdog.toml` or a backup file to a
+- Never commit `/etc/unbork/unbork.toml` or a backup file to a
   git repo. If it happens by accident, treat every currently-
   stored credential as compromised. The structured rotation path
   is in [`encryption-key-rotation.md`](encryption-key-rotation.md);

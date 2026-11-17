@@ -111,7 +111,7 @@ class TestOwnName:
 
         assert (own.hostname, own.aliases) == ("valheim", [])
 
-    async def test_falls_back_to_the_labdog_name(self, db):
+    async def test_falls_back_to_the_unbork_name(self, db):
         name = _name()
         host, _ = await _managed_host(db, hostname=name)
 

@@ -152,7 +152,7 @@ class TestWSAuth:
 
         token = _make_token(user.id)
         mock_ws = AsyncMock()
-        mock_ws.cookies = {"labdog_auth": token}
+        mock_ws.cookies = {"unbork_auth": token}
 
         result = await get_ws_user(mock_ws, db)
         assert result.id == user.id
@@ -173,7 +173,7 @@ class TestWSAuth:
         from app.auth.ws_auth import get_ws_user
 
         mock_ws = AsyncMock()
-        mock_ws.cookies = {"labdog_auth": "this.is.garbage"}
+        mock_ws.cookies = {"unbork_auth": "this.is.garbage"}
 
         with pytest.raises(RuntimeError, match="invalid token"):
             await get_ws_user(mock_ws, db)
@@ -201,7 +201,7 @@ class TestWSAuth:
 
         token = _make_token(user.id)
         mock_ws = AsyncMock()
-        mock_ws.cookies = {"labdog_auth": token}
+        mock_ws.cookies = {"unbork_auth": token}
 
         with pytest.raises(RuntimeError, match="user not found"):
             await get_ws_user(mock_ws, db)

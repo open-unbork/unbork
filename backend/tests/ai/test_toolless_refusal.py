@@ -8,7 +8,7 @@ The model followed the instruction it was given, the CLI rendered the
 absent tool result as the literal word ``undefined``, and the model
 supplied the rest itself:
 
-    {"hostname": "labdog-prod-01", "address": "10.0.10.11",
+    {"hostname": "unbork-prod-01", "address": "10.0.10.11",
      "roles": ["docker-host", "media-server", ...],
      "notes": "Primary always-on box. Runs Jellyfin, *arr stack, ..."}
 
@@ -44,7 +44,7 @@ class TestCapabilityLookup:
 
     def test_the_agent_sdk_backend_can(self) -> None:
         """The whole point of the SDK backend: same subscription billing as
-        the single-shot CLI, but it serves LabDog's tools over an
+        the single-shot CLI, but it serves unbork's tools over an
         in-process MCP server, so it can actually investigate."""
         assert supports_tools(_provider("claude_agent")) is True
 

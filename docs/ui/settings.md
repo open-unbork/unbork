@@ -18,7 +18,7 @@ effect immediately — no config file edit or restart.
 
 > **Note:** Infrastructure settings (database URL, TLS, secrets, rate
 > limits, discovery's largest scan range, terminal session caps) are set in
-> `labdog.toml` or environment variables. Only the settings below are
+> `unbork.toml` or environment variables. Only the settings below are
 > managed here.
 
 Each row shows a one-line description, the setting's key, its range and its
@@ -50,7 +50,7 @@ Two of them cover what comes *in* to unbork:
   URL to give a Grafana contact point and when the last alert arrived.
   It says **needs attention** when intake is on but the webhook would
   refuse everything because `[alerts] webhook_token` is not set in
-  `labdog.toml`, and when alerts are listed for full auto but the token is
+  `unbork.toml`, and when alerts are listed for full auto but the token is
   shorter than 32 characters. **Configure…** opens Settings › Fleet
   defaults, where intake is switched on; **Alerts** opens the [Alerts](alerts.md) page.
   The token itself is never shown. The Intake card on the Alerts page also
@@ -104,12 +104,12 @@ Whether unbork records alerts at all. Recording costs nothing and starts
 nothing; what an alert sets off is up to its Grafana labels — an action
 from the list on the Alerts page's Handling tab, and an AI investigation,
 which is `ai.auto_investigate_enabled` under [AI](#ai). The webhook also needs `[alerts] webhook_token` in
-`labdog.toml`; see [Alerts](alerts.md).
+`unbork.toml`; see [Alerts](alerts.md).
 
 | Setting | Key | Default | Range | Description |
 |---------|-----|---------|-------|-------------|
 | Alert Intake | `alerts.intake_enabled` | `0` (off) | 0 – 1 | Accept alerts from Grafana and Alertmanager. |
-| Action Check | `alerts.action_check_minutes` | `10` | 1 – 1440 min | How long after a run an alert's `labdog_action` started finishes unbork waits for the alert to resolve before judging that the action did not fix it. See [Alerts](alerts.md#afterwards). |
+| Action Check | `alerts.action_check_minutes` | `10` | 1 – 1440 min | How long after a run an alert's `unbork_action` started finishes unbork waits for the alert to resolve before judging that the action did not fix it. See [Alerts](alerts.md#afterwards). |
 | Alertmanager Poll | `alerts.poll_minutes` | `0` (never) | 0 – 1440 min | Poll the default Mimir instance's Alertmanager API, as a fallback for alerts that arrived while unbork was unreachable. **Only useful when your alert rules live in Mimir's ruler** — Grafana-managed rules go to Grafana's own Alertmanager, which this cannot see, and the poll then records nothing while looking healthy. See [Alerts](alerts.md#alertmanager-poll-catch-up). |
 
 ### Discovery
@@ -185,7 +185,7 @@ asking. The webhook token lives in the config file rather than here; see
 
 | Setting | Key | Default | Range | Description |
 |---------|-----|---------|-------|-------------|
-| Auto Investigate | `ai.auto_investigate_enabled` | `0` (off) | 0 – 1 | Start an investigation when an alert labelled `labdog_ai=true` or `labdog_ai_automate=true` arrives. What it may change is set under *Alert remediation* below. |
+| Auto Investigate | `ai.auto_investigate_enabled` | `0` (off) | 0 – 1 | Start an investigation when an alert labelled `unbork_ai=true` or `unbork_ai_automate=true` arrives. What it may change is set under *Alert remediation* below. |
 | Investigation Prompt | `ai.alert_mission_template` | built-in wording | up to 8000 characters | The prompt an alert investigation starts from. See below. |
 
 **Alert remediation.** What an alert's investigation may change. Full auto
@@ -196,8 +196,8 @@ safeguards a named alert must pass.
 | Setting | Key | Default | Range | Description |
 |---------|-----|---------|-------|-------------|
 | Alert Autonomy | `ai.alert_autonomy_level` | `read_only` | read_only / approval | What an alert's session may change. At `approval` each change waits in the approvals queue, and a request nobody sees expires after `ai.approval_expiry_hours` — subscribe to [email](notifications.md) for it. |
-| Full-Auto by Rules | `ai.alert_full_auto_rules_enabled` | `0` | 0 – 1 | Off: an alert may change the host without asking when Grafana labels it `labdog_ai_automate=true`. On: `ai.alert_full_auto_rules` decides. |
-| Full-Auto Rules | `ai.alert_full_auto_rules` | `labdog_ai_automate=true` | up to 4000 characters | One rule per line; comma-separated conditions that must all hold — an alert name, `key=value` / `key!=value` labels, `host:` and `group:` (unbork's), `!host:` / `!group:` exceptions. A rule naming a host or group unbork does not have is refused on save and flagged afterwards. See [Alerts](alerts.md#which-alerts-may-run-at-full-auto). |
+| Full-Auto by Rules | `ai.alert_full_auto_rules_enabled` | `0` | 0 – 1 | Off: an alert may change the host without asking when Grafana labels it `unbork_ai_automate=true`. On: `ai.alert_full_auto_rules` decides. |
+| Full-Auto Rules | `ai.alert_full_auto_rules` | `unbork_ai_automate=true` | up to 4000 characters | One rule per line; comma-separated conditions that must all hold — an alert name, `key=value` / `key!=value` labels, `host:` and `group:` (unbork's), `!host:` / `!group:` exceptions. A rule naming a host or group unbork does not have is refused on save and flagged afterwards. See [Alerts](alerts.md#which-alerts-may-run-at-full-auto). |
 | Full Auto Needs Snapshot | `ai.alert_full_auto_requires_snapshot` | `1` (on) | 0 – 1 | Allow full auto only on hosts unbork can snapshot first. Off allows it on bare metal and unmapped hosts, whose changes then have no rollback point. |
 | Remediation Cooldown | `ai.alert_remediation_cooldown_minutes` | `60` | 0 – 10080 min | After a full-auto session for an alert changes a host, how long before that alert may change it again (0 = no cooldown). |
 | Remediation Daily Cap | `ai.alert_remediation_daily_cap` | `3` | 1 – 100 | Most full-auto sessions that may change one host in 24 hours, across all alerts. |
@@ -292,7 +292,7 @@ Two actions sit in the head:
   unbork also runs this every hour on its own, more cautiously: it removes
   only snapshots older than `workflow.snapshot_max_age_hours`, so a
   snapshot a failed run kept for you stays at least that long. AI
-  sessions' `labdog-ai-` snapshots are left to their own retention
+  sessions' `unbork-ai-` snapshots are left to their own retention
   setting by both.
 
 ### TLS verification
@@ -343,8 +343,8 @@ Build metadata for the running unbork instance, read from
 
 | Field | Source |
 |---|---|
-| version | `VERSION` file at the repo root, baked into `backend/pyproject.toml` and `frontend/package.json` by the release pipeline. Read at runtime via `importlib.metadata.version("labdog-backend")`. |
-| commit | The git commit the image / package was built from. Set via the `GIT_SHA` Docker build arg or the `bake-build-info` Makefile target (writes `app/_build_info.py`). Falls back to the `LABDOG_COMMIT_SHA` env var. Empty on a dev install with neither source populated. |
+| version | `VERSION` file at the repo root, baked into `backend/pyproject.toml` and `frontend/package.json` by the release pipeline. Read at runtime via `importlib.metadata.version("unbork-backend")`. |
+| commit | The git commit the image / package was built from. Set via the `GIT_SHA` Docker build arg or the `bake-build-info` Makefile target (writes `app/_build_info.py`). Falls back to the `UNBORK_COMMIT_SHA` env var. Empty on a dev install with neither source populated. |
 | built | ISO 8601 timestamp of the build. Set via `BUILD_DATE` build arg / Makefile target / env var. Empty when not provided. |
 | license | `AGPL-3.0-or-later` (constant). |
 | source | Upstream project URL (constant). |

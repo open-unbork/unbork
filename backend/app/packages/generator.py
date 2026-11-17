@@ -125,7 +125,7 @@ def generate_package_playbook(
 
     playbook = [
         {
-            "name": "LabDog Package Management",
+            "name": "unbork Package Management",
             "hosts": "all",
             "become": True,
             # BUG-157: only what the tasks read. ``os_family`` for the
@@ -190,7 +190,7 @@ def _package_tasks(packages: list[dict]) -> list[dict]:
             spec, label = group[0]
             tasks.append(_package_task(f"{verb}: {label}", spec, state))
         elif group:
-            register = f"labdog_packages_{state}"
+            register = f"unbork_packages_{state}"
             listed = _package_task(
                 f"{verb}: {', '.join(label for _, label in group)}",
                 [spec for spec, _ in group],

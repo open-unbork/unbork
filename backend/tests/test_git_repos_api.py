@@ -372,7 +372,7 @@ async def test_trust_host_key_clears_the_pin_so_the_next_sync_re_tofus(superuser
 
 
 async def test_trusting_a_new_key_is_audited(superuser_client, db):
-    """Accepting a new key for the repository LabDog takes playbooks
+    """Accepting a new key for the repository unbork takes playbooks
     from is worth being able to look up later."""
     from sqlalchemy import select
 

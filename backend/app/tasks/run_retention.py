@@ -8,7 +8,7 @@ nightly twenty-host action — in a table the claim protocol scans on
 every sync, action and drift check.
 
 Window: ``logging.run_retention_days`` (default 90, ``0`` = keep
-forever), settable in ``labdog.toml`` or the settings UI. Kept separate
+forever), settable in ``unbork.toml`` or the settings UI. Kept separate
 from ``logging.audit_retention_days`` deliberately: an audit trail is
 usually wanted for longer than an ansible transcript, and an operator
 who shortens one rarely means to shorten the other.

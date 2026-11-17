@@ -15,7 +15,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import CronJobYAML, LabDogGroupYAML
+from app.gitops.schema import CronJobYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def _yaml_state(e: CronJobYAML) -> dict:
 
 async def import_cron_jobs(
     group: HostGroup,
-    parsed: LabDogGroupYAML,
+    parsed: UnborkGroupYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:
@@ -141,7 +141,7 @@ async def import_cron_jobs(
 
     Args:
         group: The target ``HostGroup`` ORM instance.
-        parsed: Validated ``LabDogGroupYAML`` from the current commit.
+        parsed: Validated ``UnborkGroupYAML`` from the current commit.
         commit_sha: Full commit SHA string (for audit trail).
         db: Active async database session.
 

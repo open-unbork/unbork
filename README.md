@@ -19,7 +19,7 @@ Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more 
 
 ```bash
 docker run -d --name unbork -p 8000:8000 \
-  -v unbork-data:/var/lib/labdog \
+  -v unbork-data:/var/lib/unbork \
   unbork/unbork:latest
 ```
 
@@ -70,10 +70,10 @@ parser, bounded by a host allowlist, redacted, and written to the audit log.
   the model went looking for.
 - **Alert-driven actions, investigation and fixes** — point a Grafana
   contact point at unbork and let the alert rule's labels say what
-  happens. `labdog_action` runs an action you have allowed on the alert's
-  host, no AI needed. `labdog_ai` has the assistant investigate, within
+  happens. `unbork_action` runs an action you have allowed on the alert's
+  host, no AI needed. `unbork_ai` has the assistant investigate, within
   budget; it only looks unless you allow more, and can ask for approval
-  for each change. `labdog_ai_automate`, or rules naming alerts, hosts and
+  for each change. `unbork_ai_automate`, or rules naming alerts, hosts and
   groups, lets it fix the host unattended. Every unattended fix is
   snapshotted first and checked afterwards, and one that made the host
   worse is rolled back.
