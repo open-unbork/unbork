@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 from app.ai.agent_sdk.bridge import NO_BUILTIN_TOOLS
 from app.ai.agent_sdk.environment import build_sdk_env, ensure_state_dir
@@ -35,14 +36,19 @@ PROBE_PROMPT = "Reply with the single word: ok"
 PROBE_TIMEOUT_SECONDS = 120
 
 
-def bundled_cli_version() -> str:
-    """The Claude Code build the installed SDK ships and expects."""
-    try:
-        from claude_agent_sdk._cli_version import __cli_version__
+def program_version(program: Path) -> str:
+    """The version of the program the Test ran, as its install recorded it.
 
-        return str(__cli_version__)
-    except Exception:  # pragma: no cover - version metadata is best-effort
-        return "unknown version"
+    unbork writes ``version`` next to a program it downloaded (S-009); an
+    operator's own program on PATH has none, so it is named by its path.
+    """
+    from app.ai.claude_code import VERSION_NAME
+
+    try:
+        recorded = (program.parent / VERSION_NAME).read_text().strip()
+    except OSError:
+        recorded = ""
+    return recorded or str(program)
 
 
 async def test_connection(provider: AIProvider) -> str:
@@ -113,7 +119,7 @@ async def test_connection(provider: AIProvider) -> str:
         detail = str(exc).strip() or exc.__class__.__name__
         raise LLMProviderError(f"The Claude Code program could not be started: {detail}") from exc
 
-    version = bundled_cli_version()
+    version = program_version(program)
     if failure:
         raise LLMProviderError(
             f"The Claude Code program ({version}) started, but the request failed: {failure}"

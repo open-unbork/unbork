@@ -492,7 +492,7 @@ Four kinds of provider are supported:
 | **Claude agent** | Claude as an agent, through the Claude Agent SDK and the Claude Code program on the server. Runs tools, so it can drive investigations and scheduled checks, billed to your Claude plan instead of API credit. |
 | **Claude single-shot** | The Claude Code program once per prompt. Cannot run tools: it writes reports and verify verdicts, nothing that has to look something up. |
 
-The last two are the **Claude Code** types. They take no API key and no
+The last two run the Claude Code program. They take no API key and no
 token: they use the Claude Code sign-in of the `unbork` service account on
 the server, which you set up once as described below.
 
@@ -625,7 +625,7 @@ One switch covers the whole instance, deliberately. A provider added
 months from now cannot start sending data off-network on its own — it
 still waits on a policy decision you made once, on purpose.
 
-Note that both Claude Code types count as off-network. The program runs
+Note that both Claude agent and Claude single-shot count as off-network. The program runs
 locally, but it is an authenticated client talking to Anthropic, so the data still
 leaves; it is gated exactly like a hosted API.
 

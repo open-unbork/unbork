@@ -352,7 +352,8 @@ session to turn on. See
 **What to decide deliberately**
 
 - **`ai.allow_cloud_providers`** (default off) is the data-egress
-  control. While off, only local endpoints and the Claude CLI may run.
+  control. While off, only local endpoints may run; the Claude agent and
+  Claude single-shot types count as off-network.
   Turning it on means host state — command output, hostnames, package
   and service inventories — leaves your network. Redaction is a safety
   net, not a guarantee.

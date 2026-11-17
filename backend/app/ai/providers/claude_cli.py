@@ -24,12 +24,12 @@ Two modes, chosen by probing the installed CLI once:
 SDK does everything this does and more, so the two looked redundant, and
 the open question was whether to retire this one. The answer is no, for a
 reason that has nothing to do with capability: ``claude-agent-sdk`` is an
-optional extra. Its wheel is platform-specific and carries a ~131 MB
-Claude Code binary, so the ``.deb`` / ``.rpm`` / ``.tar.gz`` artefacts do
-not install it — only the container image does. Retiring this backend
-would leave every package install with no way to authenticate a Claude
-subscription at all, which is the one thing neither API-key backend can
-do.
+optional extra that the ``.deb`` / ``.rpm`` / ``.tar.gz`` artefacts do not
+install, and an image built without the assistant drops it too. This
+backend needs only the Claude Code program, which unbork downloads on
+first use (``app.ai.claude_code``) or finds on PATH, so it is the one way
+such an install can use a Claude subscription, which neither API-key
+backend can do.
 
 The verify step added in phase 5 also gives ``supports_tools = False`` a
 job rather than a limitation: a verify session is toolless by design (see
@@ -257,8 +257,8 @@ class ClaudeCLIProvider:
     ) -> AsyncIterator[StreamEvent]:
         if tools:
             raise LLMProviderError(
-                "The Claude CLI backend cannot execute tool calls. Configure an "
-                "OpenAI-compatible or Anthropic provider for agentic sessions."
+                "A Claude single-shot provider cannot run tools. Use a Claude agent, "
+                "Anthropic or OpenAI-compatible provider for agentic sessions."
             )
 
         prompt = self._flatten(messages)

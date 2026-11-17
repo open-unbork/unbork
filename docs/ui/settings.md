@@ -155,7 +155,7 @@ Every one of these defaults closed. unbork does nothing with an LLM until
 | Setting | Key | Default | Range | Description |
 |---------|-----|---------|-------|-------------|
 | AI Enabled | `ai.enabled` | `0` (off) | 0 – 1 | Master switch. While off, chat sessions, scheduled AI checks, and AI verification are all skipped. |
-| Allow Cloud Providers | `ai.allow_cloud_providers` | `0` (off) | 0 – 1 | Permit providers that send host data outside your network. While off, only local endpoints and the Claude CLI may run. |
+| Allow Cloud Providers | `ai.allow_cloud_providers` | `0` (off) | 0 – 1 | Permit providers that send host data outside your network. While off, only local endpoints may run; the Claude agent and Claude single-shot types count as off-network. |
 | Currency | `ai.currency` | `USD` | USD EUR GBP SEK NOK DKK CHF CAD AUD | Label for costs and budgets. **Formatting only** — unbork never converts between currencies, so enter provider rates in the same unit you pick here. |
 
 **Spend limits.** Checked before a session starts *and* between steps, so a
