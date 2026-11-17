@@ -34,7 +34,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import UnborkGroupYAML, LinuxGroupYAML, LinuxUserYAML
+from app.gitops.schema import LinuxGroupYAML, LinuxUserYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.user_mgmt.models import LinuxGroup, LinuxUser, UserState
 from app.user_mgmt.schemas import LinuxGroupCreate, LinuxUserCreate

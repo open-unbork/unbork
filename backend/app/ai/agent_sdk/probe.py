@@ -106,7 +106,9 @@ async def test_connection(provider: AIProvider) -> str:
 
     version = bundled_cli_version()
     if failure:
-        raise LLMProviderError(f"The Claude Code program ({version}) started, but the request failed: {failure}")
+        raise LLMProviderError(
+            f"The Claude Code program ({version}) started, but the request failed: {failure}"
+        )
     if not text.strip():
         # Exit without output is the shape the single-shot backend's
         # silent-auth-failure took. Treat it as a failure, not a pass.

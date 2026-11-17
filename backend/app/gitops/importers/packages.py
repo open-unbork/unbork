@@ -19,7 +19,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import UnborkGroupYAML, PackageRepositoryYAML, PackageYAML
+from app.gitops.schema import PackageRepositoryYAML, PackageYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.packages.constants import is_protected
 from app.packages.models import (

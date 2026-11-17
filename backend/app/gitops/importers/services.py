@@ -14,7 +14,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import UnborkGroupYAML, ServiceYAML
+from app.gitops.schema import ServiceYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.services.constants import PROTECTED_SERVICES
 from app.services.models import DeployMode, ServiceRule, ServiceState
