@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
 from app.actions.registry import ACTION_REGISTRY, reload_registry_async
+from app.actions.run_audit import audit_run_cancelled, audit_run_started
 from app.actions.run_target import describe_target
 from app.actions.validation import DRY_RUN_PARAM, build_param_model
 from app.ai.run_log import FAILURE_WINDOW_SQL, failure_reason
@@ -324,6 +325,7 @@ async def _insert_run(
     db.add(run)
     await db.flush()
     await db.refresh(run)
+    await audit_run_started(db, run, origin="api", user_id=user.id)
 
     run_id = run.id
     await db.commit()
@@ -762,7 +764,7 @@ async def investigate_run(
 @router.post("/runs/{id}/cancel")
 async def cancel_run(
     id: int,
-    _: User = Depends(require("actions.run", scope=row_scope(ActionRun, "id"))),
+    user: User = Depends(require("actions.run", scope=row_scope(ActionRun, "id"))),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a run: stop the hosts it has not started, let running ones finish.
@@ -794,6 +796,7 @@ async def cancel_run(
         return {"ok": True}
 
     now = datetime.now(UTC)
+    status_before = run.status
     run.status = "cancelled"
 
     # A deferred ``_builtin.sync`` row stays ``pending`` while the SyncJob it
@@ -840,6 +843,7 @@ async def cancel_run(
     )
     if not still_running:
         run.finished_at = now
+    await audit_run_cancelled(db, run, user_id=user.id, status_before=status_before)
     await db.commit()
 
     try:

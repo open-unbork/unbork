@@ -398,11 +398,16 @@ may act; an empty list allows nothing. Once any alert can reach full
 auto, the webhook is a way to make unbork run commands as root, so the
 safeguards matter:
 
-- **The webhook token is the trigger's only lock.** A webhook-delivered
-  alert is refused full auto while `[alerts] webhook_token` is shorter
-  than 32 characters, and the same goes for running the action its
-  [`labdog_action`](ui/alerts.md#running-an-action) label names. Use `openssl rand -hex 16` or longer, and restrict
-  the path at the reverse proxy to Grafana's address.
+- **Lock the trigger three ways.** The webhook token is always required:
+  a webhook-delivered alert is refused full auto while `[alerts]
+  webhook_token` is shorter than 32 characters, and the same goes for
+  running the action its [`labdog_action`](ui/alerts.md#running-an-action)
+  label names. Use `openssl rand -hex 16` or longer. Whenever full auto or
+  alert-started actions are on, also set `[alerts] allowed_sources` to
+  Grafana's address (with `[server] trusted_proxies` behind a reverse
+  proxy), and set `webhook_hmac_secret` when your Grafana can sign webhook
+  requests, so a leaked token alone is not enough. See
+  [Restricting who may send alerts](ui/alerts.md#restricting-who-may-send-alerts).
 - **Alert text is attacker-controlled.** Whoever writes alert rules or
   annotations, or controls a label value such as a job or instance name,
   is writing text an agent with root reads. It is sanitised and fenced

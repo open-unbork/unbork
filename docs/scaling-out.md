@@ -64,6 +64,9 @@ therefore no longer delays action runs, and `actions_concurrency` caps how
 many hosts run actions at once. Every queue needs a consumer: a split
 deployment without a `worker-actions` container runs no actions at all.
 
+An installed extension's background tasks run on these same worker roles,
+on the queue the extension names; there is no extra role or queue to add.
+
 ## Postgres connections
 
 Budget about six Postgres connections per worker slot, counting every

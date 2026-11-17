@@ -8,8 +8,34 @@ The format follows [Keep a Changelog]; unbork follows
 
 ## [Unreleased]
 
+### Security
+
+- The alert webhook can be limited to listed source addresses
+  (`[alerts] allowed_sources`) and can require an HMAC signature over the
+  body (`[alerts] webhook_hmac_secret`, as Grafana's webhook contact point
+  signs). Both are off until set, and the Intake card shows whether each
+  is on.
+
 ### Added
 
+- **Extension hook for permissions.** An extension can declare
+  permissions of its own for its routes. The built-in catalog and roles
+  are unchanged. Plugin API 1.6.
+- **Extension hook for background work.** An extension can register its
+  own task module and periodic jobs. A Community install behaves exactly
+  as before. Plugin API 1.5.
+- **Extension hook to refuse or hold a sync, an action run, a scheduled
+  run or an assistant change before it starts, and to hear when it ends.**
+  A Community install behaves exactly as before. Plugin API 1.4.
+- **Extension hook for the audit log.** Groundwork for Enterprise audit
+  export; a Community install behaves exactly as before. An extension can
+  subscribe to audit entries, which are handed over after they are
+  committed. Plugin API 1.3.
+- **The audit log records who started and who cancelled every action
+  run**, whether from the API, a schedule, Run now or an alert: one
+  `action_run.started` entry per run, with its `origin`, and
+  `action_run.cancelled` when it is cancelled. Parameter names are
+  recorded, never their values.
 - **Extension hooks for rights scoped to hosts and groups.** Groundwork
   for Enterprise RBAC; a Community install behaves exactly as before.
   List routes now ask whether a user may view hosts *anywhere* and show
@@ -143,6 +169,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Fixed
 
+- Firewall rule and chain policy changes are now written to the audit
+  log, like every other module's: create, update, delete, reorder, and
+  a group's input and output policy (BUG-147).
 - **Services, packages and users read "never collected".** The group
   member grid and the host page's module states looked these three up
   under spellings the backend doesn't write (`services`, `packages`,

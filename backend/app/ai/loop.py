@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import approvals, service
 from app.ai.alert_autonomy import busy_refusal, is_unattended_remediation
-from app.ai.gate import decide
+from app.ai.gate import decide, gate_mutation
 from app.ai.models import AIApprovalRequest, AIProvider, AISession, AIToolCall
 from app.ai.providers.base import (
     LLMProvider,
@@ -419,6 +419,16 @@ class AgentLoop:
             permitted=self._permitted,
             autonomy_level=self.session.autonomy_level,
         )
+        # An installed extension may refuse or hold a change (S-002).
+        gated = await gate_mutation(self.db, self.session, call.name, call.arguments, decision)
+        if gated is not decision:
+            decision = gated
+            if not decision.needs_approval:
+                record.status = "blocked"
+                record.result_summary = decision.reason[:1000]
+                record.finished_at = datetime.now(UTC)
+                await self.db.flush()
+                return decision.reason
         if decision.needs_approval and decision.verdict is not None:
             return await self._park_for_approval(call, decision.verdict, record)
 

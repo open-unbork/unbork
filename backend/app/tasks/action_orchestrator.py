@@ -232,6 +232,13 @@ async def _run_action_async(action_run_id: int, orchestrator_id: str | None = No
     # ------------------------------------------------------------------ #
     # Phase 0: dispatch shape decision                                    #
     # ------------------------------------------------------------------ #
+    # An installed extension may refuse or hold the run before anything
+    # else happens (S-002). Both dispatch shapes start here.
+    from app.tasks.run_gate_points import gate_action_run
+
+    if not await gate_action_run(action_run_id):
+        return
+
     if await _settled_before_start(action_run_id):
         return
 

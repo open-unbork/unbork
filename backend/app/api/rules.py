@@ -3,7 +3,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._gitops_lock import check_gitops_lock
-from app.api._scoped_rules import require_group, require_host, scoped_row_or_404
+from app.api._scoped_rules import (
+    RuleAudit,
+    commit_created,
+    commit_updated,
+    delete_and_commit,
+    require_group,
+    require_host,
+    scoped_row_or_404,
+)
+from app.audit.logger import log_action
 from app.auth.permissions import require
 from app.db import get_db
 from app.models.firewall_rule import FirewallRule
@@ -28,6 +37,28 @@ from app.schemas.rules import (
 router = APIRouter(tags=["rules"])
 
 _NOT_FOUND = "Rule not found"
+
+
+def _audit_state(rule: FirewallRule) -> dict:
+    """Every operator-set field of a rule, plus where it lives."""
+    return {
+        "group_id": rule.group_id,
+        "host_id": rule.host_id,
+        "action": str(rule.action) if rule.action is not None else None,
+        "protocol": str(rule.protocol) if rule.protocol is not None else None,
+        "direction": str(rule.direction) if rule.direction is not None else None,
+        "source_cidr": rule.source_cidr,
+        "destination_cidr": rule.destination_cidr,
+        "source_host_id": rule.source_host_id,
+        "destination_host_id": rule.destination_host_id,
+        "port_start": rule.port_start,
+        "port_end": rule.port_end,
+        "priority": rule.priority,
+        "comment": rule.comment,
+    }
+
+
+_AUDIT = RuleAudit("firewall_rule", _audit_state)
 
 
 @router.get("/groups/{group_id}/rules", response_model=list[RuleResponse])
@@ -71,7 +102,7 @@ def _check_ports(body: RuleCreate) -> None:
 async def create_rule(
     group_id: int,
     body: RuleCreate,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
@@ -79,19 +110,20 @@ async def create_rule(
     await _validate_host_refs(db, body)
     rule = FirewallRule(group_id=group_id, **body.model_dump())
     db.add(rule)
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    await db.flush()
+    return await commit_created(db, rule, _AUDIT, user)
 
 
 @router.put("/groups/{group_id}/rules/reorder", status_code=200)
 async def reorder_rules(
     group_id: int,
     body: RuleReorder,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
+    before: list[dict] = []
+    after: list[dict] = []
     for idx, rule_id in enumerate(reversed(body.rule_ids)):
         result = await db.execute(
             select(FirewallRule).where(
@@ -101,7 +133,21 @@ async def reorder_rules(
         )
         rule = result.scalar_one_or_none()
         if rule:
+            before.append({"id": rule.id, "priority": rule.priority})
+            after.append({"id": rule.id, "priority": idx})
             rule.priority = idx
+    # One row per reorder, and none when no priority moved. A list of
+    # objects, not a map: JSON keys are strings and the ids stay numbers.
+    if before != after:
+        await log_action(
+            db,
+            action="reorder",
+            entity_type="firewall_rule",
+            entity_id=None,
+            user_id=user.id,
+            before_state={"group_id": group_id, "priorities": before},
+            after_state={"group_id": group_id, "priorities": after},
+        )
     await db.commit()
     return {"reordered": len(body.rule_ids)}
 
@@ -111,17 +157,17 @@ async def update_rule(
     group_id: int,
     rule_id: int,
     body: RuleUpdate,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
     rule = await scoped_row_or_404(
         db, FirewallRule, rule_id, FirewallRule.group_id == group_id, detail=_NOT_FOUND
     )
+    before = _audit_state(rule)
     await _apply_rule_update(db, rule, body)
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    await db.flush()
+    return await commit_updated(db, rule, _AUDIT, user, before)
 
 
 async def _apply_rule_update(db: AsyncSession, rule: FirewallRule, body: RuleUpdate) -> None:
@@ -151,15 +197,14 @@ async def _apply_rule_update(db: AsyncSession, rule: FirewallRule, body: RuleUpd
 async def delete_rule(
     group_id: int,
     rule_id: int,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
     rule = await scoped_row_or_404(
         db, FirewallRule, rule_id, FirewallRule.group_id == group_id, detail=_NOT_FOUND
     )
-    await db.delete(rule)
-    await db.commit()
+    await delete_and_commit(db, rule, _AUDIT, user)
 
 
 @router.get("/hosts/{host_id}/firewall-rules", response_model=list[RuleResponse])
@@ -181,7 +226,7 @@ async def list_host_rules(
 async def create_host_rule(
     host_id: int,
     body: RuleCreate,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a host-level firewall rule override."""
@@ -190,9 +235,8 @@ async def create_host_rule(
     await _validate_host_refs(db, body)
     rule = FirewallRule(host_id=host_id, **body.model_dump())
     db.add(rule)
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    await db.flush()
+    return await commit_created(db, rule, _AUDIT, user)
 
 
 @router.put("/hosts/{host_id}/firewall-rules/{rule_id}", response_model=RuleResponse)
@@ -200,32 +244,31 @@ async def update_host_rule(
     host_id: int,
     rule_id: int,
     body: RuleUpdate,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a host-level firewall rule override."""
     rule = await scoped_row_or_404(
         db, FirewallRule, rule_id, FirewallRule.host_id == host_id, detail=_NOT_FOUND
     )
+    before = _audit_state(rule)
     await _apply_rule_update(db, rule, body)
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    await db.flush()
+    return await commit_updated(db, rule, _AUDIT, user, before)
 
 
 @router.delete("/hosts/{host_id}/firewall-rules/{rule_id}", status_code=204)
 async def delete_host_rule(
     host_id: int,
     rule_id: int,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a host-level firewall rule override."""
     rule = await scoped_row_or_404(
         db, FirewallRule, rule_id, FirewallRule.host_id == host_id, detail=_NOT_FOUND
     )
-    await db.delete(rule)
-    await db.commit()
+    await delete_and_commit(db, rule, _AUDIT, user)
 
 
 @router.get("/hosts/{host_id}/effective-rules", response_model=list[EffectiveRuleResponse])
@@ -255,13 +298,26 @@ async def get_group_policies(
 async def update_group_policies(
     group_id: int,
     body: GroupPoliciesUpdate,
-    _: User = Depends(require("config.edit")),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
     group = await require_group(db, group_id)
+    before = {"input": group.input_policy, "output": group.output_policy}
     group.input_policy = body.input_policy
     group.output_policy = body.output_policy
+    after = {"input": group.input_policy, "output": group.output_policy}
+    # Like a reorder that moves nothing: no change, no row.
+    if after != before:
+        await log_action(
+            db,
+            action="update",
+            entity_type="firewall_policy",
+            entity_id=group_id,
+            user_id=user.id,
+            before_state=before,
+            after_state=after,
+        )
     await db.commit()
     await db.refresh(group)
     return ChainPoliciesResponse(

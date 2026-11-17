@@ -11,8 +11,8 @@ stages:
     items: [C-064, S-012, S-011, C-024, C-025, C-062, C-061, C-063]
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
-    base_commit: null
-    status: todo
+    base_commit: 60176318c9769d0841bc05e3b1dd9aba556ce7ba
+    status: review
     items: [C-008, C-047, C-022, S-001, S-002, S-015, S-016]
   - stage: 2
     goal: "The rename, and a clean image"
@@ -183,8 +183,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-k49y9e
     spec: items/C-008-audit-rows-for-action-runs-who-started.md
     notes: "The audit log is the base of three Enterprise items and has a hole exactly where the product does its riskiest work."
   - id: C-047
@@ -197,8 +197,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-k49y9e
     spec: items/C-047-audit-rows-for-firewall-rule-changes-bug.md
     notes: "Accepted proposal PR-01: the same hole as C-008, in the module where the record matters most."
   - id: C-022
@@ -211,8 +211,8 @@ items:
     depends_on: []
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: done
+    branch: claude/project-thread-k49y9e
     spec: items/C-022-harden-the-alert-webhook.md
     notes: "Security work on an unauthenticated-by-nature endpoint goes first by rule."
   - id: S-001
@@ -225,8 +225,8 @@ items:
     depends_on: [C-008]
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-001-extension-hook-subscribe-to-audit-entries.md
     notes: "One 37-line module is the single choke point for audit writes; a hook there unblocks every consumer of the audit stream."
   - id: S-002
@@ -239,8 +239,8 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-002-extension-hook-gate-a-run-before-it.md
     notes: "Several planned extensions need to refuse or defer a sync, run, schedule or AI fix; one seam is safer than four."
   - id: S-015
@@ -253,8 +253,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-015-extension-hook-register-celery-tasks-and-periodic.md
     notes: "Found while writing specs: an extension cannot run a background or scheduled job, and six Enterprise items need one (outboxes, scheduled directory sync, verified backups)."
   - id: S-016
@@ -267,8 +267,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-k49y9e
     spec: items/S-016-extension-hook-declare-additional-permissions.md
     notes: "Found while writing specs: an extension route cannot ask for a permission of its own, so maintenance-window overrides cannot be expressed."
   - id: C-048

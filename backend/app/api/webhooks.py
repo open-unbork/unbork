@@ -1,12 +1,16 @@
 import hashlib
 import hmac
+import ipaddress
+import json
 import logging
+import time
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_ip import get_client_ip
 from app.config import settings
 from app.db import get_db
 from app.gitops.webhook_secret import get_webhook_secret
@@ -270,6 +274,45 @@ def _authorized(request: Request) -> bool:
     return False
 
 
+def _source_allowed(client_ip: str) -> bool:
+    """Whether ``client_ip`` is in ``alerts.allowed_sources`` (empty: any)."""
+    allowed = settings.alerts.allowed_sources
+    if not allowed:
+        return True
+    try:
+        address = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    # A dual-stack listener sees IPv4 clients as ::ffff:a.b.c.d.
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return any(address in ipaddress.ip_network(entry, strict=False) for entry in allowed)
+
+
+def _signature_valid(request: Request, body: bytes) -> bool:
+    """Check the HMAC-SHA256 of ``body`` the way a Grafana webhook contact
+    point with HMAC signing computes it (grafana/alerting ``http/hmac.go``):
+    hex-encoded, over ``<timestamp>:<body>`` when a timestamp header is
+    configured and over the body alone otherwise."""
+    cfg = settings.alerts
+    signature = request.headers.get(cfg.webhook_hmac_header) or ""
+    if not signature:
+        return False
+    signed = body
+    if cfg.webhook_hmac_timestamp_header:
+        stamp = (request.headers.get(cfg.webhook_hmac_timestamp_header) or "").strip()
+        if not (stamp.isascii() and stamp.isdigit()):
+            return False
+        if abs(time.time() - int(stamp)) > cfg.webhook_hmac_max_skew_seconds:
+            return False
+        signed = stamp.encode() + b":" + body
+    expected = hmac.new(cfg.webhook_hmac_secret.encode(), signed, hashlib.sha256).hexdigest()
+    # Bytes, not str: compare_digest refuses a str with non-ASCII in it,
+    # and a header can carry any latin-1 character.
+    given = signature.strip().lower().encode("latin-1", errors="replace")
+    return hmac.compare_digest(expected.encode(), given)
+
+
 @router.post("/grafana-alerts")
 async def grafana_alerts_webhook(
     request: Request,
@@ -291,14 +334,30 @@ async def grafana_alerts_webhook(
     from app.ai.alerts import from_grafana_webhook, record
     from app.settings_service import get_setting_typed
 
+    # Checked in this order, before anything touches the database: the
+    # source, then the token, and only then is the body read for the
+    # signature, so an unauthenticated sender cannot make the server
+    # buffer a body (C-022).
+    client_ip = get_client_ip(request)
+    if not _source_allowed(client_ip):
+        logger.warning("grafana-alerts: refused %s: source address not allowed", client_ip)
+        raise HTTPException(status_code=403, detail="Source address not allowed")
+
     if not _authorized(request):
+        logger.warning("grafana-alerts: refused %s: invalid or missing token", client_ip)
         raise HTTPException(status_code=401, detail="Invalid or missing webhook token")
+
+    body = await request.body()
+    if settings.alerts.webhook_hmac_secret and not _signature_valid(request, body):
+        logger.warning("grafana-alerts: refused %s: invalid or missing signature", client_ip)
+        raise HTTPException(status_code=401, detail="Invalid or missing signature")
 
     if not int(await get_setting_typed("alerts.intake_enabled", db)):
         return {"status": "ignored", "reason": "alert intake is disabled"}
 
+    # Parse the bytes that were verified, so the body checked is the body used.
     try:
-        payload = await request.json()
+        payload = json.loads(body)
     except Exception:
         raise HTTPException(status_code=400, detail="Body is not JSON") from None
     if not isinstance(payload, dict):

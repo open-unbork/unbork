@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import contextlib
-import ipaddress
 import json
 import logging
 import logging.config
@@ -73,6 +72,7 @@ from app.api.webhooks import router as webhooks_router
 from app.auth.login_paths import is_password_login_path
 from app.auth.schemas import UserRead, UserUpdate
 from app.auth.users import auth_backend, fastapi_users
+from app.client_ip import get_client_ip, is_trusted_proxy
 from app.config import settings
 from app.middleware.csrf import CSRFMiddleware
 from app.plugins import load_plugins
@@ -132,66 +132,10 @@ def _configure_logging() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _is_trusted_proxy(ip: str, trusted: list[str]) -> bool:
-    """Whether *ip* is one of the configured proxies.
-
-    Accepts CIDR entries as well as literal addresses (SEC-32). The
-    check used to be a plain ``in`` against the list, so ``10.0.0.0/8``
-    never matched anything — which made the setting unusable in Docker,
-    where the proxy's address is assigned at container start and is not
-    known when the config is written.
-    """
-    for entry in trusted:
-        if ip == entry:
-            return True
-        try:
-            if ipaddress.ip_address(ip) in ipaddress.ip_network(entry, strict=False):
-                return True
-        except ValueError:
-            # A malformed entry should not break IP resolution for
-            # every request; skip it and try the next.
-            continue
-    return False
-
-
-@lru_cache(maxsize=1)
-def _warn_untrusted_forwarding() -> None:
-    """Say once that forwarded addresses are being discarded.
-
-    Cached rather than guarded by a module flag so the "only once" part
-    is the mechanism rather than a convention someone has to maintain.
-    """
-    logging.getLogger(__name__).warning(
-        "X-Forwarded-For is present but server.trusted_proxies is empty, so the "
-        "real client address is being ignored. Set trusted_proxies to your "
-        "reverse proxy's address or network."
-    )
-
-
-def _get_client_ip(request: Request) -> str:
-    """Extract real client IP, respecting trusted proxies."""
-    trusted = settings.server.trusted_proxies
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if trusted and request.client:
-        # SEC-49: the header is only as trustworthy as the peer that sent
-        # it. A client reaching LabDog around the proxy could otherwise
-        # name any address it liked, defeating the login limiter's IP key
-        # and falsifying audit IPs.
-        if forwarded and _is_trusted_proxy(request.client.host, trusted):
-            # Walk the chain from right to left, skipping trusted proxies
-            chain = [ip.strip() for ip in forwarded.split(",")]
-            for ip in reversed(chain):
-                if not _is_trusted_proxy(ip, trusted):
-                    return ip
-    elif forwarded:
-        # A reverse proxy is forwarding the real client address and
-        # LabDog is discarding it, so every request looks like it came
-        # from the proxy — which is what collapsed the login rate limit
-        # into a single shared bucket (SEC-32).
-        _warn_untrusted_forwarding()
-    if request.client:
-        return request.client.host
-    return "127.0.0.1"
+# The client-address helpers live in app.client_ip so that routers (the
+# alert webhook's source allowlist) can use them without importing main.
+_is_trusted_proxy = is_trusted_proxy
+_get_client_ip = get_client_ip
 
 
 # ---------------------------------------------------------------------------

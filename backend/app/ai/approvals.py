@@ -187,6 +187,15 @@ async def execute_approved(
         )
     ).scalar_one_or_none()
 
+    refusal = await _gate_refusal(db, session, approval)
+    if refusal is not None:
+        if record is not None:
+            record.status = "blocked"
+            record.result_summary = refusal[:1000]
+            record.finished_at = datetime.now(UTC)
+        await db.flush()
+        return ToolResult(refusal, ok=False, target_host_id=approval.target_host_id)
+
     snapshot_name: str | None = None
     if approval.target_host_id is not None:
         try:
@@ -236,6 +245,40 @@ async def execute_approved(
         session.command_count += 1
     await db.flush()
     return result
+
+
+async def _gate_refusal(db, session: AISession, approval: AIApprovalRequest) -> str | None:  # noqa: ANN001
+    """Ask an installed extension's run gate (``app.run_gate``) about an
+    approved call, at the moment it would run. A person's approval does not
+    lift an extension's refusal or hold (a change freeze, say): either is a
+    refusal here, with the gate's reason. None: go ahead.
+
+    The call was parked because it changes something, so it is asked about
+    whatever the gate said when it was parked, which may be hours ago.
+    """
+    from app.run_gate import RunRequest, check_run, has_run_gates
+
+    if not has_run_gates():
+        return None
+    host_ids = (
+        (approval.target_host_id,)
+        if approval.target_host_id is not None
+        else tuple(session.target_host_ids or ())
+    )
+    verdict = await check_run(
+        db,
+        RunRequest(
+            kind="ai_fix",
+            host_ids=host_ids,
+            user_id=session.created_by_user_id,
+            ai_session_id=session.id,
+            action_key=approval.tool_name,
+        ),
+    )
+    if verdict.allowed:
+        return None
+    reason = verdict.reason or "an installed extension holds changes now"
+    return f"Refused: {reason}. Do not retry this change in this session."
 
 
 def resume_prompt(approval: AIApprovalRequest, result: ToolResult | None) -> str:

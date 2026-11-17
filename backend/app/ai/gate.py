@@ -122,3 +122,56 @@ def decide(
         needs_approval=needs_approval,
         verdict=verdict,
     )
+
+
+async def gate_mutation(
+    db: Any,
+    session: Any,
+    tool_name: str,
+    arguments: dict[str, Any],
+    decision: GateDecision,
+) -> GateDecision:
+    """Ask an installed extension's run gate (``app.run_gate``) about a
+    change the assistant may make. Returns ``decision`` itself unless the
+    gate says otherwise.
+
+    Asked only when :func:`decide` allowed a ``mutating`` call; a call
+    parked for a person's approval is asked when it is approved and about
+    to run (``app.ai.approvals.execute_approved``). A refusal
+    becomes a refused call carrying the gate's reason. A deferral parks a
+    full-auto session for a human, as an approval would, and is a plain
+    refusal at any other level (an approval session already asked one).
+    :func:`decide` stays synchronous and unchanged.
+    """
+    from app.run_gate import RunRequest, check_run, has_run_gates
+
+    if not has_run_gates() or not decision.allowed or decision.classification != "mutating":
+        return decision
+    host_id = target_host(arguments, getattr(session, "target_host_ids", None))
+    verdict = await check_run(
+        db,
+        RunRequest(
+            kind="ai_fix",
+            host_ids=(host_id,) if host_id is not None else tuple(session.target_host_ids or ()),
+            user_id=getattr(session, "created_by_user_id", None),
+            ai_session_id=session.id,
+            action_key=tool_name,
+        ),
+    )
+    if verdict.allowed:
+        return decision
+    reason = verdict.reason or "an installed extension holds changes now"
+    if verdict.outcome == "defer" and session.autonomy_level == "full_auto":
+        return GateDecision(
+            allowed=False,
+            reason=f"Held for approval: {reason}",
+            classification=decision.classification,
+            needs_approval=True,
+            verdict=decision.verdict,
+        )
+    return GateDecision(
+        allowed=False,
+        reason=f"Refused: {reason}. Do not retry this change in this session.",
+        classification=decision.classification,
+        verdict=decision.verdict,
+    )

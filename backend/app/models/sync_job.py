@@ -41,6 +41,12 @@ class SyncJob(Base):
     # both as the same "Host busy" tooltip via RunStatusBadge. NULL on
     # non-pending rows and on legacy rows that predate this column.
     pending_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: Set on a ``pending`` row an extension's run gate deferred
+    #: (``app.run_gate``): the host queue skips the row until then, and
+    #: ``app.tasks.run_gate_retry`` sends it again once it has passed.
+    gate_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     triggered_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

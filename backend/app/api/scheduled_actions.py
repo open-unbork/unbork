@@ -35,6 +35,7 @@ from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.actions.registry import ACTION_REGISTRY, ActionDefinition
+from app.actions.run_audit import audit_run_started
 from app.actions.run_target import describe_target
 from app.actions.validation import build_param_model
 from app.audit.logger import log_action
@@ -670,6 +671,7 @@ async def run_now(
     await db.refresh(run)
     sa.last_dispatched_at = datetime.now(UTC)
     run_id = run.id
+    await audit_run_started(db, run, origin="run_now", user_id=user.id)
 
     await log_action(
         db,

@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.subscribers import _deliver_committed, has_audit_subscribers
+from app.db_after_commit import run_after_commit
 from app.models.audit_log import AuditLog
 from app.models.user import User
 
@@ -34,4 +36,8 @@ async def log_action(
         created_at=datetime.now(UTC),
     )
     db.add(entry)
-    # Don't commit here — let the caller's transaction handle it
+    # Don't commit here — let the caller's transaction handle it.
+    # Extensions that subscribed hear about the row once it is committed
+    # (S-001); with none, nothing is registered.
+    if has_audit_subscribers():
+        run_after_commit(db, lambda: _deliver_committed(entry))
