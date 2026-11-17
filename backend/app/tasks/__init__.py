@@ -269,7 +269,8 @@ def _register_beat_schedules_on_beat_start(sender=None, **_kwargs):
     from app.tasks.beat_registry import register_all  # noqa: PLC0415
 
     results = register_all(celery_app)
-    failed = sorted(k for k, v in results.items() if v != "ok")
+    # "removed" and "absent" are the assistant-off deletions doing their job.
+    failed = sorted(k for k, v in results.items() if v not in ("ok", "removed", "absent"))
     if failed:
         logger.error("beat schedule registration failed for: %s", ", ".join(failed))
     else:
