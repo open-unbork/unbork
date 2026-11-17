@@ -474,7 +474,7 @@ def _is_localhost_origin(origin: str) -> bool:
     return False
 
 
-def _validate_required(s: Settings) -> None:
+def _validate_required(s: Settings, old_toml_keys: list[str] | None = None) -> None:
     """Raise on insecure or missing required settings at startup."""
     errors: list[str] = []
     if s.security.secret_key in _INSECURE_DEFAULTS:
@@ -544,7 +544,7 @@ def _validate_required(s: Settings) -> None:
             )
 
     if errors:
-        old = old_names_in_use()
+        old = old_names_in_use() + (old_toml_keys or [])
         if old:
             errors.append(
                 "These names from before the rename are no longer read: "
@@ -555,8 +555,9 @@ def _validate_required(s: Settings) -> None:
 
 
 #: The prefix and config path used before the product was renamed. unbork
-#: 2.0 reads neither (D-29); they are only named in the startup error, so
-#: an install upgraded without renaming them is told why it will not start.
+#: 2.0 reads neither (D-29); they are only named, in a warning at every
+#: start and in the startup error, so an install upgraded without renaming
+#: them is told what it is ignoring.
 _OLD_ENV_PREFIX = "LABDOG_"  # old-name-ok
 _OLD_CONFIG_PATH = Path("/etc/labdog/labdog.toml")  # old-name-ok
 
@@ -566,8 +567,24 @@ def old_names_in_use(environ: dict[str, str] | None = None) -> list[str]:
     if it exists without a new one. Names only, never values."""
     env = os.environ if environ is None else environ
     found = sorted(k for k in env if k.startswith(_OLD_ENV_PREFIX))
-    if _OLD_CONFIG_PATH.is_file() and _find_config_path() is None:
+    if _OLD_CONFIG_PATH.is_file():
         found.append(str(_OLD_CONFIG_PATH))
+    return found
+
+
+def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
+    """Keys in the config file that still carry the old name.
+
+    The settings models ignore unknown keys, so ``[security]`` with the old
+    ``*_server_ip`` key would silently fall back to the default.
+    """
+    found: list[str] = []
+    for key, value in data.items():
+        dotted = f"{prefix}{key}"
+        if _OLD_ENV_PREFIX.lower().rstrip("_") in key.lower():
+            found.append(f"{dotted} (in the config file)")
+        if isinstance(value, dict):
+            found += old_toml_keys(value, f"{dotted}.")
     return found
 
 
@@ -576,7 +593,15 @@ def load_settings() -> Settings:
     path = _find_config_path()
     data = _load_toml(path)
     s = Settings(**data)
-    _validate_required(s)
+    old_keys = old_toml_keys(data)
+    _validate_required(s, old_keys)
+    old = old_names_in_use() + old_keys
+    if old:
+        logger.warning(
+            "These names from before the rename are not read: %s. Rename them as "
+            "docs/upgrade.md says (UNBORK_*, /etc/unbork/unbork.toml).",
+            ", ".join(old),
+        )
     return s
 
 
