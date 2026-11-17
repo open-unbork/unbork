@@ -12,7 +12,7 @@ stages:
   - stage: 1
     goal: "A complete audit trail and the first extension hooks"
     base_commit: 60176318c9769d0841bc05e3b1dd9aba556ce7ba
-    status: review
+    status: done
     items: [C-008, C-047, C-022, S-001, S-002, S-015, S-016]
   - stage: 2
     goal: "The rename, and a clean image"
@@ -225,7 +225,7 @@ items:
     depends_on: [C-008]
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-k49y9e
     spec: items/S-001-extension-hook-subscribe-to-audit-entries.md
     notes: "One 37-line module is the single choke point for audit writes; a hook there unblocks every consumer of the audit stream."
@@ -239,7 +239,7 @@ items:
     depends_on: []
     autonomy: B
     effort: M
-    status: review
+    status: done
     branch: claude/project-thread-k49y9e
     spec: items/S-002-extension-hook-gate-a-run-before-it.md
     notes: "Several planned extensions need to refuse or defer a sync, run, schedule or AI fix; one seam is safer than four."
@@ -253,7 +253,7 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-k49y9e
     spec: items/S-015-extension-hook-register-celery-tasks-and-periodic.md
     notes: "Found while writing specs: an extension cannot run a background or scheduled job, and six Enterprise items need one (outboxes, scheduled directory sync, verified backups)."
@@ -267,7 +267,7 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-k49y9e
     spec: items/S-016-extension-hook-declare-additional-permissions.md
     notes: "Found while writing specs: an extension route cannot ask for a permission of its own, so maintenance-window overrides cannot be expressed."

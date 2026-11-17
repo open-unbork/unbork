@@ -92,3 +92,7 @@ Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in p
 - 2026-11-16 S-015 review 7b06750. PLUGIN_API 1.5. Real worker and beat processes with a test plugin are left to the stage review.
 - 2026-11-16 S-016 review ec3817c. PLUGIN_API 1.6. Default role for an extension permission is admin only (assumption, asked in the stage report).
 - 2026-11-16 Stage 1 review: pass. 36 findings (4 high, all fixed); 11 deferred as PR-22 to PR-30; live checks on lin-manager-2 all passed. Report in `planning/reviews/stage-1.md`. Stage status `review`, waiting for Dennis's review of S-001, S-002, S-015, S-016.
+
+## 2026-11-17 Stage 1 merged
+
+- Dennis approved merging (2026-11-17). #305 merged as `829ace2`; unbork-enterprise#10 merged as `5ff6890`. S-001, S-002, S-015 and S-016 done. Stage 1 done.
