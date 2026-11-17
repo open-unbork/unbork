@@ -140,19 +140,21 @@ test.describe("Groups page", () => {
     await expect(page.getByRole("button", { name: "Services", pressed: true })).toBeVisible()
   })
 
-  // A real CA certificate (EC P-256, CA:TRUE, valid 2026–2126) that the
+  // A real CA certificate (EC P-256, CA:TRUE, valid 100 years from 2026) that the
   // backend's PEM validator accepts, so the add goes all the way through
   // the API. The editor once sent `pem` for `pem_content`; only a live
   // backend rejects that, so this runs the form rather than seeding by API.
   const E2E_CA_PEM = `-----BEGIN CERTIFICATE-----
-MIIBejCCASGgAwIBAgIUN+SuaZjYowWTWSwCkJAq+tE+8uowCgYIKoZIzj0EAwIw
-MjEbMBkGA1UEAwwSTGFiRG9nIGUyZSB0ZXN0IENBMRMwEQYDVQQKDApMYWJEb2cg
-ZTJlMCAXDTI2MDEwMTAwMDAwMFoYDzIxMjYwMTAxMDAwMDAwWjAyMRswGQYDVQQD
-DBJMYWJEb2cgZTJlIHRlc3QgQ0ExEzARBgNVBAoMCkxhYkRvZyBlMmUwWTATBgcq
-hkjOPQIBBggqhkjOPQMBBwNCAASvMh75uiNeWis4hVlYDFS5Uh4hfZxrmiW4X1Sr
-rKhqKow1wUZEILBNh/YZvU/vHrsmDT+G9pjN0wTZCoyMojm6oxMwETAPBgNVHRMB
-Af8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIAJpdT141l/f6LZbd0q2oyyWLGAN
-TjIIGPY0y9owejh0AiBZDQ3rkCgh7O9lkUGjPac4TmKyBVy5h9OBxBhBKeccGQ==
+MIIByzCCAXGgAwIBAgIUbnFM8SPOOAMfI3rjZybTQQ5DHnowCgYIKoZIzj0EAwIw
+MjETMBEGA1UECgwKdW5ib3JrIGUyZTEbMBkGA1UEAwwSdW5ib3JrIGUyZSB0ZXN0
+IENBMCAXDTI2MTExNzE0NDIwOVoYDzIxMjYxMDI0MTQ0MjA5WjAyMRMwEQYDVQQK
+DAp1bmJvcmsgZTJlMRswGQYDVQQDDBJ1bmJvcmsgZTJlIHRlc3QgQ0EwWTATBgcq
+hkjOPQIBBggqhkjOPQMBBwNCAARL1ztEO9Rt+ayT2pwqHmhXkKUSR1zyMQFZn5jx
+LkG7IaB7LEdsb6n6CZsoNP7AmYsO4n83XflHOVGkm4O1wxJyo2MwYTAdBgNVHQ4E
+FgQU7xQkebhFxPBn7f6I8GhKhopJBsswHwYDVR0jBBgwFoAU7xQkebhFxPBn7f6I
+8GhKhopJBsswDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZI
+zj0EAwIDSAAwRQIhAKl9PufAA/TFOmBep7r57v7Xn+jeeALBdwjYoAQDxsimAiAG
+VpWSdAfbjLY+I51tyCQePpDsZC1rE/V4idZZ9T/mKQ==
 -----END CERTIFICATE-----`
 
   test("CA certificates editor adds a certificate", async ({ request, page }) => {
