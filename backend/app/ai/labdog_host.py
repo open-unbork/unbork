@@ -128,18 +128,40 @@ def parse_probe(output: str) -> tuple[str | None, list[Address]]:
     return client, addresses
 
 
+def _client_address(client_ip: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        return ipaddress.ip_address(client_ip.split("%", 1)[0])
+    except ValueError:
+        return None
+
+
+def bridge_network(
+    client_ip: str, addresses: list[Address]
+) -> ipaddress.IPv4Network | ipaddress.IPv6Network | None:
+    """The container bridge on this machine that ``client_ip`` came from.
+
+    ``None`` when the connection came from one of the host's own addresses
+    (a native install, or host networking) or from anywhere else.
+    """
+    client = _client_address(client_ip)
+    if client is None:
+        return None
+    if any(interface.ip == client for _name, interface in addresses):
+        return None
+    for name, interface in addresses:
+        if name.startswith(BRIDGE_PREFIXES) and client in interface.network:
+            return interface.network
+    return None
+
+
 def runs_here(client_ip: str, addresses: list[Address]) -> bool:
     """Whether a connection from ``client_ip`` came from this machine."""
-    try:
-        client = ipaddress.ip_address(client_ip.split("%", 1)[0])
-    except ValueError:
+    client = _client_address(client_ip)
+    if client is None:
         return False
-    for name, interface in addresses:
-        if interface.ip == client:
-            return True
-        if name.startswith(BRIDGE_PREFIXES) and client in interface.network:
-            return True
-    return False
+    if any(interface.ip == client for _name, interface in addresses):
+        return True
+    return bridge_network(client_ip, addresses) is not None
 
 
 async def ask_the_host(db: AsyncSession, host: Any) -> bool | None:
