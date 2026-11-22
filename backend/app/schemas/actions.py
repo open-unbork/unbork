@@ -29,6 +29,10 @@ class ActionDefinitionOut(BaseModel):
     #: Whether this action makes sense across the entire fleet. Drives
     #: the Fleet target option in the schedule dialog.
     supports_fleet: bool = False
+    #: Whether the manifest declares quiesce and unquiesce playbooks: the
+    #: application is closed to writes for the whole run when a snapshot
+    #: is taken. The run dialog says so.
+    quiesces: bool = False
     parameters: list[ActionParameterOut]
     #: Pack whose manifest is currently active for this action key.
     pack_name: str

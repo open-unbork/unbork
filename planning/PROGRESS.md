@@ -96,3 +96,8 @@ Work branch: `claude/project-thread-k49y9e` (the session's assigned branch, in p
 ## 2026-11-17 Stage 1 merged
 
 - Dennis approved merging (2026-11-17). #305 merged as `829ace2`; unbork-enterprise#10 merged as `5ff6890`. S-001, S-002, S-015 and S-016 done. Stage 1 done.
+
+## 2026-11-22 C-014 ahead of its stage
+
+Work branch: `claude/project-thread-6heftb`, from `dev` at `2e961d7`. Dennis asked for rollback phase 2 now; C-004 is not built, so C-014 went first without it (D-53).
+- 2026-11-22 C-014 review. Manifest fields, both executors, budgets, dialog line, docs and the `with-quiesce` example (C-015 step 2). `tests/test_action_quiesce.py`. Step 6 (relax the `stateful` default) waits for C-004. The live check on a "test" VM is still to do.

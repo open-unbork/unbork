@@ -16,7 +16,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+#: Extra-vars unbork sets on the playbooks of an action with quiesce hooks.
+#: ``unbork_quiesced`` (true) reaches the main and verify playbooks of a
+#: quiesced run; ``unbork_run_outcome`` reaches the unquiesce playbook.
+QUIESCED_VAR = "unbork_quiesced"
+RUN_OUTCOME_VAR = "unbork_run_outcome"
+RESERVED_EXTRA_VARS = frozenset({QUIESCED_VAR, RUN_OUTCOME_VAR})
 
 
 class ManifestParameter(BaseModel):
@@ -119,6 +126,57 @@ class ActionManifest(BaseModel):
             "unset."
         ),
     )
+    quiesce_playbook: str | None = Field(
+        default=None,
+        description=(
+            "Optional filename (relative to the manifest's directory) of a "
+            "playbook that stops writes on the host before unbork snapshots "
+            "it: maintenance mode, writers stopped, a database checkpoint. "
+            "With nothing written between the snapshot and a rollback, the "
+            "rollback loses nothing. Runs only when a snapshot will be "
+            "attempted (destructive action, snapshot enabled, Proxmox VM "
+            "mapping, not a dry run). Requires unquiesce_playbook. The main "
+            "and verify playbooks then receive unbork_quiesced=true, so a "
+            "verify playbook must pass while the host is quiesced."
+        ),
+    )
+    unquiesce_playbook: str | None = Field(
+        default=None,
+        description=(
+            "Optional filename of the playbook that reopens the host. unbork "
+            "runs it after verify and after any rollback, also when the run "
+            "fails, times out or raises, with unbork_run_outcome set to "
+            "'succeeded', 'failed' or 'rolled_back'. After a rollback the "
+            "VM is back in its quiesced state, so the playbook must work on "
+            "the reverted system too, and it must be safe to run twice. "
+            "Requires quiesce_playbook."
+        ),
+    )
+    quiesce_timeout_seconds: int = Field(
+        default=300,
+        ge=1,
+        le=86400,
+        description=(
+            "Budget for each of the quiesce and unquiesce playbooks. Ignored when they are unset."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _quiesce_pair(self) -> ActionManifest:
+        if (self.quiesce_playbook is None) != (self.unquiesce_playbook is None):
+            raise ValueError(
+                "quiesce_playbook and unquiesce_playbook go together: declare "
+                "both or neither. A host quiesced with no way to reopen it is "
+                "an outage."
+            )
+        reserved = {p.key for p in self.parameters} & RESERVED_EXTRA_VARS
+        if reserved:
+            raise ValueError(
+                f"Parameter key(s) {sorted(reserved)} are reserved: unbork sets "
+                "them itself around a quiesced run."
+            )
+        return self
+
     ai_verify_prompt: str | None = Field(
         default=None,
         description=(

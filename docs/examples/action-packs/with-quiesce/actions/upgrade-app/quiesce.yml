@@ -1,0 +1,36 @@
+---
+# Runs before the snapshot. Close the front door to everything but
+# loopback (verify still checks health from the host itself), stop the
+# writers, then checkpoint so the snapshot is as clean as it can be.
+- name: Quiesce the app
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    worker_service: myapp-worker
+  tasks:
+    - name: Allow only loopback in nginx
+      ansible.builtin.copy:
+        dest: /etc/nginx/conf.d/00-unbork-quiesce.conf
+        content: |
+          # Written by unbork's quiesce playbook; removed by unquiesce.
+          allow 127.0.0.1;
+          allow ::1;
+          deny all;
+        mode: "0644"
+
+    - name: Reload nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: reloaded
+
+    - name: Stop the background worker
+      ansible.builtin.systemd_service:
+        name: "{{ worker_service }}"
+        state: stopped
+
+    - name: Checkpoint PostgreSQL
+      ansible.builtin.command:
+        argv: [psql, -c, CHECKPOINT]
+      become_user: postgres
+      changed_when: false

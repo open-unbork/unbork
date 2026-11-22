@@ -117,8 +117,9 @@ def snapshot_lock_wait_budget() -> int:
 
 
 def per_host_deadline_seconds(action_key: str) -> int:
-    """Upper bound on one host's whole envelope (snapshot, including any
-    wait for a locked VM → playbook → verify → rollback → cleanup).
+    """Upper bound on one host's whole envelope (quiesce → snapshot,
+    including any wait for a locked VM → playbook → verify → rollback →
+    unquiesce → cleanup).
 
     Deliberately generous: ansible-runner's own ``timeout`` always
     fires well before this, so any row still ``running`` past this age
@@ -141,7 +142,48 @@ def per_host_deadline_seconds(action_key: str) -> int:
     # locked VM. A registry miss keeps the budget: too long a deadline
     # only delays reaping a dead run, too short a one kills a live one.
     lock_wait = snapshot_lock_wait_budget() if action is None or action.destructive else 0
-    return effective_playbook_timeout(floor) + verify + ENVELOPE_GRACE_SECONDS + lock_wait
+    return (
+        effective_playbook_timeout(floor)
+        + verify
+        + ENVELOPE_GRACE_SECONDS
+        + lock_wait
+        + quiesce_budget_seconds(action_key)
+    )
+
+
+def _quiesce_timeout(action_key: str) -> int | None:
+    """The action's quiesce timeout, or None when it declares no quiesce hooks."""
+    action = _registry_lookup(action_key)
+    if action is None or getattr(action, "quiesce_playbook_path", None) is None:
+        return None
+    return int(action.quiesce_timeout_seconds)
+
+
+def quiesce_budget_seconds(action_key: str) -> int:
+    """Time the quiesce and unquiesce playbooks add to one host's envelope.
+
+    Each gets ``quiesce_timeout_seconds``; zero for an action without them.
+    """
+    timeout = _quiesce_timeout(action_key)
+    return 0 if timeout is None else 2 * timeout
+
+
+#: What an unquiesce that runs after a soft timeout gets on top of its own
+#: timeout before the hard limit: SSE and DB writes, releasing the host.
+UNQUIESCE_AFTER_TIMEOUT_SLACK_SECONDS = 120
+
+
+def hard_limit_margin_seconds(action_key: str) -> int:
+    """Gap between a child's soft and hard Celery limits for *action_key*.
+
+    After a soft timeout the executor still runs the unquiesce playbook, so
+    a host is never left closed to its users; the margin must fit it, or
+    the SIGKILL lands mid-unquiesce.
+    """
+    timeout = _quiesce_timeout(action_key)
+    if timeout is None:
+        return HARD_LIMIT_MARGIN_SECONDS
+    return max(HARD_LIMIT_MARGIN_SECONDS, timeout + UNQUIESCE_AFTER_TIMEOUT_SLACK_SECONDS)
 
 
 def run_deadline_seconds(action_key: str, host_count: int, parallelism: int) -> int:
