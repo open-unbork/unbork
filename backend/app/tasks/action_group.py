@@ -875,13 +875,30 @@ def _hook_extra_vars(spec: _GroupRunSpec) -> dict:
     return params
 
 
+def _per_member_var(name: str, table_name: str, table: dict, *, default: str) -> dict:
+    """Extra-vars that give *name* a different value on each member.
+
+    One ansible-playbook run covers every member, and extra-vars are
+    global, so *table* (inventory name → value) goes in as *table_name*
+    and *name* is a template that looks the member up in it. Ansible
+    templates extra-vars per host, and nothing outranks them: an inventory
+    host var would lose to a play's own ``vars:`` default (seen live: the
+    unquiesce printed ``outcome=unknown``). Only unbork writes the
+    template; the table holds data, never templates.
+    """
+    return {
+        table_name: table,
+        name: f"{{{{ {table_name}[inventory_hostname] | default({default}) }}}}",
+    }
+
+
 def _run_group_side_playbook(
     spec: _GroupRunSpec,
     playbook_path: Any,
     members: list[_HostCtx],
     data_dir: str,
     *,
-    host_vars: dict[int, dict] | None = None,
+    extra_vars: dict | None = None,
 ) -> tuple[Any, str, _MemberOutcomes]:
     """Run a quiesce or unquiesce playbook once against *members*.
 
@@ -899,7 +916,6 @@ def _run_group_side_playbook(
                 "ssh_user": c.ssh_user,
                 "ssh_key_path": c.ssh_key_path,
                 "known_hosts_path": c.known_hosts_path,
-                "host_vars": (host_vars or {}).get(c.host_run_id),
             }
             for c in members
         ]
@@ -908,7 +924,7 @@ def _run_group_side_playbook(
         playbook_path=playbook_path,
         inventory_json=inventory_json,
         private_data_dir=data_dir,
-        extra_vars=_hook_extra_vars(spec) or None,
+        extra_vars={**_hook_extra_vars(spec), **(extra_vars or {})} or None,
         timeout=spec.quiesce_timeout,
         roles_paths=list(spec.roles_paths) if spec.roles_paths else None,
     )
@@ -1013,7 +1029,7 @@ async def _unquiesce_members(
     Each member is removed from ``state.pending`` first, so it is never
     reopened twice. Never raises.
     """
-    from app.actions.manifest import RUN_OUTCOME_VAR
+    from app.actions.manifest import RUN_OUTCOME_VAR, RUN_OUTCOMES_VAR
 
     members = [c for c in members if c in state.pending]
     if not members or state.spec is None:
@@ -1030,10 +1046,12 @@ async def _unquiesce_members(
             state.spec.unquiesce_playbook_path,
             members,
             data_dir,
-            host_vars={
-                c.host_run_id: {RUN_OUTCOME_VAR: outcome_by_run.get(c.host_run_id, "failed")}
-                for c in members
-            },
+            extra_vars=_per_member_var(
+                RUN_OUTCOME_VAR,
+                RUN_OUTCOMES_VAR,
+                {c.inv_name: outcome_by_run.get(c.host_run_id, "failed") for c in members},
+                default="'failed'",
+            ),
         )
         status, rc = getattr(runner, "status", "unknown"), getattr(runner, "rc", -1)
     except Exception as exc:
@@ -1125,7 +1143,7 @@ def _run_group_playbook(
 ) -> _GroupPlaybookResult:
     """Phase B: build inventory + extra-vars, run ansible-runner once."""
     from app.actions.extra_vars import sanitize_extra_vars
-    from app.actions.manifest import QUIESCED_VAR
+    from app.actions.manifest import QUIESCED_HOSTS_VAR, QUIESCED_VAR
     from app.actions.validation import DRY_RUN_PARAM
     from app.ansible_runtime.runner import generate_multi_host_inventory, run_ansible
     from app.grafana.service import METRICS_DESTINATIONS_PARAM
@@ -1140,10 +1158,6 @@ def _run_group_playbook(
                 "ssh_user": ctx.ssh_user,
                 "ssh_key_path": ctx.ssh_key_path,
                 "known_hosts_path": ctx.known_hosts_path,
-                # A quiesced member's playbook learns it, so its health
-                # checks can accept a closed front door. Per host, since
-                # members without a VM mapping are not quiesced.
-                "host_vars": {QUIESCED_VAR: True} if ctx.quiesced else None,
             }
             for ctx in host_ctxs
         ]
@@ -1164,6 +1178,15 @@ def _run_group_playbook(
     extra_vars: dict | None = dict(parameters) if parameters else None
     # Dry run is ``--check`` via run_ansible, not an extra-var: see
     # run_ansible's ``check_mode``.
+    quiesced = {ctx.inv_name: True for ctx in host_ctxs if ctx.quiesced}
+    if quiesced:
+        # A quiesced member's playbook learns it, so its health checks can
+        # accept a closed front door. Per member, since members without a
+        # VM mapping are not quiesced.
+        extra_vars = {
+            **(extra_vars or {}),
+            **_per_member_var(QUIESCED_VAR, QUIESCED_HOSTS_VAR, quiesced, default="false"),
+        }
 
     # Per-action floor — see the matching comment in action_host.py.
     timeout = effective_playbook_timeout(spec.playbook_timeout)
@@ -1901,7 +1924,7 @@ async def _load_hosts_by_id(host_ids: list[int]) -> dict[int, Any]:
 
 
 async def _rollback_member(ctx: _HostCtx, hosts_by_id: dict[int, Any]) -> None:
-    """Restore one member's snapshot, then delete it if the restore succeeded."""
+    """Restore one member's snapshot; _cleanup_all deletes it afterwards."""
     from app.db import task_session  # noqa: PLC0415
     from app.workflows.steps.rollback import rollback_to_snapshot  # noqa: PLC0415
 
@@ -1927,9 +1950,9 @@ async def _rollback_member(ctx: _HostCtx, hosts_by_id: dict[int, Any]) -> None:
             )
             await db.commit()
         ctx.step_log.append(f"[rollback] success={rb.get('success')} {rb.get('error', '')}".strip())
+        # The snapshot stays until after the unquiesce: _cleanup_all
+        # deletes it, or keeps it for a member that stays closed.
         ctx.rolled_back = bool(rb.get("success"))
-        if rb.get("success") and ctx.snapshot_name is not None:
-            await _delete_snapshot_after_rollback(ctx)
     except Exception as exc:
         logger.exception(
             "action_group: rollback failed for host %d: %s",
@@ -1970,9 +1993,11 @@ async def _cleanup_all(
     Per-host policy (matches the per-host path):
 
     * Succeeded host + snapshot present → delete snapshot.
-    * Failed host → leave snapshot in place; Phase E rollback may have
-      already reverted to it, but the snapshot itself stays for the
-      periodic cleanup task to reap.
+    * Rolled-back host → delete the snapshot it was restored to. Done
+      here, after the unquiesce, rather than in Phase E.
+    * Failed host that was not rolled back → leave the snapshot in place
+      for the operator.
+    * A member whose unquiesce failed keeps its snapshot either way.
     * Cleanup errors are non-fatal — the action succeeded, an orphan
       snapshot is cosmetic.
     """
@@ -1982,11 +2007,14 @@ async def _cleanup_all(
         if ctx.snapshot_name is None or ctx.proxmox_client is None:
             return
         playbook_ok = per_host_playbook_success.get(ctx.host_run_id, False)
-        if not (playbook_ok and ctx.verify_passed):
+        if not (playbook_ok and ctx.verify_passed) and not ctx.rolled_back:
             return
         if ctx.unquiesce_error is not None:
             # Still closed: keep the snapshot for whoever reopens it.
             ctx.step_log.append(f"[cleanup] snapshot {ctx.snapshot_name} kept — unquiesce failed")
+            return
+        if ctx.rolled_back:
+            await _delete_snapshot_after_rollback(ctx)
             return
 
         try:

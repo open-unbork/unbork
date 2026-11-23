@@ -1277,10 +1277,20 @@ async def _phase_e_rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, suc
     return False
 
 
-async def _phase_f_cleanup(ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool) -> None:
-    """Delete the snapshot after a successful run."""
-    if success and env.has_snapshot:
+async def _phase_f_cleanup(
+    ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool, rolled_back: bool = False
+) -> None:
+    """Delete the snapshot after a successful run, or after a rollback restored it.
+
+    Runs after the unquiesce, so a host left closed can keep its snapshot:
+    the driver skips this call then.
+    """
+    if not env.has_snapshot:
+        return
+    if success:
         await _delete_snapshot(ctx, spec, env, note="deleted")
+    elif rolled_back:
+        await _delete_snapshot(ctx, spec, env, note="deleted after rollback")
 
 
 async def _phase_ef_rollback_or_cleanup(
@@ -1291,8 +1301,8 @@ async def _phase_ef_rollback_or_cleanup(
     The driver calls the two halves itself so the unquiesce can sit between
     them; this stays for callers that have no quiesce.
     """
-    await _phase_e_rollback(ctx, spec, env, success=success)
-    await _phase_f_cleanup(ctx, spec, env, success=success)
+    rolled_back = await _phase_e_rollback(ctx, spec, env, success=success)
+    await _phase_f_cleanup(ctx, spec, env, success=success, rolled_back=rolled_back)
 
 
 async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> bool:
@@ -1319,10 +1329,8 @@ async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> bool:
             )
             await db.commit()
         _log_step(ctx, f"[rollback] success={rb.get('success')} {rb.get('error', '')}".strip())
-        if rb.get("success"):
-            await _delete_snapshot(ctx, spec, env, note="deleted after rollback")
-            return True
-        return False
+        # The snapshot is deleted by _phase_f_cleanup, after the unquiesce.
+        return bool(rb.get("success"))
     except Exception as exc:
         logger.exception(
             "action_host: rollback failed for action_run %d host %d: %s",
@@ -1785,7 +1793,15 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
                     )
             else:
                 error_msg = f"{error_msg}; {unquiesce_error}"
-        await _phase_f_cleanup(ctx, spec, env, success=success)
+                if rolled_back and env.has_snapshot:
+                    _log_step(
+                        ctx,
+                        f"[cleanup] snapshot {env.snapshot_name} kept — unquiesce failed",
+                    )
+        # A host still closed keeps the snapshot it was restored to.
+        await _phase_f_cleanup(
+            ctx, spec, env, success=success, rolled_back=rolled_back and unquiesced
+        )
         await _phase_g_persist(
             ctx,
             spec,

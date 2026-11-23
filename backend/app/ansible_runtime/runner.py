@@ -29,8 +29,6 @@ def generate_multi_host_inventory(
               host's pinned SSH host key (SEC-26). Absent or None keeps
               the ``accept-new`` fallback for a host with no recorded
               key yet.
-            - host_vars: dict (optional) — extra inventory variables for
-              this host; ``ansible_*`` keys are ignored.
 
     Returns:
         JSON string with all hosts nested under ``all.hosts``.
@@ -44,14 +42,6 @@ def generate_multi_host_inventory(
             "ansible_user": host["ssh_user"],
             "ansible_ssh_private_key_file": host["ssh_key_path"],
             "ansible_ssh_common_args": build_ssh_common_args(host.get("known_hosts_path")),
-            # Per-host variables the caller sets (e.g. unbork_quiesced on
-            # the quiesced members of a group run). Never overrides the
-            # connection settings above.
-            **{
-                k: v
-                for k, v in (host.get("host_vars") or {}).items()
-                if not k.startswith("ansible_")
-            },
         }
     inventory = {"all": {"hosts": all_hosts}}
     return json.dumps(inventory, indent=2)

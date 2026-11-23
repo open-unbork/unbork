@@ -711,7 +711,8 @@ them, a run goes:
    is on.
 5. **Unquiesce**, with `unbork_run_outcome` set to `succeeded`,
    `failed` or `rolled_back`.
-6. **Snapshot cleanup**, only once the unquiesce succeeded.
+6. **Snapshot cleanup**, after a success or a rollback, and only once
+   the unquiesce succeeded. A host left closed keeps its snapshot.
 
 The hooks run only when a snapshot will be attempted: a destructive
 action, snapshots enabled for the run, a host with a Proxmox VM mapping,
@@ -732,15 +733,18 @@ Rules for the two playbooks:
   unbork, a timed-out run. If it fails after a successful run, the host
   run fails with "Unquiesce failed", the snapshot is kept, and nothing is
   rolled back. Run the playbook by hand to reopen the application.
-- Neither may declare a parameter named `unbork_quiesced` or
-  `unbork_run_outcome`.
+- No action may declare a parameter named `unbork_quiesced`,
+  `unbork_run_outcome`, `unbork_quiesced_hosts` or `unbork_run_outcomes`.
 
 The application is offline for the whole run, so the run dialog says so
 for these actions. In a group-dispatch run, unbork quiesces the members
 that have a VM mapping in one run of the quiesce playbook, drops any
 member it fails on (after reopening it), and reopens every member in one
 run of the unquiesce playbook, where each member gets its own
-`unbork_run_outcome`. An unbork older than these hooks ignores the three
+`unbork_run_outcome`. Both variables are extra-vars in either kind of
+run, so a playbook may give them a default in its own `vars:` without
+masking unbork's value. Members are reopened together, so a member that
+succeeded stays closed until the slowest rollback of the run is done. An unbork older than these hooks ignores the three
 fields and runs the action without them.
 
 A working example is

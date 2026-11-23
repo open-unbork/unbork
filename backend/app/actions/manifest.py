@@ -21,9 +21,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 #: Extra-vars unbork sets on the playbooks of an action with quiesce hooks.
 #: ``unbork_quiesced`` (true) reaches the main and verify playbooks of a
 #: quiesced run; ``unbork_run_outcome`` reaches the unquiesce playbook.
+#: A group run sets each of them per member through a lookup table it
+#: also passes (``unbork_quiesced_hosts``, ``unbork_run_outcomes``): as
+#: extra-vars, so a play's own ``vars:`` default can never mask them, as it
+#: would an inventory host var.
 QUIESCED_VAR = "unbork_quiesced"
 RUN_OUTCOME_VAR = "unbork_run_outcome"
-RESERVED_EXTRA_VARS = frozenset({QUIESCED_VAR, RUN_OUTCOME_VAR})
+QUIESCED_HOSTS_VAR = "unbork_quiesced_hosts"
+RUN_OUTCOMES_VAR = "unbork_run_outcomes"
+RESERVED_EXTRA_VARS = frozenset(
+    {QUIESCED_VAR, RUN_OUTCOME_VAR, QUIESCED_HOSTS_VAR, RUN_OUTCOMES_VAR}
+)
 
 
 class ManifestParameter(BaseModel):

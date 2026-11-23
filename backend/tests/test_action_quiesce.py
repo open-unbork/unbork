@@ -12,11 +12,15 @@ it.
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import yaml
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -93,6 +97,26 @@ class _Timeline:
 
     def calls(self, name: str) -> list[tuple]:
         return [e for e in self.entries if e[0] == name]
+
+
+_LOOKUP = re.compile(r"\{\{ (\w+)\[inventory_hostname\] \| default\((.*)\) \}\}")
+
+
+def _seen_by(entry: tuple, host: str, var: str):
+    """What *var* resolves to on *host* in a recorded run, as Ansible would.
+
+    A group run gives the hook variables per member as an extra-var that
+    looks the member up in a table (see ``_per_member_var``); anything else
+    is a plain extra-var. Missing means the playbook never gets it.
+    """
+    extra = entry[1]
+    value = extra.get(var, KeyError)
+    if value is KeyError:
+        return KeyError
+    match = _LOOKUP.fullmatch(value) if isinstance(value, str) else None
+    if match is None:
+        return value
+    return extra[match[1]].get(host, yaml.safe_load(match[2]))
 
 
 def _runner_for(inventory_json: str, failing: set[str] | bool):
@@ -365,11 +389,24 @@ async def test_a_failed_playbook_rolls_back_then_unquiesces(db, timeline, fake_p
         "snapshot",
         "playbook",
         "rollback",
-        "snapshot_deleted",
         "unquiesce",
+        "snapshot_deleted",
     ]
     assert timeline.calls("unquiesce")[0][1]["unbork_run_outcome"] == "rolled_back"
     assert (await _row(db, hr_id)).status == "failed"
+
+
+async def test_a_failed_unquiesce_after_a_rollback_keeps_the_snapshot(db, timeline, fake_proxmox):
+    run_id, hr_id = await _host_run(db)
+    timeline.behaviour["playbook"] = "fail"
+    timeline.behaviour["unquiesce"] = "fail"
+    await _run_host(run_id, hr_id)
+
+    assert "rollback" in timeline.names()
+    assert "snapshot_deleted" not in timeline.names()
+    hr = await _row(db, hr_id)
+    assert "Unquiesce failed" in hr.error_message
+    assert "kept — unquiesce failed" in hr.output
 
 
 async def test_a_failed_quiesce_takes_no_snapshot_and_still_unquiesces(
@@ -530,12 +567,12 @@ async def test_group_success_quiesces_mapped_members_around_the_window(
     assert names.index("playbook") < names.index("unquiesce") < names.index("snapshot_deleted")
     # Only the VM-mapped members are quiesced, and only they are told so.
     assert set(timeline.calls("quiesce")[0][2]) == {"g-h1", "g-h2"}
-    main_inventory = timeline.calls("playbook")[0][2]
-    assert main_inventory["g-h1"]["unbork_quiesced"] is True
-    assert "unbork_quiesced" not in main_inventory["g-h3"]
-    unquiesce_inventory = timeline.calls("unquiesce")[0][2]
-    assert set(unquiesce_inventory) == {"g-h1", "g-h2"}
-    assert unquiesce_inventory["g-h1"]["unbork_run_outcome"] == "succeeded"
+    main = timeline.calls("playbook")[0]
+    assert _seen_by(main, "g-h1", "unbork_quiesced") is True
+    assert _seen_by(main, "g-h3", "unbork_quiesced") is False
+    unquiesce = timeline.calls("unquiesce")[0]
+    assert set(unquiesce[2]) == {"g-h1", "g-h2"}
+    assert _seen_by(unquiesce, "g-h1", "unbork_run_outcome") == "succeeded"
     rows = await _member_rows(db, run_id)
     assert {r.status for r in rows.values()} == {"succeeded"}
     assert "[unquiesce] exit=0" in rows["g-h1"].output
@@ -548,9 +585,9 @@ async def test_group_member_failing_quiesce_is_reopened_and_dropped(db, timeline
     timeline.behaviour["quiesce"] = {"g-h2"}
     await _run_action_group_async(run_id)
 
-    first_unquiesce = timeline.calls("unquiesce")[0][2]
-    assert set(first_unquiesce) == {"g-h2"}
-    assert first_unquiesce["g-h2"]["unbork_run_outcome"] == "failed"
+    first_unquiesce = timeline.calls("unquiesce")[0]
+    assert set(first_unquiesce[2]) == {"g-h2"}
+    assert _seen_by(first_unquiesce, "g-h2", "unbork_run_outcome") == "failed"
     assert set(timeline.calls("playbook")[0][2]) == {"g-h1"}
     assert [e[1] for e in timeline.calls("snapshot")] == [950]
     rows = await _member_rows(db, run_id)
@@ -567,10 +604,12 @@ async def test_group_failed_member_rolls_back_then_unquiesces(db, timeline, fake
     await _run_action_group_async(run_id)
 
     names = timeline.names()
-    assert names.index("rollback") < names.index("unquiesce")
-    inventory = timeline.calls("unquiesce")[0][2]
-    assert inventory["g-h1"]["unbork_run_outcome"] == "rolled_back"
-    assert inventory["g-h2"]["unbork_run_outcome"] == "succeeded"
+    # The restored snapshot outlives the unquiesce, as in the per-host path.
+    assert names.index("rollback") < names.index("unquiesce") < names.index("snapshot_deleted")
+    assert sorted(e[1] for e in timeline.calls("snapshot_deleted")) == [950, 951]
+    unquiesce = timeline.calls("unquiesce")[0]
+    assert _seen_by(unquiesce, "g-h1", "unbork_run_outcome") == "rolled_back"
+    assert _seen_by(unquiesce, "g-h2", "unbork_run_outcome") == "succeeded"
 
 
 async def test_group_failed_unquiesce_keeps_that_members_snapshot(db, timeline, fake_proxmox):
@@ -598,7 +637,7 @@ async def test_group_abort_after_quiesce_still_unquiesces(db, timeline, fake_pro
     unquiesce = timeline.calls("unquiesce")
     assert len(unquiesce) == 1
     assert set(unquiesce[0][2]) == {"g-h1", "g-h2"}
-    assert {v["unbork_run_outcome"] for v in unquiesce[0][2].values()} == {"failed"}
+    assert {_seen_by(unquiesce[0], h, "unbork_run_outcome") for h in unquiesce[0][2]} == {"failed"}
     run = await db.get(ActionRun, run_id)
     assert run.status == "failed"
     released.assert_awaited()
@@ -615,3 +654,57 @@ async def test_group_dry_run_never_quiesces(db, timeline, fake_proxmox):
     await _run_action_group_async(run_id)
 
     assert timeline.names() == ["playbook"]
+
+
+@pytest.mark.skipif(shutil.which("ansible-playbook") is None, reason="needs ansible-core")
+def test_per_member_vars_outrank_a_plays_own_defaults(tmp_path):
+    """The live finding behind ``_per_member_var``: run real Ansible.
+
+    A play that gives the hook variables a default in ``vars:`` must
+    still see each member's own value. As inventory host vars they lost to
+    that default; as extra-vars nothing outranks them.
+    """
+    from app.actions.manifest import (
+        QUIESCED_HOSTS_VAR,
+        QUIESCED_VAR,
+        RUN_OUTCOME_VAR,
+        RUN_OUTCOMES_VAR,
+    )
+    from app.tasks.action_group import _per_member_var
+
+    extra = {
+        **_per_member_var(QUIESCED_VAR, QUIESCED_HOSTS_VAR, {"a": True}, default="false"),
+        **_per_member_var(
+            RUN_OUTCOME_VAR, RUN_OUTCOMES_VAR, {"a": "rolled_back"}, default="'failed'"
+        ),
+    }
+    (tmp_path / "extra.json").write_text(json.dumps(extra))
+    (tmp_path / "inv.ini").write_text("a ansible_connection=local\nb ansible_connection=local\n")
+    (tmp_path / "play.yml").write_text(
+        "- hosts: all\n"
+        "  gather_facts: false\n"
+        "  vars:\n"
+        "    unbork_quiesced: false\n"
+        "    unbork_run_outcome: unknown\n"
+        "  tasks:\n"
+        "    - ansible.builtin.debug:\n"
+        '        msg: "seen {{ inventory_hostname }} {{ unbork_quiesced | to_json }} '
+        '{{ unbork_run_outcome }}"\n'
+    )
+    result = subprocess.run(  # noqa: S603
+        [
+            shutil.which("ansible-playbook"),
+            "-i",
+            str(tmp_path / "inv.ini"),
+            "-e",
+            f"@{tmp_path / 'extra.json'}",
+            str(tmp_path / "play.yml"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=tmp_path,
+        timeout=120,
+    )
+    assert "seen a true rolled_back" in result.stdout
+    assert "seen b false failed" in result.stdout
