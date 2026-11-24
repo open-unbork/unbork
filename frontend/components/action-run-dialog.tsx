@@ -305,6 +305,12 @@ export function ActionRunDialog({ action, scope, targetId, open, onClose, hostOs
         {action.pack_name} pack{action.description ? ` · ${action.description}` : ""}
       </div>
 
+      {action.quiesces && (
+        <div className="text-[11.5px] text-text-2">
+          This action takes the application offline for the whole run.
+        </div>
+      )}
+
       {action.unresolved && (
         <Banner
           tone="warn"

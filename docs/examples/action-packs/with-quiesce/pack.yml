@@ -1,0 +1,5 @@
+name: quiesce-example
+description: >-
+  Demonstrates quiesce and unquiesce playbooks. unbork closes the
+  application to writes before it snapshots the VM and reopens it after
+  verify and any rollback, so a rollback loses nothing.

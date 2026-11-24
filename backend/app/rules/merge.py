@@ -9,12 +9,17 @@ from app.schemas.rules import ChainPoliciesResponse, EffectiveRuleResponse
 
 
 def _make_ssh_lockout_rule(server_ip: str) -> FirewallRuleSpec:
-    """Auto-injected SSH allow rule — always first, non-deletable."""
+    """Auto-injected SSH allow rule — always first, non-deletable.
+
+    ``server_ip`` is an address, or a network when unbork runs in a bridged
+    container on this very host (see ``app.ssh_utils.get_source_ip``).
+    """
+    source_cidr = server_ip if "/" in server_ip else f"{server_ip}/32"
     return FirewallRuleSpec(
         action="allow",
         protocol="tcp",
         direction="input",
-        source_cidr=f"{server_ip}/32",
+        source_cidr=source_cidr,
         port_start=22,
         comment="anti-lockout SSH allow — auto-injected, do not remove",
         is_system=True,

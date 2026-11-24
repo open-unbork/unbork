@@ -533,6 +533,9 @@ ai_verify_prompt: >-         # optional; what the AI verify step should confirm
   indicates a driver problem.
 ai_verify_fail_closed: false # optional; whether an INCONCLUSIVE AI verdict
                              # fails the action. See "AI verification" below.
+quiesce_playbook: quiesce.yml     # optional, with unquiesce_playbook; see
+unquiesce_playbook: unquiesce.yml # "Quiesce hooks for stateful applications"
+quiesce_timeout_seconds: 300      # optional; budget for each of the two
 parameters:                  # passed as --extra-vars at run time
   - key: my_param
     label: My parameter
@@ -547,9 +550,8 @@ parameters:                  # passed as --extra-vars at run time
     default: low
 ```
 
-Unknown fields are rejected (the manifest is validated with pydantic
-`extra="forbid"`), so typos fail loudly instead of silently doing
-nothing. The manifests in
+Unknown top-level fields are ignored, so a manifest written for a
+newer unbork still loads on an older one; parameters reject unknown keys. The manifests in
 [`unbork-playbooks/actions/`](https://github.com/open-unbork/unbork-playbooks/tree/main/actions)
 are working examples of every field.
 
@@ -678,6 +680,75 @@ under [`verify/`](https://github.com/open-unbork/unbork-playbooks/tree/main/veri
 inside the action directory) and pass overrides through manifest
 parameters. The `linux-upgrade` action in that repo uses
 `verify/post-upgrade.yml` and is the reference implementation.
+
+### Quiesce hooks for stateful applications
+
+A rollback restores the whole VM to the moment of the snapshot, so
+anything users wrote while the action ran (a push, an upload, a database
+row) is lost with it. A pack can close that window with two more
+playbooks:
+
+```yaml
+# actions/upgrade-app/manifest.yml
+destructive: true
+quiesce_playbook: quiesce.yml       # closes the app to writes
+unquiesce_playbook: unquiesce.yml   # reopens it
+quiesce_timeout_seconds: 300        # budget for each of the two; default 300
+```
+
+Declare both or neither: a manifest with only one fails to load. With
+them, a run goes:
+
+1. **Quiesce.** Maintenance mode, writers stopped, a database
+   checkpoint. If it fails, no snapshot is taken, the unquiesce playbook
+   runs, and the host run fails with "Quiesce failed". Refusing here,
+   before the snapshot, is also the cheapest place for a pack's own
+   "is this server healthy and ready" checks.
+2. **Snapshot.**
+3. **Playbook**, then **verify**. Both get the extra-var
+   `unbork_quiesced: true`.
+4. **Rollback**, if the playbook or verify failed and automatic rollback
+   is on.
+5. **Unquiesce**, with `unbork_run_outcome` set to `succeeded`,
+   `failed` or `rolled_back`.
+6. **Snapshot cleanup**, after a success or a rollback, and only once
+   the unquiesce succeeded. A host left closed keeps its snapshot.
+
+The hooks run only when a snapshot will be attempted: a destructive
+action, snapshots enabled for the run, a host with a Proxmox VM mapping,
+and not a dry run. Without a snapshot there is no rollback to make
+lossless, so the host stays open.
+
+Rules for the two playbooks:
+
+- **Verify runs while the host is quiesced.** Close the application to
+  everything except loopback, or teach the health check to accept the
+  closed state when `unbork_quiesced` is true. A maintenance mode that
+  makes the health endpoint fail fails every verify.
+- **The unquiesce playbook must work on both systems.** After a rollback
+  the VM is back at the snapshot, which was taken while quiesced, so the
+  same steps have to reopen the upgraded and the reverted system.
+- **It must be safe to run twice**, by hand too. unbork runs it on every
+  exit path after the quiesce started: success, failure, an error inside
+  unbork, a timed-out run. If it fails after a successful run, the host
+  run fails with "Unquiesce failed", the snapshot is kept, and nothing is
+  rolled back. Run the playbook by hand to reopen the application.
+- No action may declare a parameter named `unbork_quiesced`,
+  `unbork_run_outcome`, `unbork_quiesced_hosts` or `unbork_run_outcomes`.
+
+The application is offline for the whole run, so the run dialog says so
+for these actions. In a group-dispatch run, unbork quiesces the members
+that have a VM mapping in one run of the quiesce playbook, drops any
+member it fails on (after reopening it), and reopens every member in one
+run of the unquiesce playbook, where each member gets its own
+`unbork_run_outcome`. Both variables are extra-vars in either kind of
+run, so a playbook may give them a default in its own `vars:` without
+masking unbork's value. Members are reopened together, so a member that
+succeeded stays closed until the slowest rollback of the run is done. An unbork older than these hooks ignores the three
+fields and runs the action without them.
+
+A working example is
+[`docs/examples/action-packs/with-quiesce/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-quiesce).
 
 ### AI verification
 

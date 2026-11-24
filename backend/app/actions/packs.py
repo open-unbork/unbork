@@ -174,6 +174,26 @@ def _refuse_sibling_references(playbook: Path, manifest_path: Path, field: str) 
         )
 
 
+def _resolve_extra_playbook(
+    name: str | None, field: str, manifest_path: Path, pack: Pack
+) -> Path | None:
+    """Resolve a second playbook a manifest names (verify, quiesce, unquiesce).
+
+    Same rules as the main playbook: inside the pack, present, and with no
+    imports from its own directory, since a run gets only the file.
+    """
+    if name is None:
+        return None
+    candidate = _resolve_within_pack(manifest_path.parent / name, pack, manifest_path, field)
+    if not candidate.is_file():
+        raise FileNotFoundError(
+            f"Manifest {manifest_path} references {field} {name!r} which does not "
+            f"exist at {candidate}."
+        )
+    _refuse_sibling_references(candidate, manifest_path, field)
+    return candidate
+
+
 def _manifest_to_definition(
     manifest: ActionManifest,
     manifest_path: Path,
@@ -196,22 +216,15 @@ def _manifest_to_definition(
     roles_paths: tuple[Path, ...] = tuple(
         d for d in (manifest_path.parent / "roles", pack.roles_dir) if d.is_dir()
     )
-    verify_playbook_path: Path | None = None
-    if manifest.verify_playbook is not None:
-        candidate = _resolve_within_pack(
-            manifest_path.parent / manifest.verify_playbook,
-            pack,
-            manifest_path,
-            "verify_playbook",
-        )
-        if not candidate.is_file():
-            raise FileNotFoundError(
-                f"Manifest {manifest_path} references verify_playbook "
-                f"{manifest.verify_playbook!r} which does not exist at "
-                f"{candidate}."
-            )
-        _refuse_sibling_references(candidate, manifest_path, "verify_playbook")
-        verify_playbook_path = candidate
+    verify_playbook_path = _resolve_extra_playbook(
+        manifest.verify_playbook, "verify_playbook", manifest_path, pack
+    )
+    quiesce_playbook_path = _resolve_extra_playbook(
+        manifest.quiesce_playbook, "quiesce_playbook", manifest_path, pack
+    )
+    unquiesce_playbook_path = _resolve_extra_playbook(
+        manifest.unquiesce_playbook, "unquiesce_playbook", manifest_path, pack
+    )
     return ActionDefinition(
         key=manifest.key,
         name=manifest.name,
@@ -240,6 +253,9 @@ def _manifest_to_definition(
         roles_paths=roles_paths,
         verify_playbook_path=verify_playbook_path,
         verify_timeout_seconds=manifest.verify_timeout_seconds,
+        quiesce_playbook_path=quiesce_playbook_path,
+        unquiesce_playbook_path=unquiesce_playbook_path,
+        quiesce_timeout_seconds=manifest.quiesce_timeout_seconds,
         ai_verify_prompt=manifest.ai_verify_prompt,
         ai_verify_fail_closed=manifest.ai_verify_fail_closed,
         metrics_backend=(

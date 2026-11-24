@@ -111,3 +111,7 @@ Work branch: `claude/project-thread-1sra3u` (the session's assigned branch, in p
 - 2026-11-17 C-026 review 9828765. Whole suite passes with the assistant off (AI tests skip). Assumptions A-05, A-06.
 - 2026-11-17 S-010 blocked 24ae507. Code done; D-31 (contact address and wording) open. Assumptions A-07, A-08.
 - 2026-11-17 Stage 2 review: pass (planning/reviews/stage-2.md). 30 findings: 22 fixed, 7 deferred (PR-31 to PR-33), 1 rejected; CI 5,062 passed, coverage 84%. Live checks on lin-manager-2. S-010 still blocked on D-31; stage status stays review.
+## 2026-11-22 C-014 ahead of its stage
+
+Work branch: `claude/project-thread-6heftb`, from `dev` at `2e961d7`. Dennis asked for rollback phase 2 now; C-004 is not built, so C-014 went first without it (D-53).
+- 2026-11-22 C-014 review. Manifest fields, both executors, budgets, dialog line, docs and the `with-quiesce` example (C-015 step 2). `tests/test_action_quiesce.py`. Step 6 (relax the `stateful` default) waits for C-004. The live check on a "test" VM is still to do.

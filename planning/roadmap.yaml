@@ -687,8 +687,8 @@ items:
     depends_on: [C-004]
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-6heftb
     spec: items/C-014-quiesce-hooks-in-both-action-executors-rollback.md
     notes: "Lets a stateful host keep automatic rollback; changes the pack manifest, a public contract."
   - id: C-015

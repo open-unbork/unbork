@@ -1,6 +1,6 @@
 # Action Pack Examples
 
-Three working examples of the pack format, each focused on a different
+Working examples of the pack format, each focused on a different
 concept. Drop any of these into a git repo or local directory, add it
 via **Action Packs** in the unbork UI, and the actions show up on host
 and group detail pages.
@@ -16,6 +16,7 @@ reference of all manifest fields, see
 | [`reboot-pack/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/reboot-pack) | A realistic destructive action with a parameter. Shows how `destructive: true` activates the Proxmox snapshot → verify → rollback pipeline automatically. |
 | [`with-role/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-role) | A pack that ships its own Ansible role and reuses it from a playbook. Shows how `ANSIBLE_ROLES_PATH` resolution works across unbork's own and the pack's roles. |
 | [`with-verify/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-verify) | A destructive action with a pack-supplied verify playbook that decides pass/fail after the main playbook runs. Replaces unbork's built-in SSH/services/packages check with the pack's own definition of success. |
+| [`with-quiesce/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-quiesce) | A destructive action with quiesce and unquiesce playbooks. The app is closed to writes before the snapshot and reopened after verify or rollback, so a rollback loses nothing. |
 
 ## Quick start
 

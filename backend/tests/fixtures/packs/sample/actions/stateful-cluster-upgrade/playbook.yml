@@ -1,0 +1,19 @@
+---
+- name: Test fixture
+  hosts: all
+  gather_facts: false
+  vars:
+    fail_on_purpose: false
+    unbork_quiesced: false
+  tasks:
+    - name: Expect the host to be quiesced
+      ansible.builtin.stat:
+        path: /tmp/unbork-quiesced
+      register: _marker
+    - name: Refuse when unbork did not quiesce the host
+      ansible.builtin.assert:
+        that: not unbork_quiesced or _marker.stat.exists
+    - name: Fail on request
+      ansible.builtin.fail:
+        msg: failing as asked
+      when: fail_on_purpose | bool
