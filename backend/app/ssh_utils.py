@@ -465,19 +465,31 @@ async def shared_host_connection(
 
 
 async def get_source_ip(conn: "BoundedConnection | asyncssh.SSHClientConnection") -> str | None:
-    """Determine what IP the remote host sees us connecting from.
+    """Where the remote host sees LabDog connecting from, as it should be
+    stored in ``Host.labdog_source_ip``.
 
-    Uses SSH_CLIENT env var on the remote side, which is authoritative
-    even when labdog runs inside a Docker container (NAT/bridge).
-    Falls back to the local socket address if SSH_CLIENT is unavailable.
+    Uses SSH_CLIENT on the remote side, which is authoritative even when
+    labdog runs inside a Docker container (NAT/bridge). Falls back to the
+    local socket address if SSH_CLIENT is unavailable.
+
+    On the host LabDog itself runs on, a bridged container reaches the host
+    without NAT, so SSH_CLIENT holds the container's own bridge address.
+    Docker hands that out again on every restart, and the anti-lockout rule
+    built from it would then lock LabDog out of its own host — with the
+    probe that would notice the change blocked by that very rule. So when
+    the address sits inside a container bridge on the remote host, the
+    bridge's network (``172.18.0.0/16``) is returned instead of the address.
     """
+    from app.ai.labdog_host import PROBE_COMMAND, bridge_network, parse_probe
+
     try:
-        result = await conn.run("echo $SSH_CLIENT", check=False)
-        if result.exit_status == 0 and result.stdout.strip():
-            # SSH_CLIENT = "<client_ip> <client_port> <server_port>"
-            parts = result.stdout.strip().split()
-            if parts:
-                return parts[0]
+        # Not gated on the exit status: it is ``ip``'s, and a host without
+        # iproute2 still prints SSH_CLIENT on the first line.
+        result = await conn.run(PROBE_COMMAND, check=False)
+        client, addresses = parse_probe(str(result.stdout or ""))
+        if client:
+            network = bridge_network(client, addresses)
+            return str(network) if network is not None else client
     except Exception:
         pass
     # Fallback to local socket (may be wrong behind NAT/Docker)
