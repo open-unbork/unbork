@@ -1,0 +1,14 @@
+---
+- name: Unquiesce
+  hosts: all
+  gather_facts: false
+  vars:
+    unbork_run_outcome: unknown
+  tasks:
+    - name: Remove the quiesce marker
+      ansible.builtin.file:
+        path: /tmp/unbork-quiesced
+        state: absent
+    - name: Say how the run ended
+      ansible.builtin.debug:
+        msg: "unquiesced after outcome={{ unbork_run_outcome }}"

@@ -74,6 +74,7 @@ def _definition_to_out(defn) -> ActionDefinitionOut:
         supports_group=defn.supports_group,
         supports_host=defn.supports_host,
         supports_fleet=defn.supports_fleet,
+        quiesces=defn.quiesces,
         parameters=params,
         pack_name=defn.pack_name,
         winning_pack_id=defn.winning_pack_id,

@@ -18,6 +18,11 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Added
 
+- **Quiesce hooks for destructive actions.** A pack can declare
+  `quiesce_playbook` and `unquiesce_playbook`; unbork runs them around the
+  snapshot window, also when the run fails, so a rollback loses nothing
+  users wrote. The run dialog says the application is offline for the
+  whole run. Example pack: `docs/examples/action-packs/with-quiesce/`.
 - **Extension hook for permissions.** An extension can declare
   permissions of its own for its routes. The built-in catalog and roles
   are unchanged. Plugin API 1.6.

@@ -838,6 +838,10 @@ export interface ActionDefinition {
   /** Whether the action makes sense across the entire fleet. Drives the
    *  Fleet target option on the schedule dialog. Conservative default. */
   supports_fleet: boolean
+  /** Whether the manifest declares quiesce and unquiesce playbooks: when a
+   *  snapshot is taken, the application is closed to writes for the whole
+   *  run. Optional so older backends still type-check. */
+  quiesces?: boolean
   parameters: ActionParameter[]
   /** Pack whose manifest provided this action. */
   pack_name: string

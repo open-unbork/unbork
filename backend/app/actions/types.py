@@ -73,6 +73,12 @@ class ActionDefinition:
     #: destructive actions on hosts with a Proxmox VM mapping.
     verify_playbook_path: Path | None = None
     verify_timeout_seconds: int = 300
+    #: Pack-supplied playbooks that close the host to writes before the
+    #: snapshot and reopen it after verify or rollback. Both or neither
+    #: (the manifest validator enforces it). See ``ActionManifest``.
+    quiesce_playbook_path: Path | None = None
+    unquiesce_playbook_path: Path | None = None
+    quiesce_timeout_seconds: int = 300
     #: What the AI verify step should confirm after this action. ``None``
     #: leaves it to the generic question, which still runs when the host
     #: logged errors during the change. See ``ActionManifest``.
@@ -105,6 +111,10 @@ class ActionDefinition:
     #: value a tuple of dicts already validated through the per-module
     #: Create schema. Empty dict means no registration.
     post_run_register: dict[str, tuple[dict[str, Any], ...]] = field(default_factory=dict)
+
+    @property
+    def quiesces(self) -> bool:
+        return self.quiesce_playbook_path is not None
 
     @property
     def is_builtin(self) -> bool:

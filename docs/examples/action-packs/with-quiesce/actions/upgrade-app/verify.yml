@@ -1,0 +1,11 @@
+---
+# Runs while the host is still quiesced (unbork_quiesced is true), so it
+# checks health over loopback, which the quiesce left open.
+- name: Verify the app
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: App reports healthy
+      ansible.builtin.uri:
+        url: http://127.0.0.1/healthz
+        status_code: 200

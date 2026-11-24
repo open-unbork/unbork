@@ -140,6 +140,9 @@ class _HostCtx:
         "verify_passed",
         "verify_error",
         "step_log",
+        "quiesced",
+        "rolled_back",
+        "unquiesce_error",
     )
 
     def __init__(self, host_id: int, host_run_id: int, inv_name: str):
@@ -163,6 +166,26 @@ class _HostCtx:
         self.verify_passed: bool = True
         self.verify_error: str | None = None
         self.step_log: list[str] = []
+        # Quiesce bookkeeping: whether the quiesce playbook was run against
+        # this member, whether Phase E reverted it, and why its unquiesce
+        # failed (None when it passed or never ran).
+        self.quiesced: bool = False
+        self.rolled_back: bool = False
+        self.unquiesce_error: str | None = None
+
+
+class _QuiesceState:
+    """Which members are quiesced and still owe an unquiesce.
+
+    Created by the task driver, so its ``finally`` can reopen every member
+    the envelope closed when the envelope raises or times out.
+    """
+
+    def __init__(self) -> None:
+        self.spec: _GroupRunSpec | None = None
+        self.private_data_dir: str = ""
+        #: Members quiesced and not yet unquiesced.
+        self.pending: list[_HostCtx] = []
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +324,9 @@ class _GroupRunSpec:
     snapshot_enabled: bool
     verify_enabled: bool
     auto_rollback: bool
+    quiesce_playbook_path: Any = None
+    unquiesce_playbook_path: Any = None
+    quiesce_timeout: int = 300
 
 
 @dataclass
@@ -349,6 +375,7 @@ async def _run_action_group_async(action_run_id: int) -> None:
     # Track member host ids we successfully claimed so the finally block
     # can release each via dispatch-next-pending. Empty on the defer path.
     claimed_member_ids: list[int] = []
+    quiesce = _QuiesceState()
 
     try:
         # ------------------------------------------------------------------ #
@@ -380,6 +407,7 @@ async def _run_action_group_async(action_run_id: int) -> None:
             private_data_dir,
             channel,
             redis_client,
+            quiesce,
         )
 
     except SoftTimeLimitExceeded:
@@ -410,6 +438,11 @@ async def _run_action_group_async(action_run_id: int) -> None:
         # re-pick itself. The helper swallows per-host failures so they
         # neither mask the real task outcome nor stop the remaining
         # members from being released.
+        #
+        # Before that, reopen any member the envelope quiesced and did not
+        # get to unquiesce (it raised or timed out): a host left closed is
+        # an outage, and the next op would find it so.
+        await _unquiesce_after_abort(quiesce, channel, redis_client)
         await release_host_queue(
             claimed_member_ids,
             after=f"action_run_id={action_run_id}",
@@ -512,6 +545,9 @@ async def _load_group_run(
             snapshot_enabled=bool(run.snapshot_enabled),
             verify_enabled=bool(run.verify_enabled),
             auto_rollback=bool(run.auto_rollback),
+            quiesce_playbook_path=action.quiesce_playbook_path,
+            unquiesce_playbook_path=action.unquiesce_playbook_path,
+            quiesce_timeout=action.quiesce_timeout_seconds,
         )
 
         # Per-host: create ActionHostRun, decrypt SSH key, write to tmpfs,
@@ -621,8 +657,11 @@ async def _run_envelope(
     private_data_dir: str,
     channel: str,
     redis_client: Any,
+    quiesce: _QuiesceState | None = None,
 ) -> None:
     """Phases A to G for the members that have a usable SSH key."""
+    if quiesce is None:
+        quiesce = _QuiesceState()
     # If every host was skipped (no SSH keys), aggregate and exit early.
     if not host_ctxs:
         await _aggregate_and_finalise(action_run_id, channel, redis_client)
@@ -638,15 +677,37 @@ async def _run_envelope(
             "host_status running",
         )
 
+    host_ctxs = await _quiesce_phase(
+        spec, host_ctxs, private_data_dir, channel, redis_client, quiesce
+    )
+    if not host_ctxs:
+        await _aggregate_and_finalise(action_run_id, channel, redis_client)
+        return
+
     host_ctxs = await _snapshot_phase(
         action_run_id, spec, host_ctxs, master_key, channel, redis_client
     )
+    # Quiesced members whose snapshot failed are out of the run: reopen
+    # them now, as the per-host path does.
+    snapshot_failed = [c for c in quiesce.pending if _was_snapshot_failed(c)]
+    if snapshot_failed:
+        await _unquiesce_members(
+            quiesce, snapshot_failed, {c.host_run_id: "failed" for c in snapshot_failed}
+        )
+        await _record_unquiesce_on_rows(snapshot_failed)
     if not host_ctxs:
         # Every host failed snapshot — nothing left to run.
         await _aggregate_and_finalise(action_run_id, channel, redis_client)
         return
 
     playbook = _run_group_playbook(spec, host_ctxs, private_data_dir)
+    from app.actions.manifest import QUIESCED_VAR  # noqa: PLC0415
+
+    verify_extra_vars_for = {
+        c.host_run_id: {**(playbook.extra_vars or {}), QUIESCED_VAR: True}
+        for c in host_ctxs
+        if c.quiesced
+    }
     outcomes = _route_runner_events_to_hosts(
         host_ctxs,
         getattr(playbook.runner, "events", None) or [],
@@ -672,6 +733,7 @@ async def _run_envelope(
             ai_verify_fail_closed=spec.ai_verify_fail_closed,
             action_run_id=action_run_id,
             dry_run=playbook.dry_run,
+            extra_vars_for=verify_extra_vars_for,
         )
 
     # ------------------------------------------------------------------ #
@@ -679,6 +741,17 @@ async def _run_envelope(
     # ------------------------------------------------------------------ #
     if spec.auto_rollback and spec.destructive:
         await _rollback_all(host_ctxs, outcomes.succeeded)
+
+    # ------------------------------------------------------------------ #
+    # Unquiesce: reopen every quiesced member, before cleanup so a member  #
+    # that stays closed keeps its snapshot                                #
+    # ------------------------------------------------------------------ #
+    if quiesce.pending:
+        await _unquiesce_members(
+            quiesce,
+            list(quiesce.pending),
+            {c.host_run_id: _member_run_outcome(c, outcomes.succeeded) for c in quiesce.pending},
+        )
 
     # ------------------------------------------------------------------ #
     # Phase F: per-host cleanup (delete snapshots on succeeded hosts)    #
@@ -762,6 +835,307 @@ async def _snapshot_phase(
     return host_ctxs
 
 
+# ---------------------------------------------------------------------------
+# Quiesce and unquiesce — around the snapshot window
+# ---------------------------------------------------------------------------
+
+
+_UNQUIESCE_HINT = (
+    "The application may still be closed; run the action's unquiesce playbook by hand."
+)
+
+
+def _quiesce_applies(spec: _GroupRunSpec) -> bool:
+    """Whether this run quiesces its VM-mapped members before the snapshot."""
+    from app.actions.validation import DRY_RUN_PARAM
+
+    return (
+        spec.quiesce_playbook_path is not None
+        and spec.unquiesce_playbook_path is not None
+        and spec.destructive
+        and spec.snapshot_enabled
+        and not bool(spec.parameters.get(DRY_RUN_PARAM, False))
+    )
+
+
+def _hook_extra_vars(spec: _GroupRunSpec) -> dict:
+    """The operator's parameters as the main playbook will see them.
+
+    A copy: ``_run_group_playbook`` pops the reserved keys from
+    ``spec.parameters`` itself later.
+    """
+    from app.actions.extra_vars import sanitize_extra_vars
+    from app.actions.validation import DRY_RUN_PARAM
+    from app.grafana.service import METRICS_DESTINATIONS_PARAM
+
+    params = dict(spec.parameters)
+    params.pop(DRY_RUN_PARAM, None)
+    params.pop(METRICS_DESTINATIONS_PARAM, None)
+    sanitize_extra_vars(params)
+    return params
+
+
+def _per_member_var(name: str, table_name: str, table: dict, *, default: str) -> dict:
+    """Extra-vars that give *name* a different value on each member.
+
+    One ansible-playbook run covers every member, and extra-vars are
+    global, so *table* (inventory name → value) goes in as *table_name*
+    and *name* is a template that looks the member up in it. Ansible
+    templates extra-vars per host, and nothing outranks them: an inventory
+    host var would lose to a play's own ``vars:`` default (seen live: the
+    unquiesce printed ``outcome=unknown``). Only unbork writes the
+    template; the table holds data, never templates.
+    """
+    return {
+        table_name: table,
+        name: f"{{{{ {table_name}[inventory_hostname] | default({default}) }}}}",
+    }
+
+
+def _run_group_side_playbook(
+    spec: _GroupRunSpec,
+    playbook_path: Any,
+    members: list[_HostCtx],
+    data_dir: str,
+    *,
+    extra_vars: dict | None = None,
+) -> tuple[Any, str, _MemberOutcomes]:
+    """Run a quiesce or unquiesce playbook once against *members*.
+
+    Returns ``(runner, output, per-member outcomes)``. Raises whatever
+    ansible-runner raises.
+    """
+    from app.ansible_runtime.runner import generate_multi_host_inventory, run_ansible
+
+    inventory_json = generate_multi_host_inventory(
+        [
+            {
+                "name": c.inv_name,
+                "ip": c.ip,
+                "port": c.port,
+                "ssh_user": c.ssh_user,
+                "ssh_key_path": c.ssh_key_path,
+                "known_hosts_path": c.known_hosts_path,
+            }
+            for c in members
+        ]
+    )
+    runner = run_ansible(
+        playbook_path=playbook_path,
+        inventory_json=inventory_json,
+        private_data_dir=data_dir,
+        extra_vars={**_hook_extra_vars(spec), **(extra_vars or {})} or None,
+        timeout=spec.quiesce_timeout,
+        roles_paths=list(spec.roles_paths) if spec.roles_paths else None,
+    )
+    output: str = runner.stdout.read() if hasattr(runner.stdout, "read") else str(runner.stdout)
+    status = getattr(runner, "status", "unknown")
+    rc = getattr(runner, "rc", -1)
+    outcomes = _route_runner_events_to_hosts(
+        members, getattr(runner, "events", None) or [], status, rc
+    )
+    return runner, output, outcomes
+
+
+async def _quiesce_phase(
+    spec: _GroupRunSpec,
+    host_ctxs: list[_HostCtx],
+    private_data_dir: str,
+    channel: str,
+    redis_client: Any,
+    state: _QuiesceState,
+) -> list[_HostCtx]:
+    """Quiesce every member that will be snapshotted. Returns the members still in play.
+
+    One run of the quiesce playbook against the members with a VM mapping.
+    A member it fails on is reopened at once, marked failed and dropped,
+    as a snapshot failure is; no snapshot is taken of it.
+    """
+    if not _quiesce_applies(spec):
+        return host_ctxs
+    try:
+        from app.proxmox.models import ProxmoxNode  # noqa: PLC0415
+        from app.proxmox.vm_mapping import VMMapping  # noqa: PLC0415
+    except ImportError:
+        return host_ctxs
+
+    mappings, nodes = await _load_vm_mappings(host_ctxs, VMMapping, ProxmoxNode)
+    targets = [
+        c
+        for c in host_ctxs
+        if c.host_id in mappings and mappings[c.host_id].proxmox_node_id in nodes
+    ]
+    if not targets:
+        return host_ctxs
+
+    state.spec = spec
+    state.private_data_dir = private_data_dir
+    for c in targets:
+        # Before the call: a quiesce that dies halfway may already have
+        # closed the application.
+        c.quiesced = True
+        c.step_log.append("[quiesce] closing the host to writes before the snapshot")
+    state.pending.extend(targets)
+    _publish_global(
+        redis_client, channel, f"[group] quiescing {len(targets)} member(s) before the snapshot\n"
+    )
+
+    try:
+        runner, output, outcomes = _run_group_side_playbook(
+            spec, spec.quiesce_playbook_path, targets, f"{private_data_dir}-quiesce"
+        )
+        status, rc = getattr(runner, "status", "unknown"), getattr(runner, "rc", -1)
+    except Exception as exc:
+        logger.exception("action_group: quiesce playbook errored")
+        output, status, rc = "", "error", -1
+        outcomes = _MemberOutcomes(
+            succeeded={c.host_run_id: False for c in targets},
+            error_message={c.host_run_id: str(exc) for c in targets},
+        )
+
+    failed: list[_HostCtx] = []
+    for c in targets:
+        ok = outcomes.succeeded.get(c.host_run_id, False)
+        c.step_log.append(f"[quiesce] exit={rc} status={status} passed={ok}")
+        c.step_log.append("=== Quiesce playbook output ===")
+        c.step_log.append(output)
+        if not ok:
+            c.snapshot_error = (
+                f"Quiesce failed: {outcomes.error_message.get(c.host_run_id, 'task failed')}"
+            )
+            failed.append(c)
+
+    if failed:
+        await _unquiesce_members(state, failed, {c.host_run_id: "failed" for c in failed})
+        await _fail_members(failed, channel, redis_client)
+    failed_ids = {c.host_run_id for c in failed}
+    return [c for c in host_ctxs if c.host_run_id not in failed_ids]
+
+
+def _member_run_outcome(ctx: _HostCtx, playbook_success: dict[int, bool]) -> str:
+    """``unbork_run_outcome`` for one member: succeeded, rolled_back or failed."""
+    if playbook_success.get(ctx.host_run_id, False) and ctx.verify_passed:
+        return "succeeded"
+    return "rolled_back" if ctx.rolled_back else "failed"
+
+
+async def _unquiesce_members(
+    state: _QuiesceState,
+    members: list[_HostCtx],
+    outcome_by_run: dict[int, str],
+) -> None:
+    """Reopen *members* with one unquiesce run; record failures on each ctx.
+
+    Each member is removed from ``state.pending`` first, so it is never
+    reopened twice. Never raises.
+    """
+    from app.actions.manifest import RUN_OUTCOME_VAR, RUN_OUTCOMES_VAR
+
+    members = [c for c in members if c in state.pending]
+    if not members or state.spec is None:
+        return
+    for c in members:
+        state.pending.remove(c)
+        c.step_log.append(
+            f"[unquiesce] reopening the host (outcome={outcome_by_run.get(c.host_run_id)})"
+        )
+    data_dir = f"{state.private_data_dir}-unquiesce-{members[0].host_run_id}"
+    try:
+        runner, output, outcomes = _run_group_side_playbook(
+            state.spec,
+            state.spec.unquiesce_playbook_path,
+            members,
+            data_dir,
+            extra_vars=_per_member_var(
+                RUN_OUTCOME_VAR,
+                RUN_OUTCOMES_VAR,
+                {c.inv_name: outcome_by_run.get(c.host_run_id, "failed") for c in members},
+                default="'failed'",
+            ),
+        )
+        status, rc = getattr(runner, "status", "unknown"), getattr(runner, "rc", -1)
+    except Exception as exc:
+        logger.exception("action_group: unquiesce playbook errored")
+        for c in members:
+            c.step_log.append(f"[unquiesce] ERROR: {exc}")
+            c.unquiesce_error = f"Unquiesce failed: {exc}. {_UNQUIESCE_HINT}"
+        return
+    for c in members:
+        ok = outcomes.succeeded.get(c.host_run_id, False)
+        c.step_log.append(f"[unquiesce] exit={rc} status={status} passed={ok}")
+        c.step_log.append("=== Unquiesce playbook output ===")
+        c.step_log.append(output)
+        if not ok:
+            reason = outcomes.error_message.get(c.host_run_id, "task failed")
+            c.unquiesce_error = f"Unquiesce failed: {reason}. {_UNQUIESCE_HINT}"
+
+
+async def _fail_members(members: list[_HostCtx], channel: str, redis_client: Any) -> None:
+    """Persist *members* as failed with their step log, before any snapshot."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.db import task_session  # noqa: PLC0415
+    from app.models.action_run import ActionHostRun  # noqa: PLC0415
+
+    async with task_session() as db:
+        for c in members:
+            hr = (
+                await db.execute(select(ActionHostRun).where(ActionHostRun.id == c.host_run_id))
+            ).scalar_one()
+            hr.status = "failed"
+            error = c.snapshot_error or "failed"
+            if c.unquiesce_error:
+                error = f"{error}; {c.unquiesce_error}"
+            hr.error_message = error
+            hr.finished_at = datetime.now(UTC)
+            hr.output = "\n".join(c.step_log)
+        await db.commit()
+    for c in members:
+        _publish(
+            redis_client,
+            channel,
+            {"event": "host_status", "host_run_id": c.host_run_id, "status": "failed"},
+            "quiesce-failed status",
+        )
+
+
+async def _record_unquiesce_on_rows(members: list[_HostCtx]) -> None:
+    """Rewrite already-finished members' output, and note a failed unquiesce."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.db import task_session  # noqa: PLC0415
+    from app.models.action_run import ActionHostRun  # noqa: PLC0415
+
+    async with task_session() as db:
+        for c in members:
+            hr = (
+                await db.execute(select(ActionHostRun).where(ActionHostRun.id == c.host_run_id))
+            ).scalar_one_or_none()
+            if hr is None:
+                continue
+            if c.unquiesce_error:
+                hr.error_message = f"{hr.error_message or 'failed'}; {c.unquiesce_error}"
+            hr.output = "\n".join(c.step_log)
+        await db.commit()
+
+
+async def _unquiesce_after_abort(state: _QuiesceState, channel: str, redis_client: Any) -> None:
+    """Reopen members the envelope left quiesced when it raised. Never raises."""
+    if not state.pending:
+        return
+    members = list(state.pending)
+    try:
+        _publish_global(
+            redis_client,
+            channel,
+            f"[group] run aborted: reopening {len(members)} quiesced member(s)\n",
+        )
+        await _unquiesce_members(state, members, {c.host_run_id: "failed" for c in members})
+        await _record_unquiesce_on_rows(members)
+    except Exception:
+        logger.exception("action_group: unquiesce after abort failed")
+
+
 def _run_group_playbook(
     spec: _GroupRunSpec,
     host_ctxs: list[_HostCtx],
@@ -769,6 +1143,7 @@ def _run_group_playbook(
 ) -> _GroupPlaybookResult:
     """Phase B: build inventory + extra-vars, run ansible-runner once."""
     from app.actions.extra_vars import sanitize_extra_vars
+    from app.actions.manifest import QUIESCED_HOSTS_VAR, QUIESCED_VAR
     from app.actions.validation import DRY_RUN_PARAM
     from app.ansible_runtime.runner import generate_multi_host_inventory, run_ansible
     from app.grafana.service import METRICS_DESTINATIONS_PARAM
@@ -803,6 +1178,15 @@ def _run_group_playbook(
     extra_vars: dict | None = dict(parameters) if parameters else None
     # Dry run is ``--check`` via run_ansible, not an extra-var: see
     # run_ansible's ``check_mode``.
+    quiesced = {ctx.inv_name: True for ctx in host_ctxs if ctx.quiesced}
+    if quiesced:
+        # A quiesced member's playbook learns it, so its health checks can
+        # accept a closed front door. Per member, since members without a
+        # VM mapping are not quiesced.
+        extra_vars = {
+            **(extra_vars or {}),
+            **_per_member_var(QUIESCED_VAR, QUIESCED_HOSTS_VAR, quiesced, default="false"),
+        }
 
     # Per-action floor — see the matching comment in action_host.py.
     timeout = effective_playbook_timeout(spec.playbook_timeout)
@@ -929,7 +1313,7 @@ async def _persist_member_outcomes(
             )
             hr = hr_result.scalar_one()
             playbook_ok = outcomes.succeeded.get(ctx.host_run_id, False)
-            final_ok = playbook_ok and ctx.verify_passed
+            final_ok = playbook_ok and ctx.verify_passed and ctx.unquiesce_error is None
             if final_ok:
                 hr.status = "succeeded"
             else:
@@ -938,6 +1322,12 @@ async def _persist_member_outcomes(
                     hr.error_message = ctx.verify_error
                 elif ctx.host_run_id in outcomes.error_message:
                     hr.error_message = outcomes.error_message[ctx.host_run_id]
+                if ctx.unquiesce_error is not None:
+                    hr.error_message = (
+                        f"{hr.error_message}; {ctx.unquiesce_error}"
+                        if hr.error_message
+                        else ctx.unquiesce_error
+                    )
             hr.exit_code = playbook.rc
             hr.finished_at = datetime.now(UTC)
             hr.output = _member_output(ctx, playbook.output)
@@ -988,8 +1378,13 @@ def _remove_workspaces(ssh_key_paths: list[str], private_data_dir: str) -> None:
     # cannot miss one and needs no bookkeeping threaded through
     # _verify_all; private_data_dir is an mkdtemp path, so the prefix is
     # unambiguous.
-    for verify_dir in glob.glob(f"{private_data_dir}-verify*"):
-        shutil.rmtree(verify_dir, ignore_errors=True)
+    # The quiesce and unquiesce passes allocate theirs the same way.
+    for side_dir in (
+        glob.glob(f"{private_data_dir}-verify*")
+        + glob.glob(f"{private_data_dir}-quiesce*")
+        + glob.glob(f"{private_data_dir}-unquiesce*")
+    ):
+        shutil.rmtree(side_dir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1253,8 +1648,12 @@ async def _verify_all(
     ai_verify_fail_closed: bool = False,
     action_run_id: int | None = None,
     dry_run: bool = False,
+    extra_vars_for: dict[int, dict] | None = None,
 ) -> None:
     """Verify every host that succeeded the playbook and was snapshotted.
+
+    *extra_vars_for* overrides *extra_vars* per member, by host run id: a
+    quiesced member's verify playbook also gets ``unbork_quiesced``.
 
     Per-host: run the pack's ``verify_playbook`` against a single-host
     inventory, or fall back to the built-in SSH/services/packages check.
@@ -1287,7 +1686,7 @@ async def _verify_all(
                 verify_playbook_path,
                 verify_timeout,
                 roles_paths,
-                extra_vars,
+                (extra_vars_for or {}).get(ctx.host_run_id, extra_vars),
                 private_data_dir,
                 channel,
                 redis_client,
@@ -1525,7 +1924,7 @@ async def _load_hosts_by_id(host_ids: list[int]) -> dict[int, Any]:
 
 
 async def _rollback_member(ctx: _HostCtx, hosts_by_id: dict[int, Any]) -> None:
-    """Restore one member's snapshot, then delete it if the restore succeeded."""
+    """Restore one member's snapshot; _cleanup_all deletes it afterwards."""
     from app.db import task_session  # noqa: PLC0415
     from app.workflows.steps.rollback import rollback_to_snapshot  # noqa: PLC0415
 
@@ -1551,8 +1950,9 @@ async def _rollback_member(ctx: _HostCtx, hosts_by_id: dict[int, Any]) -> None:
             )
             await db.commit()
         ctx.step_log.append(f"[rollback] success={rb.get('success')} {rb.get('error', '')}".strip())
-        if rb.get("success") and ctx.snapshot_name is not None:
-            await _delete_snapshot_after_rollback(ctx)
+        # The snapshot stays until after the unquiesce: _cleanup_all
+        # deletes it, or keeps it for a member that stays closed.
+        ctx.rolled_back = bool(rb.get("success"))
     except Exception as exc:
         logger.exception(
             "action_group: rollback failed for host %d: %s",
@@ -1593,9 +1993,11 @@ async def _cleanup_all(
     Per-host policy (matches the per-host path):
 
     * Succeeded host + snapshot present → delete snapshot.
-    * Failed host → leave snapshot in place; Phase E rollback may have
-      already reverted to it, but the snapshot itself stays for the
-      periodic cleanup task to reap.
+    * Rolled-back host → delete the snapshot it was restored to. Done
+      here, after the unquiesce, rather than in Phase E.
+    * Failed host that was not rolled back → leave the snapshot in place
+      for the operator.
+    * A member whose unquiesce failed keeps its snapshot either way.
     * Cleanup errors are non-fatal — the action succeeded, an orphan
       snapshot is cosmetic.
     """
@@ -1605,7 +2007,14 @@ async def _cleanup_all(
         if ctx.snapshot_name is None or ctx.proxmox_client is None:
             return
         playbook_ok = per_host_playbook_success.get(ctx.host_run_id, False)
-        if not (playbook_ok and ctx.verify_passed):
+        if not (playbook_ok and ctx.verify_passed) and not ctx.rolled_back:
+            return
+        if ctx.unquiesce_error is not None:
+            # Still closed: keep the snapshot for whoever reopens it.
+            ctx.step_log.append(f"[cleanup] snapshot {ctx.snapshot_name} kept — unquiesce failed")
+            return
+        if ctx.rolled_back:
+            await _delete_snapshot_after_rollback(ctx)
             return
 
         try:

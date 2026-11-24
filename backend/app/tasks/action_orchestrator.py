@@ -267,6 +267,7 @@ async def _run_action_async(action_run_id: int, orchestrator_id: str | None = No
             orchestrator_id=orchestrator_id,
             per_host_task=started.per_host_task,
             child_soft_limit=started.child_soft_limit,
+            child_hard_margin=started.child_hard_margin,
             r=_redis(),
         ),
         started.host_run_ids,
@@ -351,7 +352,7 @@ async def _send_group_task(db, run) -> None:
     from sqlalchemy import func, select  # noqa: PLC0415
 
     from app.models.host import HostGroupMembership
-    from app.tasks.action_timeouts import HARD_LIMIT_MARGIN_SECONDS, run_deadline_seconds
+    from app.tasks.action_timeouts import hard_limit_margin_seconds, run_deadline_seconds
 
     member_count = (
         await db.scalar(
@@ -368,7 +369,7 @@ async def _send_group_task(db, run) -> None:
         args=[run.id],
         queue=CHILD_QUEUE,
         soft_time_limit=group_soft,
-        time_limit=group_soft + HARD_LIMIT_MARGIN_SECONDS,
+        time_limit=group_soft + hard_limit_margin_seconds(run.action_key),
     )
 
 
@@ -381,6 +382,9 @@ class _StartedRun:
     #: Per-child Celery limits, sized from the action's own deadline.
     child_soft_limit: int
     parallelism: int
+    #: Soft-to-hard gap; wider for an action whose unquiesce must still
+    #: run after a soft timeout.
+    child_hard_margin: int = 300
 
 
 async def _start_run(action_run_id: int, orchestrator_id: str) -> _StartedRun | None:
@@ -392,7 +396,7 @@ async def _start_run(action_run_id: int, orchestrator_id: str) -> _StartedRun | 
     fails the run.
     """
     from app.db import task_session
-    from app.tasks.action_timeouts import per_host_deadline_seconds
+    from app.tasks.action_timeouts import hard_limit_margin_seconds, per_host_deadline_seconds
 
     async with task_session() as db:
         run = await _claim_queued_run(db, action_run_id, orchestrator_id)
@@ -422,6 +426,7 @@ async def _start_run(action_run_id: int, orchestrator_id: str) -> _StartedRun | 
         # same moment its ansible timeout fires, orphaning the
         # ActionHostRun in ``running``.
         child_soft_limit = per_host_deadline_seconds(run.action_key)
+        child_hard_margin = hard_limit_margin_seconds(run.action_key)
 
         host_ids = await _resolve_target_host_ids(db, run)
         if not host_ids:
@@ -446,6 +451,7 @@ async def _start_run(action_run_id: int, orchestrator_id: str) -> _StartedRun | 
         per_host_task=per_host_task_name,
         child_soft_limit=child_soft_limit,
         parallelism=parallelism,
+        child_hard_margin=child_hard_margin,
     )
 
 
@@ -560,7 +566,7 @@ async def _resume_run_async(action_run_id: int, orchestrator_id: str) -> None:
     from app.actions.registry import ensure_registry_current
     from app.db import task_session
     from app.models.action_run import ActionHostRun, ActionRun
-    from app.tasks.action_timeouts import per_host_deadline_seconds
+    from app.tasks.action_timeouts import hard_limit_margin_seconds, per_host_deadline_seconds
 
     try:
         async with task_session() as db:
@@ -599,6 +605,7 @@ async def _resume_run_async(action_run_id: int, orchestrator_id: str) -> None:
                 orchestrator_id=orchestrator_id,
                 per_host_task=PER_HOST_TASK_FOR_BUILTIN.get(run.action_key, _DEFAULT_PER_HOST_TASK),
                 child_soft_limit=per_host_deadline_seconds(run.action_key),
+                child_hard_margin=hard_limit_margin_seconds(run.action_key),
                 r=_redis(),
             )
             parallelism = run.parallelism
@@ -640,6 +647,7 @@ class _Driver:
     per_host_task: str
     child_soft_limit: int
     r: Any
+    child_hard_margin: int = 300
 
 
 def _redis():
@@ -655,7 +663,7 @@ def _window_size(host_count: int, parallelism: int) -> int:
     return max(1, host_count) if parallelism <= 0 else max(1, parallelism)
 
 
-def _host_wait_seconds(child_soft_limit: int) -> int:
+def _host_wait_seconds(child_soft_limit: int, hard_margin: int | None = None) -> int:
     """How long one host may hold a slot before the run stops counting it.
 
     Past the children's own hard limit nothing is still working on them:
@@ -664,7 +672,8 @@ def _host_wait_seconds(child_soft_limit: int) -> int:
     """
     from app.tasks.action_timeouts import HARD_LIMIT_MARGIN_SECONDS  # noqa: PLC0415
 
-    return max(3600, child_soft_limit + HARD_LIMIT_MARGIN_SECONDS)
+    margin = HARD_LIMIT_MARGIN_SECONDS if hard_margin is None else hard_margin
+    return max(3600, child_soft_limit + margin)
 
 
 #: What :func:`_check_in` can report, and what the loop does about it.
@@ -789,7 +798,7 @@ async def _wait(
     host that has held its slot past :func:`_host_wait_seconds`, which the
     sweeper deals with.
     """
-    give_up_after = _host_wait_seconds(d.child_soft_limit)
+    give_up_after = _host_wait_seconds(d.child_soft_limit, d.child_hard_margin)
     while True:
         state, still = await _check_in(d, list(in_flight))
         if still is not None:
@@ -812,7 +821,13 @@ async def _wait(
         await _pause()
 
 
-def _send_host_task(task: str, soft_limit: int, action_run_id: int, host_run_id: int) -> None:
+def _send_host_task(
+    task: str,
+    soft_limit: int,
+    action_run_id: int,
+    host_run_id: int,
+    hard_margin: int | None = None,
+) -> None:
     from app.tasks.action_timeouts import HARD_LIMIT_MARGIN_SECONDS  # noqa: PLC0415
 
     celery_app.send_task(
@@ -820,13 +835,19 @@ def _send_host_task(task: str, soft_limit: int, action_run_id: int, host_run_id:
         args=[action_run_id, host_run_id],
         queue=CHILD_QUEUE,
         soft_time_limit=soft_limit,
-        time_limit=soft_limit + HARD_LIMIT_MARGIN_SECONDS,
+        time_limit=soft_limit + (HARD_LIMIT_MARGIN_SECONDS if hard_margin is None else hard_margin),
     )
 
 
 def _dispatch(d: _Driver, host_run_ids: list[int]) -> None:
     for host_run_id in host_run_ids:
-        _send_host_task(d.per_host_task, d.child_soft_limit, d.action_run_id, host_run_id)
+        _send_host_task(
+            d.per_host_task,
+            d.child_soft_limit,
+            d.action_run_id,
+            host_run_id,
+            d.child_hard_margin,
+        )
 
 
 def send_host_task(action_key: str, action_run_id: int, host_run_id: int) -> None:
@@ -839,13 +860,17 @@ def send_host_task(action_key: str, action_run_id: int, host_run_id: int) -> Non
     ``_builtin.drift_check`` failed when its turn came (BUG-103). The task
     and its limits come from the same lookups as the orchestrator's own.
     """
-    from app.tasks.action_timeouts import per_host_deadline_seconds  # noqa: PLC0415
+    from app.tasks.action_timeouts import (  # noqa: PLC0415
+        hard_limit_margin_seconds,
+        per_host_deadline_seconds,
+    )
 
     _send_host_task(
         PER_HOST_TASK_FOR_BUILTIN.get(action_key, _DEFAULT_PER_HOST_TASK),
         per_host_deadline_seconds(action_key),
         action_run_id,
         host_run_id,
+        hard_limit_margin_seconds(action_key),
     )
 
 

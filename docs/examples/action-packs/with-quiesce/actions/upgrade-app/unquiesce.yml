@@ -1,0 +1,31 @@
+---
+# Runs after verify and after any rollback, also when the run failed.
+# unbork_run_outcome is succeeded, failed or rolled_back. After a rollback
+# the VM is back at the moment of the snapshot, which was quiesced, so the
+# same steps reopen it. Every step is safe to run twice, by hand too.
+- name: Unquiesce the app
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    worker_service: myapp-worker
+    unbork_run_outcome: unknown
+  tasks:
+    - name: Remove the loopback-only rule
+      ansible.builtin.file:
+        path: /etc/nginx/conf.d/00-unbork-quiesce.conf
+        state: absent
+
+    - name: Reload nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: reloaded
+
+    - name: Start the background worker
+      ansible.builtin.systemd_service:
+        name: "{{ worker_service }}"
+        state: started
+
+    - name: Say how the run ended
+      ansible.builtin.debug:
+        msg: "Reopened after a run that {{ unbork_run_outcome }}."
