@@ -57,7 +57,7 @@ class TestTheOptionsHandedToTheSdk:
     async def test_built_in_tools_are_withheld(self, db, ai_provider, make_session) -> None:
         """The single most important assertion in this file. Omitting
         ``tools`` does not disable a feature — it hands the model Bash,
-        Read, Write and Edit inside LabDog's container."""
+        Read, Write and Edit inside unbork's container."""
         session = await make_session()
         _, fake, _ = await _run(db, session, ai_provider, [assistant("done"), result()])
 
@@ -76,18 +76,18 @@ class TestTheOptionsHandedToTheSdk:
 
     async def test_host_configuration_is_not_loaded(self, db, ai_provider, make_session) -> None:
         """A CLAUDE.md or MCP server belonging to whoever administers the
-        box is not part of LabDog's threat model."""
+        box is not part of unbork's threat model."""
         session = await make_session()
         _, fake, _ = await _run(db, session, ai_provider, [assistant("done"), result()])
 
         assert fake.options.setting_sources == []
         assert fake.options.strict_mcp_config is True
 
-    async def test_only_labdog_tools_are_served(self, db, ai_provider, make_session) -> None:
+    async def test_only_unbork_tools_are_served(self, db, ai_provider, make_session) -> None:
         session = await make_session()
         _, fake, _ = await _run(db, session, ai_provider, [assistant("done"), result()])
 
-        assert set(fake.options.mcp_servers) == {"labdog"}
+        assert set(fake.options.mcp_servers) == {"unbork"}
 
     async def test_the_iteration_cap_is_handed_over_as_max_turns(
         self, db, ai_provider, make_session, small_caps
@@ -262,7 +262,7 @@ class TestRefusalsAreRecorded:
         runner = AgentSDKRunner(db, session, ai_provider, LoopCaps())
 
         decision = await runner._can_use_tool(
-            "mcp__labdog__run_ssh_command",
+            "mcp__unbork__run_ssh_command",
             {"host_id": 1, "command": "systemctl restart nginx"},
             _FakeContext(),
         )
@@ -287,7 +287,7 @@ class TestRefusalsAreRecorded:
         runner = AgentSDKRunner(db, session, ai_provider, LoopCaps())
 
         await runner._can_use_tool(
-            "mcp__labdog__run_ssh_command",
+            "mcp__unbork__run_ssh_command",
             {"host_id": host.id, "command": "systemctl restart nginx"},
             _FakeContext(),
         )
@@ -312,7 +312,7 @@ class TestRefusalsAreRecorded:
         runner = AgentSDKRunner(db, session, ai_provider, LoopCaps())
 
         await runner._can_use_tool(
-            "mcp__labdog__run_ssh_command",
+            "mcp__unbork__run_ssh_command",
             {
                 "host_id": other.id if named == "other" else named,
                 "command": "systemctl restart nginx",
@@ -337,7 +337,7 @@ class TestRefusalsAreRecorded:
         runner = AgentSDKRunner(db, session, ai_provider, LoopCaps())
 
         decision = await runner._can_use_tool(
-            "mcp__labdog__run_ssh_command",
+            "mcp__unbork__run_ssh_command",
             {"host_id": 1, "command": "journalctl -u nginx -n 20"},
             _FakeContext(),
         )

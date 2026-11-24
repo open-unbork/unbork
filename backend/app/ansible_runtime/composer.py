@@ -79,12 +79,12 @@ CANONICAL_ORDER: list[str] = [
 # The firewall module produces two distinct play names depending on
 # backend (nftables vs iptables); both map to ``firewall``.
 PLAY_NAME_TO_MODULE: dict[str, str] = {
-    "LabDog Package Management": "packages",
-    "LabDog DNS resolver sync": "resolver",
-    "LabDog service management": "services",
-    "LabDog /etc/hosts management": "hosts-file",
-    "LabDog Cron Job Management": "cron",
-    "LabDog Linux User Management": "linux-users",
+    "unbork Package Management": "packages",
+    "unbork DNS resolver sync": "resolver",
+    "unbork service management": "services",
+    "unbork /etc/hosts management": "hosts-file",
+    "unbork Cron Job Management": "cron",
+    "unbork Linux User Management": "linux-users",
     "Apply nftables firewall rules (safe mode)": "firewall",
     "Apply iptables firewall rules (safe mode)": "firewall",
 }

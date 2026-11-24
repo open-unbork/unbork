@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.models import AIMessage, AIProvider, AISession, AIUsageDay
 from app.ai.providers.factory import sends_data_offsite, supports_tools
+from app.ai.providers.policy import provider_type_refusal
 from app.settings_service import get_setting_typed
 
 logger = logging.getLogger(__name__)
@@ -100,8 +101,20 @@ async def get_default_provider(db: AsyncSession) -> AIProvider | None:
     return providers[0] if len(providers) == 1 else None
 
 
+#: Why nothing AI runs on a server that left the assistant out (C-026).
+ASSISTANT_ABSENT_MESSAGE = (
+    "The assistant is not part of this install ([assistant] enabled = false)."
+)
+
+
 async def resolve_provider(db: AsyncSession, provider_id: int | None) -> AIProvider:
     """Pick the provider for a session and check it against policy."""
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        # C-026. Reached by an AI verify step, which resolves this to an
+        # inconclusive verdict under the action's fail_closed policy.
+        raise AIDisabledError(ASSISTANT_ABSENT_MESSAGE)
     if not int(await get_setting_typed("ai.enabled", db)):
         raise AIDisabledError(
             "AI features are disabled. Enable ai.enabled in Settings to use them."
@@ -122,6 +135,10 @@ async def resolve_provider(db: AsyncSession, provider_id: int | None) -> AIProvi
                 "No default AI provider is configured. Add one under Integrations "
                 "or mark an existing provider as the default."
             )
+
+    refusal = provider_type_refusal(provider.provider_type)
+    if refusal:
+        raise AIDisabledError(f"Provider {provider.name!r}: {refusal}")
 
     if sends_data_offsite(provider):
         # One gate, deliberately. This used to also require a per-provider

@@ -94,7 +94,7 @@ async def plan_host(
         raise HTTPException(status_code=404, detail="Host not found")
 
     desired, desired_policies = await _get_desired_state(
-        host_id, db, host_source_ip=host.labdog_source_ip
+        host_id, db, host_source_ip=host.unbork_source_ip
     )
     try:
         state = await fetch_current_firewall_state(host_id, db)
@@ -145,7 +145,7 @@ async def plan_group(
     for hid in host_ids:
         host = hosts[hid]
         desired, desired_policies = await _get_desired_state(
-            hid, db, host_source_ip=host.labdog_source_ip
+            hid, db, host_source_ip=host.unbork_source_ip
         )
         prepared.append((host, desired, desired_policies, await firewall_ssh_key(host, db)))
 

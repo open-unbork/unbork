@@ -2,14 +2,14 @@
 # unbork Configuration
 # ============================================================
 # Production configuration for unbork.
-# Copy this file to /etc/labdog/labdog.toml and update
+# Copy this file to /etc/unbork/unbork.toml and update
 # all REQUIRED values before starting the service.
 #
 # Every setting can be overridden via environment variables
-# using the prefix LABDOG_ with double-underscore separators:
-#   LABDOG_SERVER__PORT=9000       → [server] port
-#   LABDOG_DATABASE__URL=...       → [database] url
-#   LABDOG_SECURITY__SECRET_KEY=.. → [security] secret_key
+# using the prefix UNBORK_ with double-underscore separators:
+#   UNBORK_SERVER__PORT=9000       → [server] port
+#   UNBORK_DATABASE__URL=...       → [database] url
+#   UNBORK_SECURITY__SECRET_KEY=.. → [security] secret_key
 
 # ── Server ───────────────────────────────────────────────────
 [server]
@@ -20,7 +20,7 @@ port = 8000
 # Path to frontend static export directory (Next.js `out/`).
 # Leave empty (default) to auto-detect:
 #   - ../frontend/out  (development)
-#   - /usr/lib/labdog/frontend/out  (production)
+#   - /usr/lib/unbork/frontend/out  (production)
 # Set to a path to override, or "none" to disable static serving.
 # static_dir = ""
 # Trusted reverse-proxy IPs/CIDRs — X-Forwarded-For is only honoured
@@ -42,7 +42,7 @@ expose_docs = false
 # ── Database ─────────────────────────────────────────────────
 [database]
 # PostgreSQL async connection string (REQUIRED)
-url = "postgresql+asyncpg://labdog:CHANGE_ME@localhost:5432/labdog"
+url = "postgresql+asyncpg://unbork:CHANGE_ME@localhost:5432/unbork"
 # Connection pool tuning
 pool_size = 5
 max_overflow = 10
@@ -66,7 +66,7 @@ encryption_key = "CHANGE_ME"
 
 # IP of the unbork server — used in the auto-injected SSH
 # lockout prevention rule (REQUIRED)
-labdog_server_ip = "127.0.0.1"
+unbork_server_ip = "127.0.0.1"
 
 # Origins of a frontend served from somewhere other than unbork itself
 # (CORS, and the web terminal's origin check). Not needed when the UI is
@@ -99,6 +99,15 @@ login = "5/minute"
 # General API limit per client IP
 api = "100/minute"
 
+# ── AI assistant ─────────────────────────────────────────────
+# [assistant]
+# Set to false to leave the AI assistant out entirely: no AI routes,
+# pages, providers, background tasks or settings are loaded. Alerts
+# still run their actions. The assistant's tables stay, so turning it
+# back on loses nothing. A config-file setting on purpose: removing a
+# subsystem needs server access, not an admin session.
+# enabled = true
+
 # ── Prometheus metrics export ────────────────────────────────
 [metrics]
 # Expose unbork's own fleet state and health at GET /metrics in
@@ -122,7 +131,7 @@ enabled = false
 # Prometheus servers (or a misconfigured 1s scrape interval) cost no
 # more than one collection per window.
 cache_ttl_seconds = 15.0
-# Label labdog_action_runs_total by action_key. Scales with the number
+# Label unbork_action_runs_total by action_key. Scales with the number
 # of distinct actions you run (typically 10-100). Set false to trade
 # that detail away if your series count matters.
 action_key_label = true
@@ -200,5 +209,5 @@ max_tasks_per_child = 100
 # ── Ansible / Action packs ──────────────────────────────────
 [ansible]
 # Working directory for git-backed action pack checkouts.
-# Must be writable by the labdog user.
-packs_root_dir = "/var/lib/labdog/packs"
+# Must be writable by the unbork user.
+packs_root_dir = "/var/lib/unbork/packs"

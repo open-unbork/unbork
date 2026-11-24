@@ -110,7 +110,7 @@ def test_the_teardown_script_is_passed_as_a_mapping(backend):
         backend, "10.0.0.1", _RULES, "/dev/shm/key", policies=ChainPolicies()
     )
     tasks = yaml.safe_load(playbook)[0]["tasks"]
-    teardown = [t for t in tasks if "Remove stale LabDog" in t.get("name", "")]
+    teardown = [t for t in tasks if "Remove stale unbork" in t.get("name", "")]
     assert teardown, f"{backend}: expected a teardown task"
     for task in teardown:
         assert isinstance(task["ansible.builtin.shell"], dict)

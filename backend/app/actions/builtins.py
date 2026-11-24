@@ -235,6 +235,10 @@ AI_TASK_GROUP = ActionDefinition(
 )
 
 
+#: The built-ins that run the assistant, left out of the registry with it.
+AI_BUILTIN_KEYS = frozenset({AI_TASK.key, AI_TASK_GROUP.key})
+
+
 BUILTIN_DEFINITIONS: tuple[ActionDefinition, ...] = (
     SYNC,
     DRIFT_CHECK,
@@ -251,5 +255,11 @@ def register_builtins(registry: dict[str, ActionDefinition]) -> None:
     underscore-prefix gate in ``ActionManifest`` should keep this from
     ever happening).
     """
+    from app.features import assistant_enabled
+
+    with_assistant = assistant_enabled()
     for defn in BUILTIN_DEFINITIONS:
+        if defn.key in AI_BUILTIN_KEYS and not with_assistant:
+            # Their tasks are not loaded without the assistant (C-026).
+            continue
         registry[defn.key] = defn

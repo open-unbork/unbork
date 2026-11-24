@@ -19,7 +19,7 @@ def test_promql_builders_filter_by_host_id():
         m.disk_size_query(7),
         m.disk_available_query(7),
     ):
-        assert 'labdog_host_id="7"' in q
+        assert 'unbork_host_id="7"' in q
     # Root filesystem only, pseudo-filesystems excluded.
     assert 'mountpoint="/"' in m.disk_size_query(7)
     assert "tmpfs" in m.disk_size_query(7)

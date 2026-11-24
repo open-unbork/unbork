@@ -1,7 +1,7 @@
 """Grafana labels choose what an alert does.
 
-``labdog_action`` runs an action from the list of actions alerts may run;
-``labdog_ai`` and ``labdog_ai_automate`` ask for the AI. The label reading
+``unbork_action`` runs an action from the list of actions alerts may run;
+``unbork_ai`` and ``unbork_ai_automate`` ask for the AI. The label reading
 and the guards (app.alerts.labels), the order of things when an alert
 arrives and the check afterwards (app.tasks.alert_handling), the AI's
 label check (app.tasks.ai_alerts), and the API around them
@@ -140,12 +140,12 @@ class TestLabels:
         ("value", "expected"), [("true", True), ("True", False), ("yes", False), ("", False)]
     )
     def test_true_means_exactly_true(self, value: str, expected: bool) -> None:
-        assert is_true({"labdog_ai": value}, "labdog_ai") is expected
-        assert is_true(None, "labdog_ai") is False
+        assert is_true({"unbork_ai": value}, "unbork_ai") is expected
+        assert is_true(None, "unbork_ai") is False
 
     def test_the_action_label(self) -> None:
-        assert requested_action({"labdog_action": " restart-nginx "}) == "restart-nginx"
-        assert requested_action({"labdog_action": "  "}) is None
+        assert requested_action({"unbork_action": " restart-nginx "}) == "restart-nginx"
+        assert requested_action({"unbork_action": "  "}) is None
         assert requested_action({}) is None
         assert requested_action(None) is None
 
@@ -159,7 +159,7 @@ class TestDispatch:
     async def test_an_allowed_action_runs_on_the_alerts_host(self, db) -> None:
         host = await create_host(db)
         entry = await _allow(db)
-        event = await _alert(db, host.id, labdog_action="example")
+        event = await _alert(db, host.id, unbork_action="example")
 
         dispatch = await dispatch_for(db, event)
 
@@ -181,12 +181,12 @@ class TestDispatch:
     async def test_a_resolved_alert_dispatches_nothing(self, db) -> None:
         host = await create_host(db)
         await _allow(db)
-        event = await _alert(db, host.id, status="resolved", labdog_action="example")
+        event = await _alert(db, host.id, status="resolved", unbork_action="example")
         assert await dispatch_for(db, event) is None
 
     async def test_the_list_starts_empty(self, db) -> None:
         host = await create_host(db)
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert dispatch.outcome == "not_allowed"
         assert dispatch.detail == "example is not on the list of actions alerts may run"
         assert dispatch.action_run_id is None
@@ -195,7 +195,7 @@ class TestDispatch:
     async def test_a_paused_entry_refuses(self, db) -> None:
         host = await create_host(db)
         await _allow(db, enabled=False)
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert dispatch.outcome == "not_allowed"
         assert "paused" in dispatch.detail
 
@@ -205,9 +205,9 @@ class TestDispatch:
         outsider = await create_host(db, hostname="db-1")
         await _allow(db, target_kind="group", target_id=group.id)
 
-        inside = await dispatch_for(db, await _alert(db, member.id, labdog_action="example"))
+        inside = await dispatch_for(db, await _alert(db, member.id, unbork_action="example"))
         assert inside.outcome == "started"
-        outside = await dispatch_for(db, await _alert(db, outsider.id, labdog_action="example"))
+        outside = await dispatch_for(db, await _alert(db, outsider.id, unbork_action="example"))
         assert outside.outcome == "not_allowed"
         assert outside.detail == "alerts may run example on group web, and db-1 is not one"
 
@@ -216,21 +216,21 @@ class TestDispatch:
         other = await create_host(db)
         await _allow(db, target_kind="host", target_id=host.id)
         assert (
-            await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+            await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         ).outcome == "started"
         assert (
-            await dispatch_for(db, await _alert(db, other.id, labdog_action="example"))
+            await dispatch_for(db, await _alert(db, other.id, unbork_action="example"))
         ).outcome == "not_allowed"
 
     async def test_an_unknown_action(self, db) -> None:
         host = await create_host(db)
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="no-such"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="no-such"))
         assert dispatch.outcome == "unknown_action"
         assert dispatch.detail == "no action has the key 'no-such'"
 
     async def test_an_alert_with_no_host_says_so(self, db) -> None:
         await _allow(db)
-        dispatch = await dispatch_for(db, await _alert(db, None, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, None, unbork_action="example"))
         assert dispatch.outcome == "skipped_no_host"
         assert dispatch.action_run_id is None
 
@@ -241,20 +241,20 @@ class TestDispatch:
         host = await create_host(db)
         await _allow(db, cooldown=0)
 
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert dispatch.outcome == "skipped_token"
 
         # A polled alert carries no token, so the token does not decide it.
         polled = await dispatch_for(
-            db, await _alert(db, host.id, source="alertmanager_poll", labdog_action="example")
+            db, await _alert(db, host.id, source="alertmanager_poll", unbork_action="example")
         )
         assert polled.outcome == "started"
 
     async def test_one_run_at_a_time_per_host(self, db) -> None:
         host = await create_host(db)
         await _allow(db, cooldown=0)
-        first = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
-        second = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        first = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
+        second = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert first.outcome == "started"
         assert second.outcome == "skipped_in_flight"
         assert f"run #{first.action_run_id}" in second.detail
@@ -274,41 +274,41 @@ class TestDispatch:
             )
         )
         await db.flush()
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert dispatch.outcome == "started"
 
     async def test_the_cooldown(self, db) -> None:
         host = await create_host(db)
         await _allow(db, cooldown=60)
-        first = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        first = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         run = await db.get(ActionRun, first.action_run_id)
         run.status = "succeeded"
         await db.flush()
 
-        second = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        second = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert second.outcome == "skipped_cooldown"
         assert "cooldown 60 min" in second.detail
 
         run.created_at = datetime.now(UTC) - timedelta(minutes=61)
         await db.flush()
-        third = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        third = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert third.outcome == "started"
 
     async def test_whether_the_ai_follows_is_read_from_the_labels(self, db) -> None:
         host = await create_host(db)
         await _allow(db, cooldown=0)
-        alone = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        alone = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         assert alone.hand_to_ai is False
 
         other = await create_host(db)
         investigate = await dispatch_for(
-            db, await _alert(db, other.id, labdog_action="example", labdog_ai="true")
+            db, await _alert(db, other.id, unbork_action="example", unbork_ai="true")
         )
         assert investigate.hand_to_ai is True
 
         third = await create_host(db)
         automate = await dispatch_for(
-            db, await _alert(db, third.id, labdog_action="example", labdog_ai_automate="true")
+            db, await _alert(db, third.id, unbork_action="example", unbork_ai_automate="true")
         )
         assert automate.hand_to_ai is True
 
@@ -326,7 +326,7 @@ class TestHandleAlert:
 
         host = await create_host(db)
         await _allow(db)
-        event = await _alert(db, host.id, labdog_action="example", labdog_ai="true")
+        event = await _alert(db, host.id, unbork_action="example", unbork_ai="true")
 
         result = await _handle(event.id)
 
@@ -343,7 +343,7 @@ class TestHandleAlert:
 
         host = await create_host(db)
         await _allow(db)
-        event = await _alert(db, host.id, labdog_action="example")
+        event = await _alert(db, host.id, unbork_action="example")
         await _handle(event.id)
         await db.refresh(event)
         assert event.investigation_outcome == "handled_by_action"
@@ -355,7 +355,7 @@ class TestHandleAlert:
         from app.tasks.alert_handling import _handle
 
         host = await create_host(db)
-        event = await _alert(db, host.id, labdog_ai="true")
+        event = await _alert(db, host.id, unbork_ai="true")
         result = await _handle(event.id)
         ai_policy.assert_awaited_once_with(event.id, already_tried=None)
         assert result["actions"] == []
@@ -367,11 +367,11 @@ class TestHandleAlert:
         from app.tasks.alert_handling import _handle
 
         host = await create_host(db)
-        event = await _alert(db, host.id, labdog_action="linux-upgrade", labdog_ai="true")
+        event = await _alert(db, host.id, unbork_action="linux-upgrade", unbork_ai="true")
         await _handle(event.id)
         tried = ai_policy.await_args.kwargs["already_tried"]
         assert tried.startswith(
-            "The alert's labdog_action label asked for the action linux-upgrade, but unbork "
+            "The alert's unbork_action label asked for the action linux-upgrade, but unbork "
             "did not run it:"
         )
         sent.assert_not_called()
@@ -383,8 +383,8 @@ class TestHandleAlert:
 
         host = await create_host(db)
         await _allow(db, cooldown=0)
-        await _handle((await _alert(db, host.id, labdog_action="example")).id)
-        second = await _alert(db, host.id, labdog_action="example", labdog_ai="true")
+        await _handle((await _alert(db, host.id, unbork_action="example")).id)
+        second = await _alert(db, host.id, unbork_action="example", unbork_ai="true")
         await _handle(second.id)
         ai_policy.assert_not_awaited()
         await db.refresh(second)
@@ -404,7 +404,7 @@ class TestHandleAlert:
                 "alerts": [
                     {
                         "status": "firing",
-                        "labels": {"alertname": "NginxDown", "labdog_action": "example"},
+                        "labels": {"alertname": "NginxDown", "unbork_action": "example"},
                         "startsAt": "2026-10-15T10:00:00Z",
                         "fingerprint": uuid.uuid4().hex,
                     }
@@ -438,10 +438,10 @@ class TestTheAIWantsALabel:
         assert decided["outcome"] == "skipped_no_label"
         await db.refresh(event)
         assert event.investigation_detail == (
-            "not labelled labdog_ai=true or labdog_ai_automate=true"
+            "not labelled unbork_ai=true or unbork_ai_automate=true"
         )
 
-    @pytest.mark.parametrize("label", ["labdog_ai", "labdog_ai_automate"])
+    @pytest.mark.parametrize("label", ["unbork_ai", "unbork_ai_automate"])
     async def test_either_label_asks_for_it(
         self, db, ai_on, tasks_use_test_db, sent, label
     ) -> None:
@@ -478,7 +478,7 @@ class TestTheAIWantsALabel:
         from app.tasks.ai_alerts import _decide_and_run
 
         host = await create_host(db)
-        event = await _alert(db, host.id, labdog_ai="true")
+        event = await _alert(db, host.id, unbork_ai="true")
 
         decided = await _decide_and_run(event.id, already_tried="example ran as run #7.")
 
@@ -495,7 +495,7 @@ class TestTheAIWantsALabel:
 async def _started(db, *, ai: bool = True, output: str = ""):
     host = await create_host(db)
     await _allow(db)
-    labels = {"labdog_action": "example", **({"labdog_ai": "true"} if ai else {})}
+    labels = {"unbork_action": "example", **({"unbork_ai": "true"} if ai else {})}
     event = await _alert(db, host.id, **labels)
     dispatch = await dispatch_for(db, event)
     run = await db.get(ActionRun, dispatch.action_run_id)
@@ -551,7 +551,7 @@ class TestCheck:
         ai_policy.assert_awaited_once()
         assert ai_policy.await_args.args == (event.id,)
         tried = ai_policy.await_args.kwargs["already_tried"]
-        assert f"as run #{run.id}, as the alert's labdog_action label asked." in tried
+        assert f"as run #{run.id}, as the alert's unbork_action label asked." in tried
         assert "The run succeeded, but the alert is still firing." in tried
         assert tried.count("The run succeeded") == 1
         assert "all done" in tried
@@ -590,7 +590,7 @@ class TestCheck:
 
         assert notify.await_args.args[1] == "alert_action"
         assert notify.await_args.kwargs["subject"].startswith("Example / System Probe fixed")
-        assert "as its labdog_action label asked" in notify.await_args.kwargs["body"]
+        assert "as its unbork_action label asked" in notify.await_args.kwargs["body"]
         assert notify.await_args.kwargs["link_path"] == f"/actions/runs/{run.id}"
 
 
@@ -674,7 +674,7 @@ class TestActionsAPI:
     async def test_taking_an_action_off_keeps_what_alerts_did(self, superuser_client, db) -> None:
         host = await create_host(db)
         entry = await _allow(db)
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         await db.commit()
         assert (await superuser_client.delete(f"/api/alerts/actions/{entry.id}")).status_code == 204
         await db.refresh(dispatch)
@@ -683,7 +683,7 @@ class TestActionsAPI:
     async def test_the_last_run_is_shown(self, superuser_client, db) -> None:
         host = await create_host(db)
         await _allow(db)
-        dispatch = await dispatch_for(db, await _alert(db, host.id, labdog_action="example"))
+        dispatch = await dispatch_for(db, await _alert(db, host.id, unbork_action="example"))
         await db.commit()
         (entry,) = (await superuser_client.get("/api/alerts/actions")).json()
         assert (entry["last_run_id"], entry["last_run_status"]) == (
@@ -700,7 +700,7 @@ class TestWhereItShows:
 
         host = await create_host(db)
         entry = await _allow(db)
-        event = await _alert(db, host.id, labdog_action="example", labdog_ai="true")
+        event = await _alert(db, host.id, unbork_action="example", unbork_ai="true")
         await _handle(event.id)
         await db.commit()
 
@@ -766,7 +766,7 @@ class TestWhereItShows:
 async def test_dispatch_rows_are_cleaned_up_with_their_alert(db) -> None:
     host = await create_host(db)
     await _allow(db)
-    event = await _alert(db, host.id, labdog_action="example")
+    event = await _alert(db, host.id, unbork_action="example")
     await dispatch_for(db, event)
     await db.delete(event)
     await db.flush()

@@ -47,7 +47,7 @@ class GitRepository(Base):
         LargeBinary,
         nullable=True,
     )
-    #: SEC-27. The ``known_hosts`` line recorded the first time LabDog
+    #: SEC-27. The ``known_hosts`` line recorded the first time unbork
     #: reached this repository over SSH. Every later sync is verified
     #: against it, so an intercepted connection is refused rather than
     #: silently accepted. NULL means first contact has not happened yet

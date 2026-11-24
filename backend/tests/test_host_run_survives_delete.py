@@ -23,7 +23,7 @@ from tests.conftest import create_host, create_ssh_key
 
 pytestmark = pytest.mark.integration
 
-TRANSCRIPT = "PLAY [labdog] ***\nTASK [upgrade] ***\nfatal: [node-1]: FAILED! => rc=100\n"
+TRANSCRIPT = "PLAY [unbork] ***\nTASK [upgrade] ***\nfatal: [node-1]: FAILED! => rc=100\n"
 
 
 async def _run_with_output(db, host, *, output=TRANSCRIPT, status="failed"):

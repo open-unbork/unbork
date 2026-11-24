@@ -15,7 +15,7 @@ import path from "path"
 const AUTH_FILE = path.join(__dirname, "../playwright/.auth/user.json")
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-const TEST_EMAIL = process.env.TEST_USER_EMAIL || "e2e@labdog.io"
+const TEST_EMAIL = process.env.TEST_USER_EMAIL || "e2e@unbork.io"
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "E2eTestPass1"
 
 /** Prefix every fixture this suite creates carries, so cleanup can find it. */
@@ -76,8 +76,8 @@ setup("authenticate", async ({ page, request }) => {
   await expect(page).toHaveURL(/\/overview/)
 
   const cookies = await page.context().cookies()
-  const csrf = cookies.find((c) => c.name === "labdog_csrf")?.value ?? ""
-  expect(csrf, "login should set the labdog_csrf cookie").not.toBe("")
+  const csrf = cookies.find((c) => c.name === "unbork_csrf")?.value ?? ""
+  expect(csrf, "login should set the unbork_csrf cookie").not.toBe("")
 
   await deleteFixtures(page.request, csrf)
 

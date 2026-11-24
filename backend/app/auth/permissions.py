@@ -84,7 +84,11 @@ logger = logging.getLogger(__name__)
 #: 1.6  ``register_permission``, ``known_permissions`` (an extension
 #:      declares permissions of its own; register before importing the
 #:      routes that require them).
-PLUGIN_API = "1.6"
+#: 1.7  ``app.ai.providers.policy``: ``set_provider_type_policy``,
+#:      ``provider_type_refusal`` (lets an extension limit which AI provider
+#:      types an install accepts); ``GET /api/ai/provider-types`` and
+#:      ``refused_reason`` on providers.
+PLUGIN_API = "1.7"
 
 
 class Role(StrEnum):

@@ -108,7 +108,7 @@ async def _fresh_checkout(
     """
     ssh_key, token = await _decrypt_credentials_or_502(db, repo, step=step, repo_label=repo_label)
 
-    clone_dir = Path(tempfile.mkdtemp(prefix=f"labdog-{step}-"))
+    clone_dir = Path(tempfile.mkdtemp(prefix=f"unbork-{step}-"))
     try:
         head_sha = await _clone_or_502(
             db,

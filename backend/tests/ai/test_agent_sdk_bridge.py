@@ -4,7 +4,7 @@ The bridge is small, but one of its constants is load-bearing in a way
 that reads as a no-op: :data:`NO_BUILTIN_TOOLS` is an empty list, and an
 empty list is exactly what a careless cleanup deletes. Omitting it does
 not disable a feature — it hands the model ``Bash``, ``Read``, ``Write``
-and ``Edit`` inside LabDog's container. That was observed live, not
+and ``Edit`` inside unbork's container. That was observed live, not
 theorised: with the option absent the model ran ``Bash`` before it found
 the tool it had been asked to use.
 """
@@ -21,7 +21,7 @@ from app.ai.agent_sdk.bridge import (
     qualified_tool_name,
 )
 from app.ai.tools import TOOL_REGISTRY, ToolHandler, ToolResult
-from app.ai.tools.base import tool as labdog_tool
+from app.ai.tools.base import tool as unbork_tool
 
 sdk = pytest.importorskip("claude_agent_sdk", reason="optional [agent] extra not installed")
 
@@ -57,7 +57,7 @@ async def _never_called(handler: ToolHandler, args: dict) -> ToolResult:  # prag
 
 class TestServerConstruction:
     async def test_it_advertises_every_real_tool(self) -> None:
-        """Guards the assumption that LabDog's JSON Schemas are valid SDK
+        """Guards the assumption that unbork's JSON Schemas are valid SDK
         input schemas — a rejected one should fail here, not on a live
         session."""
         server = build_tool_server(list(TOOL_REGISTRY.values()), _never_called)
@@ -97,7 +97,7 @@ class TestAdapter:
         calls: list[str] = []
 
         def make(name: str) -> ToolHandler:
-            @labdog_tool(name, f"the {name} tool", {"type": "object"}, "read_only")
+            @unbork_tool(name, f"the {name} tool", {"type": "object"}, "read_only")
             async def _run(ctx, args):  # pragma: no cover - not run here
                 return ToolResult("unused")
 
@@ -119,7 +119,7 @@ class TestAdapter:
         """``is_error`` is how the model learns to route around a failure
         rather than trusting the text as an answer."""
 
-        @labdog_tool("boom", "fails", {"type": "object"}, "read_only")
+        @unbork_tool("boom", "fails", {"type": "object"}, "read_only")
         async def _run(ctx, args):  # pragma: no cover - not run here
             return ToolResult("unused")
 
@@ -132,7 +132,7 @@ class TestAdapter:
         assert result["content"][0]["text"] == "host unreachable"
 
     async def test_a_successful_result_is_not(self) -> None:
-        @labdog_tool("fine", "works", {"type": "object"}, "read_only")
+        @unbork_tool("fine", "works", {"type": "object"}, "read_only")
         async def _run(ctx, args):  # pragma: no cover - not run here
             return ToolResult("unused")
 

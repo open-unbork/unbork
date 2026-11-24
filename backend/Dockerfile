@@ -12,10 +12,10 @@ RUN uv export --frozen --no-emit-project --format requirements-txt -o /tmp/req.t
 
 FROM python:3.12-slim
 WORKDIR /app
-RUN useradd -m -u 1000 labdog
+RUN useradd -m -u 1000 unbork
 COPY --from=builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --chown=labdog:labdog . .
-USER labdog
+COPY --chown=unbork:unbork . .
+USER unbork
 EXPOSE 8000
 CMD ["python", "-m", "app", "--no-celery", "--skip-migrate"]

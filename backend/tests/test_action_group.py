@@ -334,7 +334,7 @@ async def _seed_proxmox_node(db) -> int:
     node = ProxmoxNode(
         name=f"pve-{id(db)}",
         api_url="https://pve.test:8006",
-        token_id="labdog@pve!ci",
+        token_id="unbork@pve!ci",
         encrypted_token_secret=encrypt_ssh_key("token-secret", get_master_key()),
         verify_ssl=False,
     )
@@ -513,7 +513,7 @@ async def test_snapshot_taken_per_member_with_vm_mapping(
     assert len(host_runs) == 3
     for hr in host_runs:
         assert hr.snapshot_name is not None
-        assert hr.snapshot_name.startswith(f"labdog-{run_id}-")
+        assert hr.snapshot_name.startswith(f"unbork-{run_id}-")
 
     # Run-level outcome: succeeded (no rollback needed).
     assert fake_proxmox.rolled_back == []

@@ -80,8 +80,8 @@ def run_ca_cert_action(self, job_id: int, host_id: int) -> dict:
     """SECURITY: SSH key decrypted inside task, written to /dev/shm/, cleaned in finally."""
     import ansible_runner
 
-    private_data_dir = tempfile.mkdtemp(prefix="labdog-ca-")
-    fd, ssh_key_path = tempfile.mkstemp(dir="/dev/shm", prefix="labdog-ca-", suffix=".key")
+    private_data_dir = tempfile.mkdtemp(prefix="unbork-ca-")
+    fd, ssh_key_path = tempfile.mkstemp(dir="/dev/shm", prefix="unbork-ca-", suffix=".key")
     os.close(fd)
     claimed = False
 
@@ -118,7 +118,7 @@ def run_ca_cert_action(self, job_id: int, host_id: int) -> dict:
                         f.write("\n")
                 os.chmod(ssh_key_path, 0o600)
 
-                # SEC-26: pin the run to the host key LabDog recorded
+                # SEC-26: pin the run to the host key unbork recorded
                 # over asyncssh. Written beside the key so the same
                 # cleanup removes it.
                 known_hosts_path = write_known_hosts(host.ssh_host_key_entry, ssh_key_path)
@@ -160,7 +160,7 @@ def run_ca_cert_action(self, job_id: int, host_id: int) -> dict:
             # No echo of the playbook into the worker log (BUG-176).
             quiet=True,
         )
-        # SEC-46: no LabDog secrets in the ansible-playbook environment.
+        # SEC-46: no unbork secrets in the ansible-playbook environment.
         runner.config.env = scrub_child_env(runner.config.env)
         runner.run()
 

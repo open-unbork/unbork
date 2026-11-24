@@ -92,7 +92,7 @@ def _numbered(lines: list[run_log.LogLine]) -> list[str]:
 
 def _trigger(run) -> str:  # noqa: ANN001 - ActionRun
     if run.alert_event_id is not None:
-        return "an alert's labdog_action label"
+        return "an alert's unbork_action label"
     if run.scheduled_action_id is not None:
         return "a schedule"
     return "an operator"
@@ -155,12 +155,12 @@ def _host_detail(hr) -> str:  # noqa: ANN001
         if len(steps) > _MAX_OUTLINE_LINES:
             parts.append(f"      ({len(steps) - _MAX_OUTLINE_LINES} more step lines)")
 
-    # A failed LabDog step ("[verify] … status=failed") is already in the
+    # A failed unbork step ("[verify] … status=failed") is already in the
     # outline above, which is where it reads best: between the steps.
     found = [
         f
         for f in run_log.failures(lines)
-        if not (f.task is None and f.lines[0].kind == "labdog-failed")
+        if not (f.task is None and f.lines[0].kind == "unbork-failed")
     ]
     for failure in found[:_MAX_FAILURES_PER_HOST]:
         heading = failure.task or "Outside any task"

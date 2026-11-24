@@ -109,7 +109,7 @@ export interface ChainPolicies {
 export interface Host {
   id: number; hostname: string; ip_address: string; ssh_port: number; ssh_user: string
   firewall_backend: FirewallBackend; sync_status: SyncStatus
-  labdog_source_ip: string | null
+  unbork_source_ip: string | null
   drift_check_enabled: boolean; last_sync_at: string | null
   last_drift_check_at: string | null; ssh_key_id: number | null
   /** When unbork last confirmed the host's state: a successful collection,
@@ -863,7 +863,7 @@ export interface ActionDefinition {
    * operator knows the side effect of running this action. */
   post_run_sync: string[]
   /** Resources the action's manifest declares it installs. After a
-   * successful run labdog inserts these as host-scope override rows
+   * successful run unbork inserts these as host-scope override rows
    * so the resources are managed going forward. Keys are canonical
    * module names; values are pre-validated dicts. Surface as a chip
    * counting items per module so the operator sees the side effect. */
@@ -910,7 +910,7 @@ export interface ActionRun {
   /** NULL for ad-hoc runs; populated when the run was dispatched by the
    *  unified scheduler or POST /api/scheduled-actions/{id}/run-now. */
   scheduled_action_id: number | null
-  /** Set when an alert's labdog_action label started the run; the name
+  /** Set when an alert's unbork_action label started the run; the name
    *  is filled in by the run detail endpoint only. */
   alert_event_id?: number | null
   alertname?: string | null
@@ -1099,6 +1099,13 @@ export interface VersionInfo {
   build_date: string | null
   license: string
   repo_url: string
+  /** Optional parts this server loads (C-026). Older servers omit it. */
+  features?: Features
+}
+
+export interface Features {
+  /** False when the server leaves the AI assistant out ([assistant] enabled = false). */
+  assistant: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,16 +1186,36 @@ export interface AIProvider {
   uses_subscription: boolean
   /**
    * When the stored credential stops working, for backends whose credential
-   * expires. `claude setup-token` mints a one-year token; API-key providers
-   * get null because their keys do not expire on a schedule.
+   * expires: a one-year subscription token saved by an earlier version
+   * (S-014). Null otherwise, including API-key providers, whose keys do not
+   * expire on a schedule.
    */
   credential_expires_at: string | null
+  /** Why an extension's provider policy refuses this type (S-017); null when allowed. */
+  refused_reason: string | null
+  /**
+   * The Claude Code program's install state for the two program-backed
+   * types (S-009); null for API-key types, which need no program.
+   */
+  runtime: AIProviderRuntime | null
   input_cost_per_mtok: number
   output_cost_per_mtok: number
   monthly_budget: number
   enabled: boolean
   created_at: string
   updated_at: string
+}
+
+export interface AIProviderRuntime {
+  state: "ready" | "missing" | "installing" | "failed"
+  detail: string
+}
+
+/** One row of GET /api/ai/provider-types: whether this install accepts the type. */
+export interface AIProviderTypeInfo {
+  type: AIProviderType
+  allowed: boolean
+  reason: string | null
 }
 
 export interface AIProviderTestResult {
@@ -1388,7 +1415,7 @@ export interface AlertIntakeStatus {
   body_signature: boolean
   ai_enabled: boolean
   auto_investigate_enabled: boolean
-  /** Off: the labdog_ai_automate=true label decides; on: the rules. */
+  /** Off: the unbork_ai_automate=true label decides; on: the rules. */
   full_auto_rules_enabled: boolean
   /** Rules in force: 1 (the label) while the rules are off. */
   full_auto_rules: number
@@ -1441,7 +1468,7 @@ export type AlertActionEntryIn = Pick<
   "action_key" | "target_kind" | "target_id" | "parameters" | "snapshot_enabled" | "verify_enabled" | "auto_rollback" | "cooldown_minutes" | "enabled"
 >
 
-/** What one alert's labdog_action label came to. */
+/** What one alert's unbork_action label came to. */
 export interface AlertDispatch {
   id: number
   alert_action_id: number | null
@@ -1524,7 +1551,7 @@ export interface AlertEvent {
   /** The latest rollback of this alert's session, if there was one. */
   rollback_status: AIRollbackStatus | null
   rollback_detail: string | null
-  /** What the alert's labdog_action label came to: at most one entry. */
+  /** What the alert's unbork_action label came to: at most one entry. */
   actions: AlertDispatch[]
   created_at: string
 }

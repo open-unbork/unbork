@@ -142,7 +142,7 @@ def git_auth_context(
 @contextmanager
 def _materialised_ssh_key(private_key: str) -> Iterator[Path]:
     """Write the key to a 0700 temp dir with 0600 perms, yield path, clean up."""
-    tmpdir = tempfile.mkdtemp(prefix="labdog-pack-ssh-")
+    tmpdir = tempfile.mkdtemp(prefix="unbork-pack-ssh-")
     try:
         os.chmod(tmpdir, 0o700)
         key_path = Path(tmpdir) / "id"

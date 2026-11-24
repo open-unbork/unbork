@@ -4676,7 +4676,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "70 \n71     fd, ssh_key_path = tempfile.mkstemp(dir=\"/dev/shm\", prefix=\"labdog-\", suffix=\".key\")\n72     os.close(fd)\n",
+      "code": "70 \n71     fd, ssh_key_path = tempfile.mkstemp(dir=\"/dev/shm\", prefix=\"unbork-\", suffix=\".key\")\n72     os.close(fd)\n",
       "col_offset": 44,
       "end_col_offset": 54,
       "filename": "app/gitops/git_service.py",
@@ -4959,7 +4959,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "196         # never fired \u2014 wedging that host's queue.\n197         key_dir = \"/dev/shm\" if Path(\"/dev/shm\").is_dir() else None\n198         fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix=\"labdog-action-\", suffix=\".key\")\n",
+      "code": "196         # never fired \u2014 wedging that host's queue.\n197         key_dir = \"/dev/shm\" if Path(\"/dev/shm\").is_dir() else None\n198         fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix=\"unbork-action-\", suffix=\".key\")\n",
       "col_offset": 37,
       "end_col_offset": 47,
       "filename": "app/tasks/action_host.py",
@@ -4979,7 +4979,7 @@
       "test_name": "hardcoded_tmp_directory"
     },
     {
-      "code": "196         # never fired \u2014 wedging that host's queue.\n197         key_dir = \"/dev/shm\" if Path(\"/dev/shm\").is_dir() else None\n198         fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix=\"labdog-action-\", suffix=\".key\")\n",
+      "code": "196         # never fired \u2014 wedging that host's queue.\n197         key_dir = \"/dev/shm\" if Path(\"/dev/shm\").is_dir() else None\n198         fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix=\"unbork-action-\", suffix=\".key\")\n",
       "col_offset": 18,
       "end_col_offset": 28,
       "filename": "app/tasks/action_host.py",
@@ -5020,7 +5020,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "27     private_data_dir = tempfile.mkdtemp(prefix=\"labdog-ca-\")\n28     fd, ssh_key_path = tempfile.mkstemp(dir=\"/dev/shm\", prefix=\"labdog-ca-\", suffix=\".key\")\n29     os.close(fd)\n",
+      "code": "27     private_data_dir = tempfile.mkdtemp(prefix=\"unbork-ca-\")\n28     fd, ssh_key_path = tempfile.mkstemp(dir=\"/dev/shm\", prefix=\"unbork-ca-\", suffix=\".key\")\n29     os.close(fd)\n",
       "col_offset": 44,
       "end_col_offset": 54,
       "filename": "app/tasks/ca_cert_action.py",
@@ -5061,7 +5061,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "108                                 host.labdog_source_ip = await get_source_ip(probe)\n109                         except Exception:\n110                             pass\n111                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
+      "code": "108                                 host.unbork_source_ip = await get_source_ip(probe)\n109                         except Exception:\n110                             pass\n111                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
       "col_offset": 24,
       "end_col_offset": 32,
       "filename": "app/tasks/cron_drift.py",
@@ -5082,7 +5082,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "115                         host.labdog_source_ip = await get_source_ip(probe)\n116             except Exception:\n117                 pass\n118         await db.commit()\n",
+      "code": "115                         host.unbork_source_ip = await get_source_ip(probe)\n116             except Exception:\n117                 pass\n118         await db.commit()\n",
       "col_offset": 12,
       "end_col_offset": 20,
       "filename": "app/tasks/drift.py",
@@ -5124,7 +5124,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "97                                 host.labdog_source_ip = await get_source_ip(probe)\n98                         except Exception:\n99                             pass\n100                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
+      "code": "97                                 host.unbork_source_ip = await get_source_ip(probe)\n98                         except Exception:\n99                             pass\n100                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
       "col_offset": 24,
       "end_col_offset": 32,
       "filename": "app/tasks/package_drift.py",
@@ -5145,7 +5145,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "103                         host.labdog_source_ip = await get_source_ip(probe)\n104                 except Exception:\n105                     pass\n106 \n",
+      "code": "103                         host.unbork_source_ip = await get_source_ip(probe)\n104                 except Exception:\n105                     pass\n106 \n",
       "col_offset": 16,
       "end_col_offset": 24,
       "filename": "app/tasks/resolver_drift.py",
@@ -5166,7 +5166,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "218                                 host.labdog_source_ip = await get_source_ip(probe)\n219                         except Exception:\n220                             pass\n221                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
+      "code": "218                                 host.unbork_source_ip = await get_source_ip(probe)\n219                         except Exception:\n220                             pass\n221                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
       "col_offset": 24,
       "end_col_offset": 32,
       "filename": "app/tasks/resolver_drift.py",
@@ -5231,7 +5231,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "94                                 host.labdog_source_ip = await get_source_ip(probe)\n95                         except Exception:\n96                             pass\n97                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
+      "code": "94                                 host.unbork_source_ip = await get_source_ip(probe)\n95                         except Exception:\n96                             pass\n97                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
       "col_offset": 24,
       "end_col_offset": 32,
       "filename": "app/tasks/service_drift.py",
@@ -5252,7 +5252,7 @@
       "test_name": "try_except_pass"
     },
     {
-      "code": "111                                 host.labdog_source_ip = await get_source_ip(probe)\n112                         except Exception:\n113                             pass\n114                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
+      "code": "111                                 host.unbork_source_ip = await get_source_ip(probe)\n112                         except Exception:\n113                             pass\n114                 except (OSError, asyncssh.Error, TimeoutError) as e:\n",
       "col_offset": 24,
       "end_col_offset": 32,
       "filename": "app/tasks/user_drift.py",

@@ -34,7 +34,7 @@ from app.models.user import User
 
 _ALGORITHM = "HS256"
 _AUDIENCE = ["fastapi-users:auth"]
-_COOKIE_NAME = "labdog_auth"
+_COOKIE_NAME = "unbork_auth"
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 logger = logging.getLogger(__name__)

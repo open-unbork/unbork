@@ -27,7 +27,7 @@ const MIN_HEIGHT = 120
  * title, meta, the caller's actions) plus text size, minimize and maximize,
  * over a body whose height a handle on its free edge drags. Height, text
  * size, minimized and wrap are remembered per browser under
- * `labdog.window.<storageKey>`. `rememberHeight={false}` keeps a dragged
+ * `unbork.window.<storageKey>`. `rememberHeight={false}` keeps a dragged
  * height for this page only, for a window whose right default depends on
  * what is on the page (the run log sits under however many hosts the run
  * has).
@@ -79,7 +79,7 @@ export function Window({
   testId?: string
   children: (s: WindowState) => ReactNode
 }) {
-  const [pref, update] = useLocalPref<WindowPref>(`labdog.window.${storageKey}`, {
+  const [pref, update] = useLocalPref<WindowPref>(`unbork.window.${storageKey}`, {
     height: null,
     fontSize: defaultFontSize,
     minimized: false,

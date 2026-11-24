@@ -92,7 +92,7 @@ its host. The last 100 of each source.
 **Path:** `/alerts` (`?tab=handling`)
 
 Alerts received from Grafana and Alertmanager, and what each one set off:
-the action its `labdog_action` label named, an AI investigation, or
+the action its `unbork_action` label named, an AI investigation, or
 nothing. The Handling tab holds the actions alerts may run. See
 [Alerts](alerts.md).
 

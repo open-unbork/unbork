@@ -11,9 +11,9 @@ the first key that is a substring of the command wins, everything else
 returns exit 1 (== "absent"/"false").  The token constants below are
 chosen so each probe is matched by a substring unique to that probe's
 command — see the ``_PROBE_*`` constants in host_state.  Because the
-iptables "active" probe string is a superset of the iptables "LabDog"
+iptables "active" probe string is a superset of the iptables "unbork"
 probe string, its unique token (``T_IPT_ACTIVE``) must be inserted into
-the mapping *before* ``T_IPT_LABDOG`` for the active case.
+the mapping *before* ``T_IPT_UNBORK`` for the active case.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -24,12 +24,12 @@ from app.api.host_state import _detect_firewall_backend, _probe_competing_firewa
 # Probe tokens — each is a substring of exactly one _PROBE_* command
 # ---------------------------------------------------------------------------
 
-T_NFT_PRESENT = "command -v nft >/dev/null"  # _PROBE_NFT_PRESENT (labdog/active use "|| echo")
+T_NFT_PRESENT = "command -v nft >/dev/null"  # _PROBE_NFT_PRESENT (unbork/active use "|| echo")
 T_IPT_PRESENT = "command -v iptables >/dev/null"  # _PROBE_IPT_PRESENT
-T_NFT_LABDOG = "Managed by LabDog"  # _PROBE_NFT_LABDOG only
+T_NFT_UNBORK = "Managed by unbork"  # _PROBE_NFT_UNBORK only
 T_NFT_ACTIVE = "hook input"  # _PROBE_NFT_ACTIVE only
-T_IPT_ACTIVE = "grep -qvE"  # _PROBE_IPT_ACTIVE only (must precede T_IPT_LABDOG)
-T_IPT_LABDOG = "LABDOG-INPUT >/dev/null 2>&1"  # in both ipt LabDog + active commands
+T_IPT_ACTIVE = "grep -qvE"  # _PROBE_IPT_ACTIVE only (must precede T_IPT_UNBORK)
+T_IPT_UNBORK = "UNBORK-INPUT >/dev/null 2>&1"  # in both ipt unbork + active commands
 T_DOCKER = "docker.sock"
 T_KUBE = "kubelet"
 T_NERDCTL = "nerdctl"
@@ -142,23 +142,23 @@ class TestSingleBackendPresent:
 
 
 class TestBothPresentLadder:
-    async def test_stickiness_nftables_labdog(self):
-        """Existing LabDog nftables ruleset → keep nftables."""
-        (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_NFT_LABDOG: 0})
+    async def test_stickiness_nftables_unbork(self):
+        """Existing unbork nftables ruleset → keep nftables."""
+        (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_NFT_UNBORK: 0})
         assert backend == "nftables"
         assert any("keeping nftables" in m for m in messages)
 
-    async def test_stickiness_iptables_labdog(self):
-        """Existing LabDog iptables ruleset → keep iptables."""
-        (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_IPT_LABDOG: 0})
+    async def test_stickiness_iptables_unbork(self):
+        """Existing unbork iptables ruleset → keep iptables."""
+        (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_IPT_UNBORK: 0})
         assert backend == "iptables"
         assert any("keeping iptables" in m for m in messages)
 
     async def test_stickiness_beats_container_constraint(self):
         """Stickiness (step 2) sits above the container constraint (step 3):
-        a LabDog nftables ruleset is kept even when Docker is present."""
+        an unbork nftables ruleset is kept even when Docker is present."""
         (backend, messages), *_ = await _run(
-            {T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_NFT_LABDOG: 0, T_DOCKER: 0}
+            {T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_NFT_UNBORK: 0, T_DOCKER: 0}
         )
         assert backend == "nftables"
         assert any("keeping nftables" in m for m in messages)
@@ -166,14 +166,14 @@ class TestBothPresentLadder:
         assert not any("Docker" in m for m in messages)
 
     async def test_competing_store_warns_and_falls_through(self):
-        """LabDog rules in BOTH backends → warn, then decide via tiebreakers
+        """unbork rules in BOTH backends → warn, then decide via tiebreakers
         (here Docker forces iptables)."""
         (backend, messages), *_ = await _run(
             {
                 T_NFT_PRESENT: 0,
                 T_IPT_PRESENT: 0,
-                T_NFT_LABDOG: 0,
-                T_IPT_LABDOG: 0,
+                T_NFT_UNBORK: 0,
+                T_IPT_UNBORK: 0,
                 T_DOCKER: 0,
             }
         )
@@ -182,7 +182,7 @@ class TestBothPresentLadder:
         assert any("Docker" in m for m in messages)
 
     async def test_container_docker_forces_iptables(self):
-        """No LabDog rules, Docker present → iptables (hard constraint)."""
+        """No unbork rules, Docker present → iptables (hard constraint)."""
         (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_DOCKER: 0})
         assert backend == "iptables"
         assert any("Docker" in m for m in messages)
@@ -198,16 +198,16 @@ class TestBothPresentLadder:
         assert any("nerdctl" in m.lower() for m in messages)
 
     async def test_active_ruleset_tiebreak_nftables(self):
-        """No LabDog rules, no container, only nftables has an active ruleset."""
+        """No unbork rules, no container, only nftables has an active ruleset."""
         (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_NFT_ACTIVE: 0})
         assert backend == "nftables"
         assert any("active nftables" in m for m in messages)
 
     async def test_active_ruleset_tiebreak_iptables(self):
-        """No LabDog rules, no container, only iptables has an active ruleset.
+        """No unbork rules, no container, only iptables has an active ruleset.
 
-        T_IPT_ACTIVE is inserted before T_IPT_LABDOG so the iptables 'active'
-        probe resolves true while its 'LabDog' probe resolves false."""
+        T_IPT_ACTIVE is inserted before T_IPT_UNBORK so the iptables 'active'
+        probe resolves true while its 'unbork' probe resolves false."""
         (backend, messages), *_ = await _run({T_NFT_PRESENT: 0, T_IPT_PRESENT: 0, T_IPT_ACTIVE: 0})
         assert backend == "iptables"
         assert any("active iptables" in m for m in messages)
@@ -249,13 +249,13 @@ class TestBothPresentLadder:
 
 class TestCompetingStoreProbe:
     async def test_nftables_active_warns_on_stale_iptables(self):
-        conn = make_mock_conn({T_IPT_LABDOG: 0})
+        conn = make_mock_conn({T_IPT_UNBORK: 0})
         warning = await _probe_competing_firewall_store(conn, "nftables")
         assert warning is not None
         assert "iptables" in warning
 
     async def test_iptables_active_warns_on_stale_nftables(self):
-        conn = make_mock_conn({T_NFT_LABDOG: 0})
+        conn = make_mock_conn({T_NFT_UNBORK: 0})
         warning = await _probe_competing_firewall_store(conn, "iptables")
         assert warning is not None
         assert "nftables" in warning

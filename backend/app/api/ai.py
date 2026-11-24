@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import service
 from app.ai.loop import LoopCaps
 from app.ai.models import (
+    PROVIDER_TYPES,
     TERMINAL_SESSION_STATUSES,
     AIApprovalRequest,
     AIMessage,
@@ -33,12 +34,14 @@ from app.ai.providers.factory import (
     build_provider,
     runs_on_agent_sdk,
 )
+from app.ai.providers.policy import provider_type_refusal
 from app.ai.schemas import (
     AIApprovalDecision,
     AIApprovalResponse,
     AIProviderCreate,
     AIProviderResponse,
     AIProviderTestResponse,
+    AIProviderTypeInfo,
     AIProviderUpdate,
     AIRollbackRequest,
     AIRollbackResponse,
@@ -89,35 +92,62 @@ async def _unset_other_defaults(db: AsyncSession, keep_id: int | None) -> None:
     await db.execute(stmt)
 
 
-#: What `claude setup-token` emits. Checked at save time because the field
-#: sits next to several other credential fields in the UI and accepts any
-#: string: pasting the wrong secret stores something guaranteed to 401, and
-#: without this the first sign of it is a failed session.
-#:
-#: Kept to a prefix test rather than a full format match — if Anthropic
-#: lengthens or re-shapes the token this still passes, and it only has to
-#: catch the case of a credential that plainly is not one of these.
-SUBSCRIPTION_TOKEN_PREFIX = "sk-ant-oat"  # nosec B105 - prefix, not a secret
+def _refuse_credential(provider_type: str, api_key: str | None) -> None:
+    """The two program-backed types take no credential (S-014, D-04).
 
-
-def _check_subscription_token(provider_type: str, api_key: str | None) -> None:
-    """Reject a subscription token that is obviously not one.
-
-    A blank value is fine and means "use whatever the host is logged in as".
+    They use the Claude Code sign-in of the service account on the server.
+    An empty string is still accepted: it clears a token an earlier version
+    stored.
     """
-    if provider_type not in SUBSCRIPTION_BACKED_TYPES or not api_key:
-        return
-    if api_key.startswith(SUBSCRIPTION_TOKEN_PREFIX):
-        return
-    raise HTTPException(
-        status_code=400,
-        detail=(
-            f"That does not look like a Claude subscription token — they begin "
-            f"with {SUBSCRIPTION_TOKEN_PREFIX!r}. Run 'claude setup-token' on "
-            f"your own machine and paste the value it prints. An Anthropic API "
-            f"key will not work here; use an Anthropic provider for that."
-        ),
-    )
+    if provider_type in SUBSCRIPTION_BACKED_TYPES and api_key:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This provider type takes no credential. "
+                "Sign in to Claude Code on the server instead."
+            ),
+        )
+
+
+def _refuse_provider_type(provider_type: str) -> None:
+    """400 when an extension's policy refuses ``provider_type`` (S-017)."""
+    refusal = provider_type_refusal(provider_type)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
+
+
+@router.get("/provider-types", response_model=list[AIProviderTypeInfo])
+async def list_provider_types(_: User = Depends(require("ai.use"))):
+    """Every provider type, and whether this install accepts it (S-017)."""
+    rows = []
+    for provider_type in PROVIDER_TYPES:
+        reason = provider_type_refusal(provider_type)
+        rows.append(AIProviderTypeInfo(type=provider_type, allowed=reason is None, reason=reason))
+    return rows
+
+
+def _queue_program_install(provider: AIProvider) -> str | None:
+    """Start installing Claude Code if this provider needs it and it is absent.
+
+    Returns the program's state (``None`` for types that need no program).
+    The download runs on a worker (``app.tasks.ai_runtime``), never in the
+    request (S-009).
+    """
+    from app.ai import claude_code
+    from app.ai.providers.factory import uses_subscription
+
+    if not uses_subscription(provider):
+        return None
+    state = claude_code.status().state
+    if state in ("missing", "failed"):
+        from app.tasks import celery_app
+
+        try:
+            # retry=False: a broker outage must not hold the request.
+            celery_app.send_task("app.tasks.ai_runtime.install_claude_code", retry=False)
+        except Exception:
+            logger.warning("ai: could not queue the Claude Code install", exc_info=True)
+    return state
 
 
 @router.get("/providers", response_model=list[AIProviderResponse])
@@ -157,7 +187,8 @@ async def create_provider(
             ),
         )
 
-    _check_subscription_token(payload.provider_type, payload.api_key)
+    _refuse_credential(payload.provider_type, payload.api_key)
+    _refuse_provider_type(payload.provider_type)
 
     provider = AIProvider(
         name=payload.name,
@@ -197,6 +228,8 @@ async def create_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    if provider.enabled:
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
@@ -224,7 +257,35 @@ async def update_provider(
             detail="An Anthropic provider needs an API key; it cannot be cleared.",
         )
 
-    _check_subscription_token(provider.provider_type, api_key)
+    _refuse_credential(provider.provider_type, api_key)
+    # A key stored under an API-key type would be handed to the program as
+    # its token once the type changes (S-014): the change must clear it.
+    if (
+        "provider_type" in data
+        and provider.provider_type in SUBSCRIPTION_BACKED_TYPES
+        and provider.encrypted_api_key
+        and api_key != ""
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This provider type takes no credential. Clear the stored key "
+                '(api_key: "") in the same change, and sign in to Claude Code on the '
+                "server instead."
+            ),
+        )
+    # Checked against the type the row has after this update: moving a
+    # refused provider to an allowed type passes, and so does taking it out
+    # of use (disabling it, unsetting the default); any other edit of it is
+    # refused (S-017).
+    standing_down = (
+        api_key is None
+        and set(data) <= {"enabled", "is_default"}
+        and not data.get("enabled")
+        and not data.get("is_default")
+    )
+    if not standing_down:
+        _refuse_provider_type(provider.provider_type)
 
     # Tri-state: absent keeps, "" clears, a value replaces.
     if api_key is not None:
@@ -250,6 +311,10 @@ async def update_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    # Turning a provider on, or moving it to a program-backed type, is when
+    # the program is needed. Other edits leave a failed install alone.
+    if provider.enabled and ("enabled" in data or "provider_type" in data):
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
@@ -284,6 +349,22 @@ async def test_provider(
     provider = await db.get(AIProvider, provider_id)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
+    refusal = provider_type_refusal(provider.provider_type)
+    if refusal:
+        return AIProviderTestResponse(ok=False, message=refusal)
+    state = _queue_program_install(provider)
+    if state in ("missing", "installing"):
+        return AIProviderTestResponse(
+            ok=False,
+            message="Installing the Claude Code program; try again in a few minutes.",
+        )
+    if state == "failed":
+        from app.ai import claude_code
+
+        return AIProviderTestResponse(
+            ok=False,
+            message=f"{claude_code.status().detail} Trying the install again in the background.",
+        )
     try:
         if runs_on_agent_sdk(provider):
             # No LLMProvider exists for these — the SDK owns the loop — so

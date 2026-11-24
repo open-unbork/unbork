@@ -24,6 +24,10 @@ _CREATE_TABLE = re.compile(r'create_table\(\s*"(\w+)"(.*?)(?=\n    \)|\n\s*op\.)
 _COLUMN = re.compile(r'sa\.Column\(\s*"(\w+)"')
 _ADD_COLUMN = re.compile(r'add_column\(\s*"(\w+)",\s*sa\.Column\(\s*"(\w+)"')
 _DROP_COLUMN = re.compile(r'drop_column\(\s*"(\w+)",\s*"(\w+)"\)')
+# The baseline (0001) is a pg_dump replayed as raw SQL from a module-level
+# list, not op.create_table calls, so it is read from the whole file.
+_SQL_CREATE_TABLE = re.compile(r"CREATE TABLE (?:public\.)?(\w+) \((.*?)\n\)", re.S)
+_SQL_COLUMN = re.compile(r"^\s+(\w+) ", re.M)
 _RENAME = re.compile(r'alter_column\(\s*"(\w+)",\s*"(\w+)",\s*new_column_name="(\w+)"\)')
 
 
@@ -48,7 +52,12 @@ def _schema_before(target: Path) -> dict[str, set[str]]:
     for path in _revision_files():
         if path.name == target.name:
             break
-        body = _upgrade_body(path.read_text())
+        source = path.read_text()
+        for table, block in _SQL_CREATE_TABLE.findall(source):
+            schema.setdefault(table, set()).update(
+                c for c in _SQL_COLUMN.findall(block) if c.upper() != "CONSTRAINT"
+            )
+        body = _upgrade_body(source)
         for table, block in _CREATE_TABLE.findall(body):
             schema.setdefault(table, set()).update(_COLUMN.findall(block))
         for table, column in _ADD_COLUMN.findall(body):

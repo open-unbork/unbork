@@ -2,7 +2,7 @@
 
 Both tables are treated as audit data and share the same retention window:
 ``logging.audit_retention_days`` (default 90, ``0`` = keep forever), an app
-setting changed on the Settings page. labdog.toml has no say in it.
+setting changed on the Settings page. unbork.toml has no say in it.
 
 Tasks:
     prune_old_audit_logs         -- deletes audit_log rows older than the window

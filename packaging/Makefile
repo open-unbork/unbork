@@ -8,7 +8,7 @@ VERSION      ?= $(shell grep '^version' ../backend/pyproject.toml 2>/dev/null | 
 ARCH         ?= amd64
 PYTHON       ?= python3.12
 DESTDIR      ?= $(CURDIR)/staging
-PREFIX       ?= /usr/lib/labdog
+PREFIX       ?= /usr/lib/unbork
 DIST         ?= $(CURDIR)/dist
 
 # Build metadata baked into backend/app/_build_info.py at package time
@@ -20,7 +20,7 @@ COMMIT_SHA   ?= $(shell git rev-parse HEAD 2>/dev/null || echo "")
 BUILD_DATE   ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # --- Phony targets ---
-.PHONY: help build build-venv _build-venv build-frontend _build-frontend bake-build-info clean deb rpm tarball all
+.PHONY: help build build-venv _build-venv build-frontend _build-frontend bake-build-info notices clean deb rpm tarball all
 
 # --- Default ---
 help:
@@ -40,7 +40,7 @@ help:
 	@echo "  DESTDIR=$(DESTDIR)  PREFIX=$(PREFIX)"
 
 # --- Aggregate ---
-build: build-venv build-frontend bake-build-info
+build: build-venv build-frontend bake-build-info notices
 
 # --- bake-build-info ---
 # Always re-runs (no skip-if-cached check) so a rebuild with a fresh
@@ -73,7 +73,7 @@ _build-venv:
 	@echo "[build-venv] Installing backend dependencies..."
 	@# setuptools' dynamic version reads a VERSION file relative to
 	@# backend/pyproject.toml, but the source of truth lives at the repo
-	@# root. Stage it in so the installed labdog-backend dist-metadata
+	@# root. Stage it in so the installed unbork-backend dist-metadata
 	@# carries the real version (otherwise it builds as 0.0.0 and
 	@# /api/version reports 0.0.0). backend/VERSION is gitignored.
 	cp ../VERSION ../backend/VERSION
@@ -146,6 +146,27 @@ _build-frontend:
 	cp -r ../frontend/out $(DESTDIR)$(PREFIX)/frontend/out
 	@echo "✓ frontend built at $(DESTDIR)$(PREFIX)/frontend/out"
 
+# --- notices ---
+# LICENSE, SOURCE-OFFER.md and THIRD-PARTY-NOTICES in /usr/share/doc/unbork
+# (S-010), as in the image. The notices list the staged venv's Python
+# packages and the npm packages the pages ship; the packages carry no
+# Debian packages of their own. Fails on an unknown or AGPL-incompatible
+# licence (licence-overrides.toml for reviewed exceptions).
+DOCDIR := $(DESTDIR)/usr/share/doc/unbork
+notices: build-venv build-frontend
+	@mkdir -p $(DOCDIR)
+	cp ../LICENSE ../SOURCE-OFFER.md $(DOCDIR)/
+	cd ../frontend && node scripts/licences.mjs > $(CURDIR)/frontend-licences.json
+	$(PYTHON) ../backend/scripts/third_party_notices.py \
+		--site $$(ls -d $(DESTDIR)$(PREFIX)/venv/lib/python3*/site-packages | head -1) \
+		--frontend $(CURDIR)/frontend-licences.json \
+		--overrides licence-overrides.toml \
+		--out $(DOCDIR)/THIRD-PARTY-NOTICES
+	@# Also next to the code: minimal images and some sites exclude
+	@# /usr/share/doc from dpkg installs, and the notices must survive that.
+	cp $(DOCDIR)/LICENSE $(DOCDIR)/SOURCE-OFFER.md $(DOCDIR)/THIRD-PARTY-NOTICES $(DESTDIR)$(PREFIX)/
+	@rm -f $(CURDIR)/frontend-licences.json
+
 # --- clean ---
 clean:
 	rm -rf $(DESTDIR) $(DIST)
@@ -153,18 +174,18 @@ clean:
 
 # --- Packaging targets ---
 
-TARBALL_NAME := labdog-$(VERSION)-linux-$(ARCH).tar.gz
-TARBALL_DIR  := labdog-$(VERSION)-linux-$(ARCH)
+TARBALL_NAME := unbork-$(VERSION)-linux-$(ARCH).tar.gz
+TARBALL_DIR  := unbork-$(VERSION)-linux-$(ARCH)
 
 deb: build
 	@mkdir -p $(DIST)
 	VERSION=$(VERSION) nfpm pkg --packager deb --config nfpm.yaml --target $(DIST)/
-	@echo "✓ .deb built: $$(ls $(DIST)/labdog_*.deb | tail -1)"
+	@echo "✓ .deb built: $$(ls $(DIST)/unbork_*.deb | tail -1)"
 
 rpm: build
 	@mkdir -p $(DIST)
 	VERSION=$(VERSION) nfpm pkg --packager rpm --config nfpm.yaml --target $(DIST)/
-	@echo "✓ .rpm built: $$(ls $(DIST)/labdog-*.rpm | tail -1)"
+	@echo "✓ .rpm built: $$(ls $(DIST)/unbork-*.rpm | tail -1)"
 
 tarball: build
 	@mkdir -p $(DIST)/$(TARBALL_DIR)
@@ -177,9 +198,12 @@ tarball: build
 	@# the .deb / .rpm directly via nfpm.yaml; the tarball has to
 	@# bundle them here.
 	@mkdir -p $(DIST)/$(TARBALL_DIR)/systemd $(DIST)/$(TARBALL_DIR)/tmpfiles.d $(DIST)/$(TARBALL_DIR)/etc
-	cp systemd/labdog.service $(DIST)/$(TARBALL_DIR)/systemd/
-	cp tmpfiles.d/labdog.conf $(DIST)/$(TARBALL_DIR)/tmpfiles.d/
-	cp etc/labdog.toml $(DIST)/$(TARBALL_DIR)/etc/
+	cp systemd/unbork.service $(DIST)/$(TARBALL_DIR)/systemd/
+	cp tmpfiles.d/unbork.conf $(DIST)/$(TARBALL_DIR)/tmpfiles.d/
+	cp etc/unbork.toml $(DIST)/$(TARBALL_DIR)/etc/
+	@# The licence, notices and source offer, at the tarball root too so
+	@# they are visible before anything is installed.
+	cp $(DOCDIR)/LICENSE $(DOCDIR)/SOURCE-OFFER.md $(DOCDIR)/THIRD-PARTY-NOTICES $(DIST)/$(TARBALL_DIR)/
 	@echo "[tarball] Creating archive..."
 	tar -czf $(DIST)/$(TARBALL_NAME) -C $(DIST) $(TARBALL_DIR)
 	rm -rf $(DIST)/$(TARBALL_DIR)

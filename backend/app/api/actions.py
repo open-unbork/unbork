@@ -47,6 +47,8 @@ from app.schemas.actions import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/actions", tags=["actions"])
+#: The assistant's routes here, included only when it is loaded (C-026).
+assistant_router = APIRouter(prefix="/actions", tags=["actions"])
 
 
 def _definition_to_out(defn) -> ActionDefinitionOut:
@@ -685,7 +687,7 @@ async def get_host_run_output_by_row(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/runs/{id}/investigate", response_model=RunInvestigationOut)
+@assistant_router.post("/runs/{id}/investigate", response_model=RunInvestigationOut)
 async def investigate_run(
     id: int,
     response: Response,

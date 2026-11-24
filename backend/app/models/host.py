@@ -70,7 +70,7 @@ class Host(Base):
         Enum(SyncStatus, name="syncstatus"),
         default=SyncStatus.unknown,
     )
-    labdog_source_ip: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    unbork_source_ip: Mapped[str | None] = mapped_column(String(50), nullable=True)
     drift_check_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_drift_check_at: Mapped[datetime | None] = mapped_column(
@@ -86,7 +86,7 @@ class Host(Base):
         DateTime(timezone=True), nullable=True
     )
     #: The name the host calls itself, read by facts collection — unlike
-    #: ``hostname``, which is only what LabDog calls it. The hosts-file
+    #: ``hostname``, which is only what unbork calls it. The hosts-file
     #: merge maps it to 127.0.1.1 (BUG-115).
     reported_hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ssh_host_key_entry: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)

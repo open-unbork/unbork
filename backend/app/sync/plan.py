@@ -77,13 +77,13 @@ def _fmt_port(port_start: int | None, port_end: int | None) -> str:
 
 
 def _fmt_rule(r) -> str:
-    # Mirrors the nftables renderer's _safe_comment: every LabDog-managed rule
-    # carries the "Managed by LabDog" prefix on the host, with the user's
+    # Mirrors the nftables renderer's _safe_comment: every unbork-managed rule
+    # carries the "Managed by unbork" prefix on the host, with the user's
     # comment appended when present. Kept in sync with the frontend
     # groups/[id]/sync formatRule.
     port = _fmt_port(r.port_start, r.port_end)
     text = (r.comment or "").strip()
-    comment = f"Managed by LabDog: {text}" if text else "Managed by LabDog"
+    comment = f"Managed by unbork: {text}" if text else "Managed by unbork"
     src = r.source_cidr or "any"
     dst = r.destination_cidr or "any"
     return f"{r.action} {r.protocol} {r.direction} {src} → {dst} port={port} ({comment})"
@@ -94,7 +94,7 @@ async def _firewall_plan(host: Host, db: AsyncSession, private_key_pem: str | No
     from app.sync.diff import compute_diff, read_firewall_state
 
     desired, desired_policies = await get_desired_state(
-        host.id, db, host_source_ip=host.labdog_source_ip
+        host.id, db, host_source_ip=host.unbork_source_ip
     )
 
     async def collect(conn: Any) -> list[DiffChange]:

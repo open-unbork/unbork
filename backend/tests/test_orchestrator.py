@@ -523,19 +523,19 @@ def test_runner_events_to_task_events_resolves_real_event_shape() -> None:
     """
     realistic_events = [
         # Packages play
-        _real_shape_event("playbook_on_play_start", "LabDog Package Management"),
-        _real_shape_event("playbook_on_task_start", "LabDog Package Management"),
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Gathering Facts"),
+        _real_shape_event("playbook_on_play_start", "unbork Package Management"),
+        _real_shape_event("playbook_on_task_start", "unbork Package Management"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Gathering Facts"),
         # Services play
-        _real_shape_event("playbook_on_play_start", "LabDog service management"),
+        _real_shape_event("playbook_on_play_start", "unbork service management"),
         _real_shape_event(
-            "runner_on_ok", "LabDog service management", task="Gather systemd service facts"
+            "runner_on_ok", "unbork service management", task="Gather systemd service facts"
         ),
         _real_shape_event(
-            "runner_on_skipped", "LabDog service management", task="Remove orphaned overrides"
+            "runner_on_skipped", "unbork service management", task="Remove orphaned overrides"
         ),
         # Hosts file play
-        _real_shape_event("runner_on_ok", "LabDog /etc/hosts management", task="Deploy /etc/hosts"),
+        _real_shape_event("runner_on_ok", "unbork /etc/hosts management", task="Deploy /etc/hosts"),
         # Firewall (nftables) play
         _real_shape_event(
             "runner_on_ok",
@@ -543,7 +543,7 @@ def test_runner_events_to_task_events_resolves_real_event_shape() -> None:
             task="Apply nftables rules atomically",
         ),
         # Unrelated event types should not produce projection rows.
-        {"event": "verbose", "event_data": {"play": "LabDog Package Management"}},
+        {"event": "verbose", "event_data": {"play": "unbork Package Management"}},
         {"event": "playbook_on_stats", "event_data": {}},
     ]
 
@@ -574,10 +574,10 @@ def test_runner_events_to_task_events_marks_failed_event_correctly() -> None:
         ),
         _real_shape_event(
             "runner_on_unreachable",
-            "LabDog DNS resolver sync",
+            "unbork DNS resolver sync",
             task="Render resolver config",
         ),
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Install package: vim"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Install package: vim"),
     ]
 
     projected = _runner_events_to_task_events(events)
@@ -618,9 +618,9 @@ async def test_orchestrator_outcomes_real_event_fixture(db: AsyncSession, tmp_pa
     # the modules emit no events (no managed config / idempotent
     # no-op) so they should land as ``no_tasks``.
     events = [
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Gathering Facts"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Gathering Facts"),
         _real_shape_event(
-            "runner_on_ok", "LabDog service management", task="Gather systemd service facts"
+            "runner_on_ok", "unbork service management", task="Gather systemd service facts"
         ),
         _real_shape_event(
             "runner_on_ok",

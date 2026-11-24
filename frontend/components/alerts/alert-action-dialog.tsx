@@ -79,7 +79,7 @@ export function AlertActionDialog({ entry, allowed, onClose }: { entry?: AlertAc
   return (
     <Modal
       title={isEdit ? `Alerts running ${entry!.action_key}` : "Allow an action"}
-      description="An alert labelled labdog_action=<this action's key> runs it on the host the alert names, if that host is in Where."
+      description="An alert labelled unbork_action=<this action's key> runs it on the host the alert names, if that host is in Where."
       w={620}
       onClose={onClose}
       footer={
@@ -91,7 +91,7 @@ export function AlertActionDialog({ entry, allowed, onClose }: { entry?: AlertAc
         </>
       }
     >
-      <Field as="div" label="action" hint={action ? <>Grafana label: <span className="mono">labdog_action={action.key}</span>{action.description ? ` — ${action.description}` : ""}</> : "Only actions that run on a single host."}>
+      <Field as="div" label="action" hint={action ? <>Grafana label: <span className="mono">unbork_action={action.key}</span>{action.description ? ` — ${action.description}` : ""}</> : "Only actions that run on a single host."}>
         <select className="inp" value={actionKey} disabled={isEdit} onChange={(e) => { setActionKey(e.target.value); setParameters({}) }} data-testid="alert-action-picker">
           <option value="">Pick an action…</option>
           {choices.map((a) => (

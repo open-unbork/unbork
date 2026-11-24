@@ -42,5 +42,5 @@ d:[["children",{"s":"(dashboard)","h":512,"d":{"r":["$","$1","c",{"children":[[[
 1a:["$","$1","c",{"children":[["$","$L26",null,{}],[["$","script","script-0",{"src":"/_next/static/chunks/1qe38z2sdxtsx.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/259fxixnl_xsm.js","async":true,"nonce":"$undefined"}]],["$","$L27",null,{"children":["$","$20",null,{"name":"Next.MetadataOutlet","children":"$@28"}]}]]}]
 1d:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
 29:I[27201,["$a"],"IconMark"]
-21:[["$","title","0",{"children":"LabDog"}],["$","meta","1",{"name":"description","content":"Self-hosted Linux configuration management"}],["$","link","2",{"rel":"icon","href":"/icon?ea7a0482032176a6","alt":"$undefined","type":"image/png","sizes":"32x32"}],["$","$L29","3",{}]]
+21:[["$","title","0",{"children":"unbork"}],["$","meta","1",{"name":"description","content":"Self-hosted Linux configuration management"}],["$","link","2",{"rel":"icon","href":"/icon?ea7a0482032176a6","alt":"$undefined","type":"image/png","sizes":"32x32"}],["$","$L29","3",{}]]
 28:null

@@ -196,7 +196,7 @@ function isMultiline(s: AppSetting): boolean {
   return s.value_type === "text"
 }
 
-const COLLAPSE_STORAGE_KEY = "labdog:settings-collapse"
+const COLLAPSE_STORAGE_KEY = "unbork:settings-collapse"
 
 /**
  * Manual expand/collapse choices, keyed by category. A key's *absence*

@@ -16,13 +16,13 @@ def _address(value: str) -> str:
     Not pydantic's ``EmailStr``: it refuses special-use domains, and
     ``home.arpa`` — the domain RFC 8375 sets aside for home networks — is
     one of them, as is ``.local``. A homelab mail relay accepting
-    ``labdog@home.arpa`` is the ordinary case here. Whether the server
+    ``unbork@home.arpa`` is the ordinary case here. Whether the server
     takes an address is the server's call, and the test button asks it.
     """
     value = value.strip()
     local, at, domain = value.rpartition("@")
     if not at or not local or not domain or any(c.isspace() for c in value) or "<" in value:
-        raise ValueError("must be a plain address such as labdog@example.com")
+        raise ValueError("must be a plain address such as unbork@example.com")
     return value
 
 

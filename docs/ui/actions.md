@@ -23,14 +23,14 @@ The catalog comes from two sources:
 - **Pack-supplied actions** come from **packs** — pluggable collections
   of playbooks, from a git repository or a local directory. None is
   built into unbork: a fresh install registers the
-  [`labdog-playbooks`](#the-labdog-playbooks-pack) pack, and admins add
+  [`unbork-playbooks`](#the-unbork-playbooks-pack) pack, and admins add
   their own alongside it or instead of it.
 
 - [Running actions](#running-actions)
 - [Scheduled actions](#scheduled-actions)
 - [Group-dispatch actions](#group-dispatch-actions)
 - [Action packs](#action-packs)
-  - [The labdog-playbooks pack](#the-labdog-playbooks-pack)
+  - [The unbork-playbooks pack](#the-unbork-playbooks-pack)
   - [Adding a pack](#adding-a-pack)
   - [Pack precedence and resolving conflicts](#pack-precedence-and-resolving-conflicts)
   - [Provenance: which pack won?](#provenance-which-pack-won)
@@ -279,9 +279,9 @@ is unrunnable (see
 [below](#pack-precedence-and-resolving-conflicts)). There is no
 global pack ordering.
 
-### The labdog-playbooks pack
+### The unbork-playbooks pack
 
-A fresh install registers one pack, `labdog-playbooks` (it kept its
+A fresh install registers one pack, `unbork-playbooks` (it kept its
 name from before the rename), on the git repository
 [`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 (branch `main`). It syncs on startup like any other pack and supplies
@@ -299,11 +299,11 @@ Nothing about it is special. Edit, disable or delete it like any other
 pack. Until a pack has synced, only the built-in `_builtin.*` actions
 are available.
 
-- **No GitHub access** (an air-gapped site): edit the `labdog-playbooks`
+- **No GitHub access** (an air-gapped site): edit the `unbork-playbooks`
   repository under [Git Repos](gitops-ui.md) to point at an internal
   mirror, or add a local-directory pack holding a copy.
 - **A private fork**: add your fork as a pack and pin its keys with **win
-  all keys**, or delete `labdog-playbooks` so your fork is the only
+  all keys**, or delete `unbork-playbooks` so your fork is the only
   contributor.
 - **Deleted it by mistake**: add the repository again
   (`https://github.com/open-unbork/unbork-playbooks`, branch `main`, no
@@ -595,7 +595,7 @@ state in a way that's hard to undo (reboots, package upgrades, config
 rewrites). For destructive actions, **if the host has a Proxmox VM
 mapping**, unbork automatically:
 
-1. Takes a Proxmox snapshot named `labdog-<run_id>-<timestamp>`.
+1. Takes a Proxmox snapshot named `unbork-<run_id>-<timestamp>`.
 2. Runs the playbook.
 3. Runs a post-run SSH + services + packages health check.
 4. On success, deletes the snapshot.
@@ -951,7 +951,7 @@ UI/API first.** Otherwise the next sync removes whatever the action
 installed.
 
 The other module behaviours are tolerant: `packages`, `cron`,
-`linux-users` (non-SSH), and `services` (non-labdog-marked units)
+`linux-users` (non-SSH), and `services` (non-unbork-marked units)
 leave unknown entries alone. Install-this-new-thing actions
 targeting only those modules are safe even without
 `post_run_register` — though without it, the resources won't
@@ -993,6 +993,6 @@ run without snapshot protection.
 
 **Where the checkouts live.** unbork clones git packs into
 `<settings.ansible.packs_root_dir>/<pack_id>` — default
-`/var/lib/labdog/packs/<pack_id>`. If you're running in Docker and
+`/var/lib/unbork/packs/<pack_id>`. If you're running in Docker and
 don't want cold-starts to re-clone everything, mount a persistent
 volume at that path.

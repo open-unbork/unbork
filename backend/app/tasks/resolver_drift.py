@@ -108,11 +108,11 @@ async def _collect_and_diff(host, hms, db):
 
     await refresh_host_sync_status(host, db)
 
-    if not host.labdog_source_ip:
+    if not host.unbork_source_ip:
         try:
             imported_key = asyncssh.import_private_key(private_key_pem)
             async with ssh_connect_host(host, db, client_keys=[imported_key]) as probe:
-                host.labdog_source_ip = await get_source_ip(probe)
+                host.unbork_source_ip = await get_source_ip(probe)
         except Exception:
             # Best-effort optimisation for the next merge, not part of the
             # verdict. Debug level because a host that fails this fails it

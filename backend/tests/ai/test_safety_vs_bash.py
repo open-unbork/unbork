@@ -20,7 +20,7 @@ The lines cover quoting (letters, the operators, quotes, escapes, ``#`` and
 front, and inline shells). A fixed corpus first, then seeded random lines
 built the same way, most of them a well-formed line with a character or two
 changed, since a bug in either shows up where the line nearly balances. Set
-``LABDOG_SAFETY_FUZZ_CASES`` to run more of them.
+``UNBORK_SAFETY_FUZZ_CASES`` to run more of them.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ BASH = shutil.which("bash")
 
 pytestmark = pytest.mark.skipif(BASH is None, reason="needs bash")
 
-CASES = int(os.environ.get("LABDOG_SAFETY_FUZZ_CASES", "3000"))
+CASES = int(os.environ.get("UNBORK_SAFETY_FUZZ_CASES", "3000"))
 
 # `a f` fails, so that `a f || b` runs `b`. The functions are exported so that
 # `bash -c a` finds them. `trap wait EXIT` so a line ending in `&` is not
@@ -71,7 +71,7 @@ exec "$@"
 
 @pytest.fixture(autouse=True)
 def only_a_is_read_only(monkeypatch):
-    """LabDog's own policy, wrappers and all, with ``a`` the only read."""
+    """unbork's own policy, wrappers and all, with ``a`` the only read."""
     data = {**command_policy.load_data(), "read_only": {"a": "any"}, "options": {}, "gates": {}}
     monkeypatch.setattr(command_policy, "DEFAULT", command_policy.CommandPolicy.from_data(data))
 

@@ -28,7 +28,7 @@ class ScanStatus(BaseModel):
     progress: int = 0  # hosts scanned so far
     total: int = 0  # total hosts to scan
     hosts_found: list[DiscoveredHost] = []
-    skipped_known: list[KnownHost] = []  # in the range, already in LabDog
+    skipped_known: list[KnownHost] = []  # in the range, already in unbork
     error: str | None = None
 
 

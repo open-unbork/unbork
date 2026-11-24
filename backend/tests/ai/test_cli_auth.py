@@ -37,16 +37,17 @@ class TestTokenInjection:
     def test_the_rest_of_the_environment_survives(self) -> None:
         """Dropping unrelated variables would break PATH, HOME, and the
         proxy settings the CLI needs to reach the network at all."""
-        base = {"PATH": "/usr/bin", "HOME": "/var/lib/labdog", "HTTPS_PROXY": "http://p"}
+        base = {"PATH": "/usr/bin", "HOME": "/var/lib/unbork", "HTTPS_PROXY": "http://p"}
         env = build_cli_env("tok", base=base)
         for key, value in base.items():
             assert env[key] == value
 
-    def test_no_token_leaves_the_environment_untouched(self) -> None:
-        """A host where the CLI is already logged in must keep working."""
+    def test_no_token_pins_the_config_dir_and_keeps_the_rest(self) -> None:
+        """The operator's own sign-in lives in unbork's state directory
+        (S-014), so a sign-in made as the docs say survives a restart."""
         base = {"PATH": "/usr/bin", "ANTHROPIC_API_KEY": "sk-ant-api-key"}
-        assert build_cli_env(None, base=base) == base
-        assert build_cli_env("", base=base) == base
+        assert build_cli_env(None, base=base) == {**base, CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
+        assert build_cli_env("", base=base) == {**base, CONFIG_DIR_ENV: DEFAULT_CONFIG_DIR}
 
 
 class TestPrecedenceTrap:
@@ -84,7 +85,7 @@ class TestStoredCredentialTrap:
     With the *same* bogus token and a HOME containing a real
     `.claude/.credentials.json`, it succeeded — the stored login won and the
     configured token was ignored, with no warning and no visible difference
-    in the output. Identical failure signature to the env-var trap: LabDog
+    in the output. Identical failure signature to the env-var trap: unbork
     would silently authenticate as somebody else's account.
 
     `CLAUDE_CONFIG_DIR` is what closes it; pointing it at an empty directory
@@ -97,23 +98,22 @@ class TestStoredCredentialTrap:
 
     def test_isolation_overrides_an_inherited_config_dir(self) -> None:
         """An inherited value pointing at a home with a login would reopen
-        the trap, so LabDog's value has to win."""
+        the trap, so unbork's value has to win."""
         env = build_cli_env("tok", base={CONFIG_DIR_ENV: "/home/someone/.claude"})
         assert env[CONFIG_DIR_ENV] == DEFAULT_CONFIG_DIR
 
-    def test_config_dir_is_untouched_when_no_token_is_configured(self) -> None:
-        """Without a token the intended setup *is* the host's own login, so
-        isolating the config directory would break the only thing that case
-        can use to authenticate."""
-        base = {CONFIG_DIR_ENV: "/home/labdog/.claude"}
+    def test_an_operator_config_dir_wins_when_no_token_is_configured(self) -> None:
+        """Without a token the operator's sign-in is used; one they placed
+        somewhere else with CLAUDE_CONFIG_DIR stays where they put it."""
+        base = {CONFIG_DIR_ENV: "/srv/claude"}
         assert build_cli_env(None, base=base) == base
-        assert CONFIG_DIR_ENV not in build_cli_env(None, base={})
+        assert build_cli_env(None, base={})[CONFIG_DIR_ENV] == DEFAULT_CONFIG_DIR
 
-    def test_the_isolated_directory_lives_under_labdog_state(self) -> None:
+    def test_the_isolated_directory_lives_under_unbork_state(self) -> None:
         """It has to be somewhere both deployment shapes can write:
         `ReadWritePaths` in the systemd unit, and the documented volume
         mount in a container. Anywhere else and one of the two breaks."""
-        assert DEFAULT_CONFIG_DIR.startswith("/var/lib/labdog/")
+        assert DEFAULT_CONFIG_DIR.startswith("/var/lib/unbork/")
 
 
 class TestConfigDirCreation:
@@ -122,9 +122,15 @@ class TestConfigDirCreation:
         ClaudeCLIProvider(oauth_token="tok", config_dir=str(target))._ensure_config_dir()
         assert target.is_dir()
 
-    def test_nothing_is_created_without_a_token(self, tmp_path) -> None:
-        """That case never uses the directory — creating it would litter the
-        filesystem of every operator using a host login."""
+    def test_it_is_created_without_a_token_too(self, tmp_path, monkeypatch) -> None:
+        """The operator's sign-in is kept there (S-014)."""
+        monkeypatch.delenv(CONFIG_DIR_ENV, raising=False)
+        target = tmp_path / "claude-cli"
+        ClaudeCLIProvider(config_dir=str(target))._ensure_config_dir()
+        assert target.is_dir()
+
+    def test_an_operator_set_dir_is_not_created(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setenv(CONFIG_DIR_ENV, str(tmp_path / "theirs"))
         target = tmp_path / "claude-cli"
         ClaudeCLIProvider(config_dir=str(target))._ensure_config_dir()
         assert not target.exists()
@@ -244,86 +250,58 @@ class TestConnectionActuallyAuthenticates:
         assert "authentication failed" in source
 
 
-class TestSubscriptionTokenFormat:
-    """Guards the field against the wrong secret being pasted into it.
+class TestNoCredentialForProgramBackedTypes:
+    """S-014: the two program-backed types take no credential."""
 
-    Seen in practice: a 92-character non-Anthropic secret stored happily,
-    then `401 Invalid bearer token` at session time, with the provider test
-    still green.
-    """
-
-    def test_the_check_exists_and_names_the_command(self) -> None:
-        from pathlib import Path
-
-        source = Path("app/api/ai.py").read_text()
-        assert "SUBSCRIPTION_TOKEN_PREFIX" in source
-        assert "claude setup-token" in source, (
-            "the error should say how to get a real token, not just reject one"
-        )
-
-    def test_it_is_applied_on_both_create_and_update(self) -> None:
-        from pathlib import Path
-
-        source = Path("app/api/ai.py").read_text()
-        assert source.count("_check_subscription_token(") >= 3, (
-            "expected the helper plus a call on create and on update"
-        )
-
-    def test_a_blank_token_is_still_allowed(self) -> None:
-        """Blank means 'use the host's own login' and must keep working."""
-        from app.api.ai import _check_subscription_token
-
-        _check_subscription_token("claude_cli", None)
-        _check_subscription_token("claude_cli", "")
-
-    def test_a_real_looking_token_passes(self) -> None:
-        from app.api.ai import _check_subscription_token
-
-        _check_subscription_token("claude_cli", "sk-ant-oat01-abc123")
-
-    def test_another_providers_key_is_not_checked(self) -> None:
-        """Only the CLI field carries a subscription token; an Anthropic API
-        key must not be measured against this prefix."""
-        from app.api.ai import _check_subscription_token
-
-        _check_subscription_token("anthropic", "sk-ant-api03-whatever")
-
-    def test_a_wrong_secret_is_rejected(self) -> None:
+    def test_a_token_is_refused(self) -> None:
         from fastapi import HTTPException
 
-        from app.api.ai import _check_subscription_token
+        from app.api.ai import _refuse_credential
 
-        with pytest.raises(HTTPException) as err:
-            _check_subscription_token("claude_cli", "Nj4pvdSQwzI2jZsomethingelse")
-        assert err.value.status_code == 400
-        assert "setup-token" in str(err.value.detail)
+        for provider_type in ("claude_cli", "claude_agent"):
+            with pytest.raises(HTTPException) as err:
+                _refuse_credential(provider_type, "sk-ant-oat01-abc123")
+            assert err.value.status_code == 422
+            assert "Sign in to Claude Code on the server" in str(err.value.detail)
+
+    def test_blank_is_still_allowed(self) -> None:
+        """Blank clears a token an earlier version stored."""
+        from app.api.ai import _refuse_credential
+
+        _refuse_credential("claude_cli", None)
+        _refuse_credential("claude_agent", "")
+
+    def test_other_types_keep_their_keys(self) -> None:
+        from app.api.ai import _refuse_credential
+
+        _refuse_credential("anthropic", "sk-ant-api03-whatever")
+        _refuse_credential("openai_compat", "key")
 
 
 class TestMissingBinary:
-    """The message an operator sees when the CLI is not installed.
+    """The message an operator sees when the program is not installed.
 
-    The cause differs by deployment shape — a package install expects the
-    operator to supply the binary, while the official image bundles it, so
-    a container hitting this is on a custom or outdated image. A bare "not
-    found" sends a container user looking in the wrong place entirely.
+    Since S-009 no deployment ships it: unbork downloads it on first use,
+    and a server that cannot reach the download supplies its own on PATH.
+    The message has to say both, or an offline operator has nowhere to go.
     """
 
-    def test_message_covers_both_deployment_shapes(self) -> None:
+    def test_message_names_the_download_and_the_offline_route(self) -> None:
         from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
 
         lowered = NOT_FOUND_MESSAGE.lower()
+        assert "downloads it" in lowered
+        assert "path" in lowered and "service user" in lowered
         assert "container" in lowered, "container users get no guidance"
         assert "anthropic" in lowered, "no pointer to the provider that needs no binary"
         assert "docs/ui/assistant.md" in NOT_FOUND_MESSAGE
 
-    def test_message_does_not_claim_the_image_lacks_the_binary(self) -> None:
-        """It did lack it until the CLI was added to the Dockerfile. Leaving
-        that claim in place would send operators to build a derived image
-        they no longer need."""
+    def test_message_does_not_claim_the_image_bundles_it(self) -> None:
+        """It did until S-009. Leaving that claim would send a container
+        operator looking for a binary that is no longer there."""
         from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
 
-        assert "does not include" not in NOT_FOUND_MESSAGE.lower()
-        assert "extend the image" not in NOT_FOUND_MESSAGE.lower()
+        assert "bundles" not in NOT_FOUND_MESSAGE.lower()
 
 
 class TestAnthropicKeyIsRequired:

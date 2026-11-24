@@ -222,7 +222,7 @@ function MailServer({ settings, onSaved }: { settings: EmailSettings; onSaved: (
           </Field>
         </div>
         <Field label="from address" htmlFor="m-from" hint="a plain address — the server decides whether it may send as it">
-          <input id="m-from" className="inp mono" placeholder="labdog@example.com" value={form.from_address} onChange={(e) => set("from_address", e.target.value)} />
+          <input id="m-from" className="inp mono" placeholder="unbork@example.com" value={form.from_address} onChange={(e) => set("from_address", e.target.value)} />
         </Field>
         {result && <Banner tone={result.success ? "ok" : "danger"}>{result.message}</Banner>}
       </div>

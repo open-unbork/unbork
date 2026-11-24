@@ -77,7 +77,7 @@ def parse_nftables_json(json_str: str) -> list[FirewallRuleSpec]:
 
 def _filter_chain_directions(nftables: list[dict]) -> dict[tuple[str, str, str], str]:
     """``(family, table, chain) -> hook`` for the ``inet filter`` chains
-    hooked at input or output, the only ones LabDog reads rules from."""
+    hooked at input or output, the only ones unbork reads rules from."""
     chain_directions: dict[tuple[str, str, str], str] = {}
     for item in nftables:
         if "chain" in item:
@@ -107,7 +107,7 @@ class _RuleFields:
 
 
 def _rule_spec(rule: dict, exprs: list[dict], direction: str) -> FirewallRuleSpec | None:
-    """The rule as a spec, or None when it has no verdict LabDog maps."""
+    """The rule as a spec, or None when it has no verdict unbork maps."""
     fields = _RuleFields(comment=rule.get("comment"))  # nftables >= 1.0 puts comment at rule level
 
     for expr in exprs:

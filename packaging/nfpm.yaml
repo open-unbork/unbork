@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
-name: labdog
+name: unbork
 arch: amd64
 platform: linux
 version: ${VERSION}
 release: "1"
-maintainer: "LabDog Maintainers <noreply@github.com>"
+maintainer: "unbork Maintainers <noreply@github.com>"
 description: |
-  LabDog — a homelabber's best friend.
+  unbork — a homelabber's best friend.
   Linux node configuration management platform. Manages firewall rules,
   services, users, cron jobs, /etc/hosts, and more using Ansible under
   the hood with a web UI and drift detection.
@@ -30,49 +30,59 @@ recommends:
 
 contents:
   # ── Application code (venv + backend + frontend) ──────────────────────
-  - src: staging/usr/lib/labdog/
-    dst: /usr/lib/labdog/
+  - src: staging/usr/lib/unbork/
+    dst: /usr/lib/unbork/
     type: tree
     file_info:
       owner: root
       group: root
       mode: 0755
 
+  # ── Licence, third-party notices, source offer (S-010) ────────────────
+  # No mode: on a tree it applies to the directory too, and 0644 would
+  # make /usr/share/doc/unbork unreadable to anyone but root.
+  - src: staging/usr/share/doc/unbork/
+    dst: /usr/share/doc/unbork/
+    type: tree
+    file_info:
+      owner: root
+      group: root
+
   # ── Config file (config|noreplace — preserved on upgrade) ─────────────
-  - src: etc/labdog.toml
-    dst: /etc/labdog/labdog.toml
+  - src: etc/unbork.toml
+    dst: /etc/unbork/unbork.toml
     type: config|noreplace
     file_info:
       mode: 0640
       owner: root
-      group: labdog
+      group: unbork
 
   # ── Systemd units ──────────────────────────────────────────────────────
-  - src: systemd/labdog.service
-    dst: /usr/lib/systemd/system/labdog.service
+  - src: systemd/unbork.service
+    dst: /usr/lib/systemd/system/unbork.service
 
   # ── tmpfiles.d ─────────────────────────────────────────────────────────
-  - src: tmpfiles.d/labdog.conf
-    dst: /usr/lib/tmpfiles.d/labdog.conf
+  - src: tmpfiles.d/unbork.conf
+    dst: /usr/lib/tmpfiles.d/unbork.conf
 
   # ── Owned directories ──────────────────────────────────────────────────
-  - dst: /etc/labdog/
+  - dst: /etc/unbork/
     type: dir
     file_info:
       owner: root
-      group: labdog
+      group: unbork
       mode: 0750
-  - dst: /var/lib/labdog/
+  - dst: /var/lib/unbork/
     type: dir
     file_info:
-      owner: labdog
-      group: labdog
+      owner: unbork
+      group: unbork
       mode: 0750
-  - dst: /var/log/labdog/
+  - dst: /var/log/unbork/
     type: dir
     file_info:
-      owner: labdog
-      group: labdog
+      owner: unbork
+      group: unbork
       mode: 0750
 
 scripts:

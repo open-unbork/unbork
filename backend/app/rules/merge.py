@@ -11,7 +11,7 @@ from app.schemas.rules import ChainPoliciesResponse, EffectiveRuleResponse
 def _make_ssh_lockout_rule(server_ip: str) -> FirewallRuleSpec:
     """Auto-injected SSH allow rule — always first, non-deletable.
 
-    ``server_ip`` is an address, or a network when LabDog runs in a bridged
+    ``server_ip`` is an address, or a network when unbork runs in a bridged
     container on this very host (see ``app.ssh_utils.get_source_ip``).
     """
     source_cidr = server_ip if "/" in server_ip else f"{server_ip}/32"
@@ -50,7 +50,7 @@ def merge_group_rules(
     if host_source_ip:
         server_ip = host_source_ip
     elif server_ip is None:
-        server_ip = settings.security.labdog_server_ip
+        server_ip = settings.security.unbork_server_ip
 
     # Sort groups by priority descending (highest priority first), ties by
     # group id ascending — see app.merge_utils for why the tiebreak matters.
@@ -102,7 +102,7 @@ def merge_group_rules(
     )
 
     # Prepend SSH lockout rule (always first). Drop any group/host rule that
-    # targets the same match (allow *or* deny of SSH from the LabDog IP) so the
+    # targets the same match (allow *or* deny of SSH from the unbork IP) so the
     # effective set doesn't carry a duplicate — or a now-dead deny — alongside
     # the auto-injected anti-lockout rule.
     ssh_rule = _make_ssh_lockout_rule(server_ip)
@@ -163,7 +163,7 @@ async def get_effective_rules(
 
     host_result = await db.execute(select(Host).where(Host.id == host_id))
     host = host_result.scalar_one_or_none()
-    host_source_ip = host.labdog_source_ip if host else None
+    host_source_ip = host.unbork_source_ip if host else None
 
     # Read-only display: tolerate a dangling host ref (render name-only)
     # rather than 500-ing the whole Rules tab. Rendering/diffing keep the

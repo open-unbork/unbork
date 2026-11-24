@@ -2,7 +2,7 @@
 
 The limiter keyed on the client IP alone. Behind a reverse proxy with
 ``server.trusted_proxies`` unset — the default, and what
-``packaging/etc/labdog.toml`` ships — ``_get_client_ip`` returns the
+``packaging/etc/unbork.toml`` ships — ``_get_client_ip`` returns the
 proxy's address for every request, so the whole install shared one
 5/minute bucket. Five bad passwords from anywhere locked everybody out,
 and an attacker was throttled no harder than a typo.

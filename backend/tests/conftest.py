@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures and factory helpers for LabDog integration tests.
+Shared pytest fixtures and factory helpers for unbork integration tests.
 """
 
 import os
@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 # CSRF-aware ASGI transport helper
 # ---------------------------------------------------------------------------
 
-_CSRF_COOKIE = "labdog_csrf"
+_CSRF_COOKIE = "unbork_csrf"
 _CSRF_HEADER = "X-CSRF-Token"
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -80,15 +80,36 @@ class _CsrfAutoTransport(httpx.AsyncBaseTransport):
 # loads that subdirectory's conftest before any ``pytest_configure`` hook
 # runs, and ``tests/ai/conftest.py`` imports the app, which reads its
 # settings on import. This file is always loaded before it (BUG-114).
-os.environ.setdefault("LABDOG_SECURITY__SECRET_KEY", "test-secret-key-not-for-production")
+os.environ.setdefault("UNBORK_SECURITY__SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault(
-    "LABDOG_SECURITY__ENCRYPTION_KEY", "vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg="
+    "UNBORK_SECURITY__ENCRYPTION_KEY", "vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg="
 )
 # Shared Redis across tests causes rate-limit pollution — fresh test runs
 # still trip the 5/min login and 100/min API limits because httpx hits
 # testserver from 127.0.0.1 repeatedly. Disable rate limiting for tests;
 # individual rate-limit behavior can be tested in targeted integration tests.
-os.environ.setdefault("LABDOG_RATE_LIMIT__ENABLED", "false")
+os.environ.setdefault("UNBORK_RATE_LIMIT__ENABLED", "false")
+
+
+_AI_TESTS = Path(__file__).resolve().parent / "ai"
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark the assistant's tests, and skip them when it is left out (C-026).
+
+    Everything under ``tests/ai/`` is marked ``needs_assistant``; tests
+    elsewhere that need it carry the marker by hand. CI runs the suite
+    once more with ``UNBORK_ASSISTANT__ENABLED=false``.
+    """
+    from app.features import assistant_enabled
+
+    with_assistant = assistant_enabled()
+    skip = pytest.mark.skip(reason="the assistant is left out ([assistant] enabled = false)")
+    for item in items:
+        if Path(str(item.fspath)).resolve().is_relative_to(_AI_TESTS):
+            item.add_marker(pytest.mark.needs_assistant)
+        if not with_assistant and item.get_closest_marker("needs_assistant"):
+            item.add_marker(skip)
 
 
 @pytest.fixture(scope="session")
@@ -106,7 +127,7 @@ def pg_url():
         settings.database.url = async_url
         settings.security.encryption_key = generate_master_key()
         env = os.environ.copy()
-        env["LABDOG_DATABASE__URL"] = async_url
+        env["UNBORK_DATABASE__URL"] = async_url
         alembic_path = str(Path(sys.executable).parent / "alembic")
         result = subprocess.run(
             [alembic_path, "upgrade", "head"],
@@ -129,7 +150,7 @@ def pg_url():
             settings.database.url = async_url
             settings.security.encryption_key = generate_master_key()
             env = os.environ.copy()
-            env["LABDOG_DATABASE__URL"] = async_url
+            env["UNBORK_DATABASE__URL"] = async_url
             alembic_path = str(Path(sys.executable).parent / "alembic")
             result = subprocess.run(
                 [alembic_path, "upgrade", "head"],
@@ -276,7 +297,7 @@ SAMPLE_PACK_DIR = Path(__file__).parent / "fixtures" / "packs" / "sample"
 async def sample_pack(db):
     """Register ``tests/fixtures/packs/sample`` as a local pack and load it.
 
-    Nothing pack-supplied ships with LabDog, so a test that needs a real
+    Nothing pack-supplied ships with unbork, so a test that needs a real
     action (``linux-upgrade``, ``k8s-upgrade``, ``linux-os-upgrade``,
     ``example``) asks for this. The pack row lives in the test's
     transaction, so a rebuild during the test (``ensure_registry_current``)

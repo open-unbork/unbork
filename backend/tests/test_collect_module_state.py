@@ -221,7 +221,7 @@ async def test_a_timeout_message_is_kept_when_it_has_one(db):
 async def test_a_full_collection_reads_every_module(db, caplog):
     host = await _host(db, firewall_backend="nftables")
     world = _World()
-    world.competing.return_value = "LabDog rules also found in iptables"
+    world.competing.return_value = "unbork rules also found in iptables"
 
     with caplog.at_level(logging.INFO, logger="app.api.host_state"):
         async with world.active():
@@ -276,7 +276,7 @@ async def test_a_full_collection_reads_every_module(db, caplog):
     assert world.rules.await_args.args[3] == "nftables"
     world.detect.assert_not_awaited()
 
-    warning = "LabDog rules also found in iptables"
+    warning = "unbork rules also found in iptables"
     assert notices == [warning]
     assert by_module["firewall"].warnings == [warning]
     assert all(s.warnings == [] for m, s in by_module.items() if m != "firewall")
@@ -285,7 +285,7 @@ async def test_a_full_collection_reads_every_module(db, caplog):
     assert list(world.drift.await_args.args[2]) == ORDER
 
     await db.refresh(host)
-    assert host.labdog_source_ip == "10.9.9.9"
+    assert host.unbork_source_ip == "10.9.9.9"
     rows = await _hms(db, host.id)
     assert set(rows) == set(ORDER)
     # BUG-159: one connection for the probe and every collector, which each
@@ -393,7 +393,7 @@ async def test_packages_skip_the_state_probe_when_none_are_desired(db):
 
 async def test_inline_drift_settles_a_collected_module(db):
     """The real drift check runs on what was collected: with nothing desired,
-    jobs LabDog does not manage are not drift."""
+    jobs unbork does not manage are not drift."""
     host = await _host(db)
     world = _World()
 

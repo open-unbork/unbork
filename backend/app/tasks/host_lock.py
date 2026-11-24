@@ -289,17 +289,22 @@ async def check_host_busy(
         not a bool).
     """
     from app.ai.models import AIRollback
+    from app.features import assistant_enabled
     from app.models.action_run import ActionHostRun, ActionRun
     from app.models.sync_job import JobStatus, SyncJob
 
-    # 0. A rollback of this host's VM.
-    rollback_hit = (
-        await db.execute(
-            select(AIRollback.id)
-            .where(AIRollback.host_id == host_id, AIRollback.status == "running")
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+    # 0. A rollback of this host's VM. Only the assistant runs these, and
+    # only its own sweep closes one a killed worker left "running"; without
+    # the assistant such a row would hold the host forever (C-026).
+    rollback_hit = None
+    if assistant_enabled():
+        rollback_hit = (
+            await db.execute(
+                select(AIRollback.id)
+                .where(AIRollback.host_id == host_id, AIRollback.status == "running")
+                .limit(1)
+            )
+        ).scalar_one_or_none()
     if rollback_hit is not None:
         return BlockerInfo(kind="ai_rollback", id=rollback_hit, host_id=host_id)
 

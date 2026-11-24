@@ -42,7 +42,7 @@ export class ApiError extends Error {
 const _MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 /**
- * Read the labdog_csrf double-submit cookie value from document.cookie.
+ * Read the unbork_csrf double-submit cookie value from document.cookie.
  * Returns an empty string when the cookie is absent (e.g. not logged in).
  * The value is base64url-safe so no URL-decoding is needed.
  */
@@ -51,8 +51,8 @@ function _readCsrfCookie(): string {
   const match = document.cookie
     .split(";")
     .map((c) => c.trim())
-    .find((c) => c.startsWith("labdog_csrf="))
-  return match ? match.slice("labdog_csrf=".length) : ""
+    .find((c) => c.startsWith("unbork_csrf="))
+  return match ? match.slice("unbork_csrf=".length) : ""
 }
 
 /**

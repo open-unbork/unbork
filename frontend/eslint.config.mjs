@@ -24,7 +24,7 @@ export default defineConfig([
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 
   {
-    name: "labdog/next",
+    name: "unbork/next",
     files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     plugins: {
       "react-hooks": reactHooks,
@@ -58,7 +58,7 @@ export default defineConfig([
   // rules demoted to warnings.
   ...tseslint.configs.recommended,
   {
-    name: "labdog/typescript",
+    name: "unbork/typescript",
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
       "@typescript-eslint/no-unused-vars": "warn",

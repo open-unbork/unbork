@@ -37,7 +37,7 @@ class TestTheImageReapsItsOrphans:
 
     def test_the_app_is_still_the_command(self, dockerfile):
         """tini is the wrapper, not a replacement: ``docker run <image>``
-        must still start LabDog, and ``docker run <image> <other>`` must
+        must still start unbork, and ``docker run <image> <other>`` must
         still work — which is why the app stays in CMD rather than being
         folded into the ENTRYPOINT."""
         assert 'CMD ["python", "-m", "app"]' in dockerfile

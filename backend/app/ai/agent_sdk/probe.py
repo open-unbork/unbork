@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 from app.ai.agent_sdk.bridge import NO_BUILTIN_TOOLS
 from app.ai.agent_sdk.environment import build_sdk_env, ensure_state_dir
@@ -35,14 +36,19 @@ PROBE_PROMPT = "Reply with the single word: ok"
 PROBE_TIMEOUT_SECONDS = 120
 
 
-def bundled_cli_version() -> str:
-    """The Claude Code build the installed SDK ships and expects."""
-    try:
-        from claude_agent_sdk._cli_version import __cli_version__
+def program_version(program: Path) -> str:
+    """The version of the program the Test ran, as its install recorded it.
 
-        return str(__cli_version__)
-    except Exception:  # pragma: no cover - version metadata is best-effort
-        return "unknown version"
+    unbork writes ``version`` next to a program it downloaded (S-009); an
+    operator's own program on PATH has none, so it is named by its path.
+    """
+    from app.ai.claude_code import VERSION_NAME
+
+    try:
+        recorded = (program.parent / VERSION_NAME).read_text().strip()
+    except OSError:
+        recorded = ""
+    return recorded or str(program)
 
 
 async def test_connection(provider: AIProvider) -> str:
@@ -65,7 +71,16 @@ async def test_connection(provider: AIProvider) -> str:
         TextBlock,
     )
 
+    from app.ai.claude_code import binary_path
+    from app.ai.providers.claude_cli import NOT_FOUND_MESSAGE
+
+    program = binary_path()
+    if program is None:
+        raise LLMProviderError(NOT_FOUND_MESSAGE)
+
     options = ClaudeAgentOptions(
+        # The program unbork installed (S-009); the image ships none.
+        cli_path=str(program),
         # No tools at all for the probe. It has nothing to look up, and
         # the built-ins would be a shell in the container either way.
         tools=NO_BUILTIN_TOOLS,
@@ -94,7 +109,7 @@ async def test_connection(provider: AIProvider) -> str:
                         )
     except TimeoutError as exc:
         raise LLMProviderError(
-            f"Claude Code did not answer within {PROBE_TIMEOUT_SECONDS}s. "
+            f"The Claude Code program did not answer within {PROBE_TIMEOUT_SECONDS}s. "
             "Check that the container can reach api.anthropic.com."
         ) from exc
     except LLMProviderError:
@@ -102,21 +117,23 @@ async def test_connection(provider: AIProvider) -> str:
     except Exception as exc:
         logger.warning("agent sdk probe failed for provider %s", provider.id, exc_info=True)
         detail = str(exc).strip() or exc.__class__.__name__
-        raise LLMProviderError(f"Claude Code could not be started: {detail}") from exc
+        raise LLMProviderError(f"The Claude Code program could not be started: {detail}") from exc
 
-    version = bundled_cli_version()
+    version = program_version(program)
     if failure:
-        raise LLMProviderError(f"Claude Code {version} started, but the request failed: {failure}")
+        raise LLMProviderError(
+            f"The Claude Code program ({version}) started, but the request failed: {failure}"
+        )
     if not text.strip():
         # Exit without output is the shape the single-shot backend's
         # silent-auth-failure took. Treat it as a failure, not a pass.
         raise LLMProviderError(
-            f"Claude Code {version} started but returned nothing. That usually means "
-            "the subscription token was rejected — regenerate it with "
-            "'claude setup-token' and paste the value it prints last."
+            f"The Claude Code program ({version}) started but returned nothing. That usually means "
+            "the sign-in was rejected. Sign in to Claude Code on the server again "
+            "as docs/ui/assistant.md describes (Signing in)."
         )
 
     return (
-        f"Claude Code {version} via the Agent SDK; authenticated; "
+        f"{provider.name}: Claude Code program {version} via the Agent SDK; authenticated; "
         f"tools enabled, so this provider can run investigations."
     )

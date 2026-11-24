@@ -3,7 +3,7 @@
 An action pack is a git repository someone points unbork at. Its playbooks
 run against managed hosts, which is the point — but ansible-core also gives
 a repository several ways to run code on the *controller*, which is the
-unbork host itself, as the labdog user:
+unbork host itself, as the unbork user:
 
 * ``action_plugins/``, ``library/``, ``filter_plugins/``, ``lookup_plugins/``,
   ``callback_plugins/``, ``strategy_plugins/``, ``vars_plugins/``,
@@ -103,7 +103,7 @@ _SAFE_LOOKUPS = frozenset(
 _LOOKUP_CALL = re.compile(r"\b(?:lookup|query|q)\s*\(\s*(?P<arg>[^,)]*)")
 
 #: Modules whose ``src`` is read on the controller, so an absolute or
-#: parent-relative ``src`` copies a LabDog file to the target.
+#: parent-relative ``src`` copies an unbork file to the target.
 _CONTROLLER_SRC_MODULES = frozenset(
     {"copy", "template", "unarchive", "script", "assemble", "include_vars", "patch"}
 )

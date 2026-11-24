@@ -23,8 +23,8 @@ const KIND_STYLE: Partial<Record<LineKind, CSSProperties>> = {
   fatal: { color: DANGER },
   unreachable: { color: DANGER },
   error: { color: DANGER },
-  "labdog-failed": { color: DANGER },
-  labdog: { color: toneVar("accent") },
+  "unbork-failed": { color: DANGER },
+  unbork: { color: toneVar("accent") },
 }
 
 /** A recap count's colour: what it counts, and only when it is not zero. */

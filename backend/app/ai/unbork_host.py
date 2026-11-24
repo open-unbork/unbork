@@ -8,10 +8,10 @@ auto is refused there, and so is a rollback.
 
 unbork cannot see its own address — inside a container it does not even
 have the host's — but the hosts it manages can. Every probe records the
-address a host saw unbork connect from (``Host.labdog_source_ip``), and
+address a host saw unbork connect from (``Host.unbork_source_ip``), and
 that gives the machine away in one of two ways — besides the plainest,
 the server address in unbork's own configuration
-(``[security] labdog_server_ip``), when it has been set:
+(``[security] unbork_server_ip``), when it has been set:
 
 * **Other hosts see unbork coming from this host's address.** A container
   on a bridge network reaches other machines through its host's NAT, so
@@ -51,7 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-#: Interface names of container and VM bridges. A remote LabDog on the
+#: Interface names of container and VM bridges. A remote unbork on the
 #: same LAN shares a subnet with the host's ordinary interface, so being
 #: inside a subnet only counts on one of these. Generic LAN bridges
 #: (``br0``, ``vmbr0``) are deliberately absent for the same reason.
@@ -70,7 +70,7 @@ BRIDGE_PREFIXES = (
     "weave",
 )
 
-#: Read-only, and run by LabDog itself rather than proposed by the model,
+#: Read-only, and run by unbork itself rather than proposed by the model,
 #: so it does not go through the command classifier. The first line is
 #: where this SSH session came from, as the host sees it.
 PROBE_COMMAND = 'echo "$SSH_CLIENT"; ip -o addr show 2>/dev/null'
@@ -92,19 +92,19 @@ Address = tuple[str, ipaddress.IPv4Interface | ipaddress.IPv6Interface]
 async def seen_from(db: AsyncSession, host: Any) -> bool:
     """The database test: does any host record unbork as this host?
 
-    The configured ``[security] labdog_server_ip`` counts first. It is the
+    The configured ``[security] unbork_server_ip`` counts first. It is the
     address the firewall rules keep SSH open for, so an operator who set
     it has already said which machine unbork is on.
     """
     from app.config import settings
     from app.models.host import Host
 
-    if host.ip_address == settings.security.labdog_server_ip:
+    if host.ip_address == settings.security.unbork_server_ip:
         return True
-    if host.labdog_source_ip and host.labdog_source_ip == host.ip_address:
+    if host.unbork_source_ip and host.unbork_source_ip == host.ip_address:
         return True
     other = await db.execute(
-        select(Host.id).where(Host.id != host.id, Host.labdog_source_ip == host.ip_address).limit(1)
+        select(Host.id).where(Host.id != host.id, Host.unbork_source_ip == host.ip_address).limit(1)
     )
     return other.scalar_one_or_none() is not None
 
@@ -179,7 +179,7 @@ async def ask_the_host(db: AsyncSession, host: Any) -> bool | None:
                 conn.run(PROBE_COMMAND, check=False), timeout=PROBE_TIMEOUT_SECONDS
             )
     except Exception as exc:
-        logger.info("labdog_host: could not ask %s where unbork runs: %s", host.hostname, exc)
+        logger.info("unbork_host: could not ask %s where unbork runs: %s", host.hostname, exc)
         return None
     client, addresses = parse_probe(str(result.stdout or ""))
     if not client:
@@ -205,7 +205,7 @@ def forget() -> None:
     _answers.clear()
 
 
-async def labdog_runs_on(db: AsyncSession, host: Any, *, ask: bool = True) -> bool:
+async def unbork_runs_on(db: AsyncSession, host: Any, *, ask: bool = True) -> bool:
     """Whether unbork runs on ``host``.
 
     ``ask=False`` skips the live test, for callers that cannot afford a

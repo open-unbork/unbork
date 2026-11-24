@@ -16,7 +16,7 @@ HOSTNAME_RE = re.compile(
 #: against HOSTNAME_RE; ``comment`` was not checked at all, so a newline in
 #: it closed the line and started a real one. A comment of
 #: ``"x\n1.2.3.4 deb.debian.org"`` appended a working /etc/hosts entry to
-#: every host in the group — a package-mirror redirect, written by LabDog
+#: every host in the group — a package-mirror redirect, written by unbork
 #: itself and invisible in the UI, which renders the comment on one line
 #: (SEC-24).
 #:

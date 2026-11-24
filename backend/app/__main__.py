@@ -10,10 +10,10 @@ Usage:
     python -m app --role orchestrator   # action-run orchestrator worker
     python -m app --role beat           # the scheduler; exactly one per deployment
 
-``--role`` takes a comma list and can also be set as ``LABDOG_ROLE``.
+``--role`` takes a comma list and can also be set as ``UNBORK_ROLE``.
 See app.celery_manager.ROLE_PROCESSES.
 
-All server settings (host, port, TLS) are read from labdog.toml.
+All server settings (host, port, TLS) are read from unbork.toml.
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ def main() -> None:
         "--role",
         default=None,
         help="Comma list of roles to run: all (default), api, beat, orchestrator, "
-        "worker, worker-drift. Also LABDOG_ROLE.",
+        "worker, worker-drift. Also UNBORK_ROLE.",
     )
     args = parser.parse_args()
 
@@ -137,7 +137,7 @@ def main() -> None:
     from app.celery_manager import API_ROLES, CeleryManager, parse_roles, processes_for
 
     try:
-        roles = parse_roles(args.role or os.environ.get("LABDOG_ROLE"))
+        roles = parse_roles(args.role or os.environ.get("UNBORK_ROLE"))
     except ValueError as exc:
         parser.error(str(exc))
     serves_api = any(r in API_ROLES for r in roles)

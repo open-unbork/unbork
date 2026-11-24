@@ -531,7 +531,7 @@ async def notify_alert_action(
         subject = f"{name} failed on {host} for {alertname}"
 
     lines = [
-        f"{alertname} fired on {host}, and unbork ran {name}, as its labdog_action label asked.",
+        f"{alertname} fired on {host}, and unbork ran {name}, as its unbork_action label asked.",
         "",
         f"Action:    {one_line(dispatch.action_key, 64)}",
         f"Run:       #{run.id}, {run.status}" if run is not None else "Run:       deleted",
@@ -545,8 +545,8 @@ async def notify_alert_action(
             "The alert has been handed to the AI. Whether it investigates depends on the AI "
             "settings; the Alerts page shows what it did."
             if handed_to_ai
-            else "Nothing more will happen on its own: the alert is not labelled labdog_ai or "
-            "labdog_ai_automate, or it already has an investigation or has resolved.",
+            else "Nothing more will happen on its own: the alert is not labelled unbork_ai or "
+            "unbork_ai_automate, or it already has an investigation or has resolved.",
         ]
     return await notify(
         db,

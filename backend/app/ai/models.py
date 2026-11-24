@@ -39,12 +39,12 @@ from app.models.base import Base
 # subscription token rather than an API key, and differ in who runs the
 # agent loop: "claude_cli" shells out once per prompt and cannot call
 # tools, while "claude_agent" drives Claude Code through the Claude Agent
-# SDK, which runs the loop itself and calls LabDog's tools over an
+# SDK, which runs the loop itself and calls unbork's tools over an
 # in-process MCP server.
 #
 # Who owns the loop is also why they stream differently, which looks like
 # an inconsistency and is not one. "anthropic" and "openai_compat" are
-# LLMProviders: AgentLoop asks them for one turn at a time, so LabDog owns
+# LLMProviders: AgentLoop asks them for one turn at a time, so unbork owns
 # the token stream and forwards deltas as it reads them. "claude_agent"
 # cannot be an LLMProvider at all — it is never asked for a turn — so what
 # arrives is a whole AssistantMessage, and that is the unit the runner
@@ -119,7 +119,7 @@ class AIProvider(Base):
     temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Money per million tokens, operator-entered, in whatever currency
-    # ai.currency names. LabDog never converts, so the unit is simply
+    # ai.currency names. unbork never converts, so the unit is simply
     # whatever the operator typed. 0 == free/self-hosted.
     input_cost_per_mtok: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     output_cost_per_mtok: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -412,11 +412,11 @@ class AIUsageDay(Base):
 
 #: Where an alert came from. Both producers write the same rows — the
 #: webhook is the fast path, the poller is the fallback for when Grafana
-#: cannot reach LabDog — so the source is recorded rather than inferred.
+#: cannot reach unbork — so the source is recorded rather than inferred.
 ALERT_SOURCES = ("grafana_webhook", "alertmanager_poll")
 
 #: Alertmanager's own vocabulary, kept verbatim rather than mapped onto
-#: something LabDog-flavoured: an operator comparing LabDog against
+#: something unbork-flavoured: an operator comparing unbork against
 #: Grafana should not have to translate.
 ALERT_STATUSES = ("firing", "resolved")
 
@@ -426,13 +426,13 @@ ALERT_STATUSES = ("firing", "resolved")
 #: rather than reconstructed from logs that may have rotated.
 INVESTIGATION_OUTCOMES = (
     "started",
-    # The alert's labdog_action label ran an action for it first. The AI
+    # The alert's unbork_action label ran an action for it first. The AI
     # looks only if that does not fix it and the labels ask for the AI
     # (app.tasks.alert_handling); otherwise the action alone handles it.
     "waiting_on_action",
     "handled_by_action",
     "skipped_disabled",
-    # Not labelled labdog_ai or labdog_ai_automate, and no full-auto rule
+    # Not labelled unbork_ai or unbork_ai_automate, and no full-auto rule
     # matched: the alert did not ask for the AI.
     "skipped_no_label",
     # From before 1.0.0, when a severity threshold decided. Kept so old
@@ -444,7 +444,7 @@ INVESTIGATION_OUTCOMES = (
     "failed",
 )
 
-#: Whether a full-auto fix worked, as LabDog judged it afterwards — see
+#: Whether a full-auto fix worked, as unbork judged it afterwards — see
 #: :mod:`app.ai.remediation`. ``checking`` while the check runs;
 #: ``unchecked`` when it could not run in time, which is reported rather
 #: than guessed at.
@@ -455,7 +455,7 @@ REMEDIATION_OUTCOMES = ("checking", "fixed", "not_effective", "made_worse", "unc
 ROLLBACK_TRIGGERS = ("automatic", "manual")
 
 #: ``refused`` records a rollback that was wanted and not attempted, with
-#: the reason, so "LabDog decided not to" reads differently from "LabDog
+#: the reason, so "unbork decided not to" reads differently from "unbork
 #: never considered it".
 ROLLBACK_STATUSES = ("running", "succeeded", "failed", "refused")
 
@@ -503,19 +503,19 @@ class AlertEvent(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="firing", index=True)
     labels: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
     annotations: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
-    # Alertmanager's own timestamps, not LabDog's. When the alert began
+    # Alertmanager's own timestamps, not unbork's. When the alert began
     # and ended according to the system that decided it was an alert.
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    # How many times LabDog has been told about this same firing. 1 on
+    # How many times unbork has been told about this same firing. 1 on
     # creation. A high count on a short-lived alert is what flapping
     # looks like from here.
     dedup_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    # The host this alert is about, when LabDog can work it out from the
+    # The host this alert is about, when unbork can work it out from the
     # labels. NULL when it cannot — plenty of alerts are about a service
-    # or a cluster rather than a machine LabDog manages.
+    # or a cluster rather than a machine unbork manages.
     host_id: Mapped[int | None] = mapped_column(
         ForeignKey("hosts.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -530,7 +530,7 @@ class AlertEvent(Base):
     investigation_detail: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     # The autonomy level the investigation was started at, and why when
     # that is not simply the instance setting — see app.ai.alert_autonomy.
-    # Stored here rather than only read off the session: whether LabDog
+    # Stored here rather than only read off the session: whether unbork
     # was allowed to change a host because of this alert is worth keeping
     # after the session itself has been deleted.
     investigation_autonomy: Mapped[str | None] = mapped_column(

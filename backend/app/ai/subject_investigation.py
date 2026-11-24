@@ -574,7 +574,7 @@ async def _prepare_host(db: AsyncSession, subject) -> PreparedInvestigation:  # 
         "check the basics on the host with run_ssh_command: uptime, df -h, free -m, "
         "systemctl --failed, journalctl -p err -b --no-pager | tail -50.",
         "- query_mimir_range shows trends; host metrics carry "
-        f'labdog_host_id="{host.id}". list_action_runs and get_action_run_output '
+        f'unbork_host_id="{host.id}". list_action_runs and get_action_run_output '
         "explain failed runs.",
     ]
     return PreparedInvestigation(

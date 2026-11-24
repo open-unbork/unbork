@@ -14,7 +14,7 @@ from app.gitops.importers._common import (
     replace_group_rows,
     warn_if_section_empty,
 )
-from app.gitops.schema import LabDogGroupYAML, ServiceYAML
+from app.gitops.schema import ServiceYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.services.constants import PROTECTED_SERVICES
 from app.services.models import DeployMode, ServiceRule, ServiceState
@@ -121,7 +121,7 @@ def _yaml_state(e: ServiceYAML) -> dict:
 
 async def import_services(
     group: HostGroup,
-    parsed: LabDogGroupYAML,
+    parsed: UnborkGroupYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:
@@ -139,7 +139,7 @@ async def import_services(
 
     Args:
         group: The target ``HostGroup`` ORM instance.
-        parsed: Validated ``LabDogGroupYAML`` from the current commit.
+        parsed: Validated ``UnborkGroupYAML`` from the current commit.
         commit_sha: Full commit SHA string (for audit trail).
         db: Active async database session.
 

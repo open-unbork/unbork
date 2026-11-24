@@ -81,7 +81,7 @@ async def test_a_host_run_finished_without_output_reads_back_empty(db):
 
 async def test_the_rewrite_empties_only_the_two_quote_rows(db):
     stale = await _host_run(db, output=TWO_QUOTES)
-    real = await _host_run(db, output="PLAY [labdog] ***\nok: [node-1]\n")
+    real = await _host_run(db, output="PLAY [unbork] ***\nok: [node-1]\n")
     quoted = await _host_run(db, output="changed: ''\n")
 
     conn = await db.connection()
@@ -90,5 +90,5 @@ async def test_the_rewrite_empties_only_the_two_quote_rows(db):
         await db.refresh(row)
 
     assert stale.output == ""
-    assert real.output == "PLAY [labdog] ***\nok: [node-1]\n"
+    assert real.output == "PLAY [unbork] ***\nok: [node-1]\n"
     assert quoted.output == "changed: ''\n"

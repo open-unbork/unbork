@@ -44,7 +44,7 @@ from app.ai.gate import GateDecision, decide
 UNAVAILABLE_MESSAGE = (
     "The Claude Agent SDK is not installed. The official container image "
     "ships it; package installs do not, so add it with "
-    "`pip install 'labdog-backend[agent]'` on this host."
+    "`pip install 'unbork-backend[agent]'` on this host."
 )
 
 

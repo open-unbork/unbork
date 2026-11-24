@@ -5,7 +5,7 @@ behind a TLS-terminating reverse proxy, with persistent volumes
 and env-sourced secrets.
 
 > **Canonical alternative:** the `.deb` / `.rpm` install with the
-> systemd unit at [`packaging/systemd/labdog.service`](../packaging/systemd/labdog.service)
+> systemd unit at [`packaging/systemd/unbork.service`](../packaging/systemd/unbork.service)
 > is the canonical production deployment for non-container hosts.
 > It is documented in the main [README](./README.md#installation).
 > This compose example is for shops that already run Docker and
@@ -15,7 +15,7 @@ and env-sourced secrets.
 - [compose.yaml](#composeyaml)
 - [Caddyfile](#caddyfile)
 - [Secrets via .env](#secrets-via-env)
-- [labdog.toml](#labdogtoml)
+- [unbork.toml](#unborktoml)
 - [Sizing Postgres connections](#sizing-postgres-connections)
 - [Bring it up](#bring-it-up)
 - [Upgrading PostgreSQL 16 → 18](#upgrading-postgresql-16--18)
@@ -30,7 +30,7 @@ and env-sourced secrets.
 ├── compose.yaml
 ├── Caddyfile
 ├── .env                    # secrets — chmod 0600, NOT in git
-├── labdog.toml             # non-secret config
+├── unbork.toml             # non-secret config
 └── caddy_data/             # ACME certs (auto-managed by Caddy)
 ```
 
@@ -40,11 +40,11 @@ Volumes managed by the compose file:
   `/var/lib/postgresql` (PG 18 keeps the cluster in a version-specific
   subdirectory below that — do **not** mount at `.../data`).
 - `unbork_packs` — DB-backed action-pack checkouts. Mounts onto
-  `ansible.packs_root_dir` (default `/var/lib/labdog/packs` —
+  `ansible.packs_root_dir` (default `/var/lib/unbork/packs` —
   see `backend/app/config.py`). Every action pack is synced into it,
-  including the seeded `labdog-playbooks` one; without the volume they
+  including the seeded `unbork-playbooks` one; without the volume they
   are cloned again on every start. A site without GitHub access edits
-  the `labdog-playbooks` repository (**Settings › Git repositories**) to
+  the `unbork-playbooks` repository (**Settings › Git repositories**) to
   point at an internal mirror, or adds a local-directory pack.
 - `caddy_data` — Caddy's ACME state.
 
@@ -57,14 +57,14 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: labdog
+      POSTGRES_USER: unbork
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: labdog
+      POSTGRES_DB: unbork
     volumes:
       # PG 18: mount the parent dir, not .../data (see "Upgrading" note below).
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labdog"]
+      test: ["CMD-SHELL", "pg_isready -U unbork"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -83,26 +83,31 @@ services:
   unbork:
     image: unbork/unbork:1.0.0    # pin a real version
     environment:
-      LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:${POSTGRES_PASSWORD}@postgres:5432/labdog
-      LABDOG_REDIS__URL: redis://redis:6379/0
-      LABDOG_SECURITY__SECRET_KEY: ${LABDOG_SECURITY__SECRET_KEY}
-      LABDOG_SECURITY__ENCRYPTION_KEY: ${LABDOG_SECURITY__ENCRYPTION_KEY}
-      LABDOG_SECURITY__LABDOG_SERVER_IP: ${LABDOG_SECURITY__LABDOG_SERVER_IP}
-      LABDOG_SECURITY__COOKIE_SECURE: "true"
-      LABDOG_SECURITY__ALLOWED_ORIGINS: '["https://unbork.example.com"]'
-      LABDOG_TLS__FORCE_HTTPS: "true"
-      LABDOG_SERVER__TRUSTED_PROXIES: '["caddy"]'
-      LABDOG_SERVER__FORWARDED_ALLOW_IPS: "*"
+      UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:${POSTGRES_PASSWORD}@postgres:5432/unbork
+      UNBORK_REDIS__URL: redis://redis:6379/0
+      UNBORK_SECURITY__SECRET_KEY: ${UNBORK_SECURITY__SECRET_KEY}
+      UNBORK_SECURITY__ENCRYPTION_KEY: ${UNBORK_SECURITY__ENCRYPTION_KEY}
+      UNBORK_SECURITY__UNBORK_SERVER_IP: ${UNBORK_SECURITY__UNBORK_SERVER_IP}
+      UNBORK_SECURITY__COOKIE_SECURE: "true"
+      UNBORK_SECURITY__ALLOWED_ORIGINS: '["https://unbork.example.com"]'
+      UNBORK_TLS__FORCE_HTTPS: "true"
+      UNBORK_SERVER__TRUSTED_PROXIES: '["caddy"]'
+      UNBORK_SERVER__FORWARDED_ALLOW_IPS: "*"
     volumes:
-      - unbork_packs:/var/lib/labdog/packs
+      - unbork_packs:/var/lib/unbork/packs
       # Claude Code's own session files. Only needed if you use a Claude
       # subscription provider — but then it is load-bearing: an AI session
       # paused waiting for your approval resumes from here, and a pause can
       # last a day. Without the volume, upgrading the image mid-approval
       # loses everything the assistant established before it stopped.
-      - unbork_claude:/var/lib/labdog/claude-cli
+      - unbork_claude:/var/lib/unbork/claude-cli
+      # The Claude Code program those providers run. The image does not
+      # ship it: unbork downloads it from files.pythonhosted.org the first
+      # time it is needed. Without this volume it is downloaded again
+      # after every container replacement.
+      - unbork_claude_code:/var/lib/unbork/claude-code
       # Optional: mount a host-side TOML for non-secret tunables.
-      - ./labdog.toml:/etc/labdog/labdog.toml:ro
+      - ./unbork.toml:/etc/unbork/unbork.toml:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -130,11 +135,18 @@ volumes:
   postgres_data:
   unbork_packs:
   unbork_claude:
+  unbork_claude_code:
   caddy_data:
   caddy_config:
 ```
 
 ---
+
+Not using the AI assistant? Add `UNBORK_ASSISTANT__ENABLED: "false"` to
+the `unbork` service's environment (or `[assistant] enabled = false` in
+`unbork.toml`) and drop the two Claude volumes, or build the image with
+`--build-arg WITH_ASSISTANT=0`. See
+[Running without the assistant](ui/assistant.md#running-without-the-assistant).
 
 ## Caddyfile
 
@@ -166,7 +178,7 @@ in a local CA cert via `tls /etc/ssl/certs/unbork.crt
 
 ## Secrets via .env
 
-**Do NOT bake secrets into `labdog.toml`.** Source them from the
+**Do NOT bake secrets into `unbork.toml`.** Source them from the
 environment, where they're easier to rotate and won't end up in a
 container image, a git repo, or a backup snapshot tarball by
 accident.
@@ -174,9 +186,9 @@ accident.
 ```bash
 # /srv/unbork/.env  — chmod 0600, owned by root or the deploy user
 POSTGRES_PASSWORD=<run: openssl rand -base64 24>
-LABDOG_SECURITY__SECRET_KEY=<run: openssl rand -base64 32>
-LABDOG_SECURITY__ENCRYPTION_KEY=<run: openssl rand -base64 32>
-LABDOG_SECURITY__LABDOG_SERVER_IP=10.0.0.42
+UNBORK_SECURITY__SECRET_KEY=<run: openssl rand -base64 32>
+UNBORK_SECURITY__ENCRYPTION_KEY=<run: openssl rand -base64 32>
+UNBORK_SECURITY__UNBORK_SERVER_IP=10.0.0.42
 ```
 
 Generate the keys once, on the deploy host:
@@ -201,10 +213,10 @@ entrypoint shim — but `.env` with `chmod 0600` is the minimum bar.
 
 ---
 
-## labdog.toml
+## unbork.toml
 
 The non-secret subset. Mount this into the container at
-`/etc/labdog/labdog.toml`. Anything sensitive belongs in the
+`/etc/unbork/unbork.toml`. Anything sensitive belongs in the
 environment (see above) — env values override TOML values.
 
 ```toml
@@ -225,7 +237,7 @@ min_prefix    = 22
 max_bulk_add  = 100
 
 [ansible]
-packs_root_dir = "/var/lib/labdog/packs"
+packs_root_dir = "/var/lib/unbork/packs"
 
 [rate_limit]
 enabled = true
@@ -234,7 +246,7 @@ api     = "100/minute"
 ```
 
 How long the audit log, action runs and drift samples are kept is not a
-`labdog.toml` setting. Set it once unbork is up, under
+`unbork.toml` setting. Set it once unbork is up, under
 [Settings › System](ui/settings.md#logging-and-retention); a production
 install usually wants the audit log kept longer than the 90-day default.
 
@@ -278,7 +290,7 @@ in the main README.
 
 For backups, see [backup-restore.md](./backup-restore.md). The
 backup script needs the Postgres credentials and read access to
-`labdog.toml` (or whichever env source holds the encryption key) —
+`unbork.toml` (or whichever env source holds the encryption key) —
 it does not need to run inside the container.
 
 ---
@@ -293,7 +305,7 @@ a major version won't start on a cluster written by an older major.
 Because unbork's database is small, a **logical dump/restore** is the
 right method (not in-place `pg_upgrade`).
 
-> **Keep `LABDOG_SECURITY__ENCRYPTION_KEY` (and `SECRET_KEY`)
+> **Keep `UNBORK_SECURITY__ENCRYPTION_KEY` (and `SECRET_KEY`)
 > unchanged.** unbork encrypts stored SSH credentials at the app layer,
 > so the dump holds ciphertext — restoring under a different encryption
 > key makes every credential undecryptable.
@@ -309,7 +321,7 @@ docker run --rm -v unbork_postgres_data:/data -v "$PWD":/backup alpine \
 docker compose stop unbork
 
 # 3. Dump the database from the running PG 16 container.
-docker compose exec -T postgres pg_dump -U labdog -Fc labdog > labdog-$(date +%F).dump
+docker compose exec -T postgres pg_dump -U unbork -Fc unbork > unbork-$(date +%F).dump
 
 # 4. Stop the stack.
 docker compose down
@@ -323,11 +335,11 @@ docker compose down
 ```bash
 # 6. Bring up only Postgres so a fresh PG 18 cluster initializes.
 docker compose up -d postgres
-docker compose exec postgres pg_isready -U labdog   # wait until ready
+docker compose exec postgres pg_isready -U unbork   # wait until ready
 
 # 7. Restore into the fresh cluster.
-docker compose exec -T postgres pg_restore -U labdog -d labdog \
-  --clean --if-exists < labdog-$(date +%F).dump
+docker compose exec -T postgres pg_restore -U unbork -d unbork \
+  --clean --if-exists < unbork-$(date +%F).dump
 
 # 8. Start the app (Alembic is a no-op — the dump is already at head).
 docker compose up -d
@@ -341,6 +353,17 @@ docker volume rm unbork_postgres_data
 **Redis needs none of this** — Redis 8 reads 7.x RDB/AOF and unbork's
 Redis holds only transient broker/schedule state, so
 `redis:7.4-alpine` → `redis:8-alpine` is a plain tag swap.
+
+---
+
+## Licence and source
+
+unbork is AGPL-3.0-or-later. If you change it and let people use it over
+the network, offer them the source of your version (section 13 of the
+licence); unchanged, the image's `SOURCE-OFFER.md` already says where it
+is. The image lists every third-party component it ships, with its
+licence, in `/usr/share/doc/unbork/THIRD-PARTY-NOTICES`
+([details](./README.md#licence-and-third-party-notices)).
 
 ---
 

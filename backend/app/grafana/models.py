@@ -46,7 +46,7 @@ class GrafanaInstance(Base):
     verify_ssl: Mapped[bool] = mapped_column(Boolean, default=True)
     # Plaintext PEM CA certificate (NOT encrypted — CA certs are public).
     ca_cert_pem: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
-    # At most one default **per kind** — the Mimir LabDog queries for host
+    # At most one default **per kind** — the Mimir unbork queries for host
     # metrics, and the Mimir/Loki it injects into the Alloy action when none
     # is explicitly chosen. Enforced in the API layer.
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

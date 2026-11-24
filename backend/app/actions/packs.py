@@ -69,7 +69,7 @@ def _resolve_within_pack(
 
     A manifest is content from a git remote or an operator-supplied
     directory, so its paths are input rather than configuration. Without
-    this, ``playbook: ../../../../etc/labdog/labdog.toml`` resolved outside
+    this, ``playbook: ../../../../etc/unbork/unbork.toml`` resolved outside
     the checkout and was read into the run — and because a parse failure
     reports the offending content, the file came back out in the run output
     shown in the UI. An arbitrary-file-read primitive from a pack repo.

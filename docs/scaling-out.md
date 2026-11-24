@@ -7,7 +7,7 @@ containers, one per **role**, so worker capacity scales on its own.
 
 ## Roles
 
-Set `LABDOG_ROLE` (or pass `--role` to `python -m app`). A comma list runs
+Set `UNBORK_ROLE` (or pass `--role` to `python -m app`). A comma list runs
 several roles in one container.
 
 | Role | Runs | Notes |
@@ -37,13 +37,13 @@ docker compose -f dev/docker-compose.split.yml up -d --scale worker=2 --scale wo
 
 | Setting | Used by | Default |
 | --- | --- | --- |
-| `celery.concurrency` (`LABDOG_CELERY__CONCURRENCY`) | `work` in `all`, `worker` | 4 |
+| `celery.concurrency` (`UNBORK_CELERY__CONCURRENCY`) | `work` in `all`, `worker` | 4 |
 | `celery.drift_concurrency` | `worker-drift` | 4 |
 | `celery.actions_concurrency` | `worker-actions` | 4 |
 | `celery.orchestrator_concurrency` | `orchestrator` | 4 |
 
-Every container needs the same `LABDOG_DATABASE__URL`, `LABDOG_REDIS__URL`,
-`LABDOG_SECURITY__SECRET_KEY` and `LABDOG_SECURITY__ENCRYPTION_KEY`.
+Every container needs the same `UNBORK_DATABASE__URL`, `UNBORK_REDIS__URL`,
+`UNBORK_SECURITY__SECRET_KEY` and `UNBORK_SECURITY__ENCRYPTION_KEY`.
 
 ## Drift checks
 
@@ -86,10 +86,16 @@ front of Postgres once the total grows.
 * **One `beat`.** Two schedulers against one RedBeat keyspace would fire
   every periodic job twice.
 * **One pack checkout, shared.** Mount the same volume at
-  `/var/lib/labdog/packs` (`ansible.packs_root_dir`) in every container,
+  `/var/lib/unbork/packs` (`ansible.packs_root_dir`) in every container,
   as the example compose file does. A pack you add or sync in the UI is
   synced by the `api` container alone, and workers reload the action
   registry from what is on their disk. With a disk each, workers would
   keep running the old playbook, or fail a new action as "not found in
   registry", until they restarted. Concurrent syncs into the shared
   volume are safe: the checkout lock is a Postgres advisory lock.
+* **One Claude Code program, shared** (only with a "Claude agent" or
+  "Claude single-shot" provider). Mount the same volume at
+  `/var/lib/unbork/claude-code` in the `api` container and every worker.
+  The providers page and Test read the API's copy and a worker
+  downloads it; with a disk each, the page keeps saying "installing" and
+  each worker downloads its own copy on its first session.

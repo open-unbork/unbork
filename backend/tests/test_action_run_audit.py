@@ -216,7 +216,7 @@ async def test_alert_run_writes_one_started_row_with_no_user(db, monkeypatch):
         alertname="NginxDown",
         severity="critical",
         status="firing",
-        labels={"alertname": "NginxDown", "labdog_action": "example"},
+        labels={"alertname": "NginxDown", "unbork_action": "example"},
         annotations={},
         starts_at=datetime.now(UTC),
         host_id=host.id,

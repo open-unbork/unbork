@@ -59,7 +59,7 @@ Everything lives in `components/shell/`:
 becomes an overlay that closes on navigation; below 640px the rail is a
 bottom tab bar and the pane is gone. The desktop rail is icons-only by
 default and expands to icons with names (the `»`/`«` button at its foot, or
-`]`); the choice is a per-browser `useLocalPref` (`labdog.rail`), and an
+`]`); the choice is a per-browser `useLocalPref` (`unbork.rail`), and an
 overlay pane starts at the rail's current width. Keyboard: `⌘K`/`Ctrl+K`
 palette, `[` toggles the pane, `]` expands or collapses the rail, `t`
 toggles the theme (never while typing in a field).
@@ -144,7 +144,7 @@ rn/m — which is most of what reading a hostname or an address needs.
 Two themes, both defined as tokens in `app/globals.css` under
 `html[data-theme="dark"]` (primary) and `html[data-theme="light"]` (a real
 second theme, not an inversion). `next-themes` writes both `class` and
-`data-theme` on `<html>`, persisted under `labdog:theme`.
+`data-theme` on `<html>`, persisted under `unbork:theme`.
 
 | Token | Tailwind | Use |
 |-------|----------|-----|

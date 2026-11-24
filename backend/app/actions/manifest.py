@@ -53,7 +53,7 @@ class MetricsBackendMapping(BaseModel):
     from the Mimir and Loki instances that host resolves to (its own
     assignment, else its highest-priority group's, else the default; see
     ``app.grafana.service.resolve_host_instance``), so e.g.
-    labdog-playbooks' alloy-install action ships to the same backend unbork
+    unbork-playbooks' alloy-install action ships to the same backend unbork
     queries for that host, without the operator re-typing URLs. Keeping the
     var *names* in the manifest means unbork core never hardcodes
     ``alloy_*``.
@@ -219,9 +219,9 @@ class ActionManifest(BaseModel):
         description=(
             "Opt-in mapping that lets unbork inject each host's Grafana "
             "destinations (URLs, tenants, TLS verification) into this action's "
-            "playbook vars at dispatch (e.g. labdog-playbooks' alloy-install "
+            "playbook vars at dispatch (e.g. unbork-playbooks' alloy-install "
             "action). unbork also "
-            "always injects labdog_host_id / labdog_hostname for per-host "
+            "always injects unbork_host_id / unbork_hostname for per-host "
             "runs so shipped metrics are queryable back."
         ),
     )
@@ -254,7 +254,7 @@ class ActionManifest(BaseModel):
             "after the action succeeds. Each named module is dispatched "
             "through the normal sync pipeline against the same target "
             "host (per-host fan-out for group-dispatched actions). "
-            "Semantics are 'push labdog's desired state', NOT 'collect "
+            "Semantics are 'push unbork's desired state', NOT 'collect "
             "current state' -- only declare modules where re-enforcing "
             "the existing config is what the action wants. Skipped on "
             "dry-run and on action failure. Module names must match "
@@ -278,7 +278,7 @@ class ActionManifest(BaseModel):
     post_run_register: dict[str, list[dict[str, Any]]] = Field(
         default_factory=dict,
         description=(
-            "Resources to register as host-scope overrides in labdog's "
+            "Resources to register as host-scope overrides in unbork's "
             "desired-state model after the action succeeds. Top-level "
             "keys are canonical module names (packages, resolver, "
             "services, hosts-file, cron, linux-users, firewall); each "
@@ -290,12 +290,12 @@ class ActionManifest(BaseModel):
             "action succeeded. Conflicts (uniqueness collisions with "
             "existing rows) are skipped silently and logged so "
             "operator-declared rows win over action-declared ones. "
-            "Use this for actions that install resources labdog "
+            "Use this for actions that install resources unbork "
             "should manage going forward (e.g. install Alloy + "
             "register alloy.service + alloy package). Do NOT use "
             "actions to mutate firewall, hosts-file, resolver, or "
             "SSH-keys without first declaring them here or via "
-            "labdog's UI/API -- those modules purge unknown entries "
+            "unbork's UI/API -- those modules purge unknown entries "
             "on next sync."
         ),
     )

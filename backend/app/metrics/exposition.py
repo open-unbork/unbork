@@ -40,9 +40,9 @@ class Sample:
 
     ``suffix`` is appended to the family name to form the full metric name
     — ``""`` for gauges/counters (whose family name is already complete,
-    e.g. ``labdog_sync_jobs_total``), or ``"_bucket"`` / ``"_sum"`` /
+    e.g. ``unbork_sync_jobs_total``), or ``"_bucket"`` / ``"_sum"`` /
     ``"_count"`` for histogram components (whose family name is the base,
-    e.g. ``labdog_sync_job_duration_seconds``).
+    e.g. ``unbork_sync_job_duration_seconds``).
     """
 
     suffix: str

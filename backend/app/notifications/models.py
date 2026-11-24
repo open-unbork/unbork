@@ -121,7 +121,7 @@ class Notification(Base):
     recipient: Mapped[str] = mapped_column(String(255), nullable=False)
     subject: Mapped[str] = mapped_column(String(300), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    #: Path inside LabDog this message points at, e.g. ``/alerts``. Joined
+    #: Path inside unbork this message points at, e.g. ``/alerts``. Joined
     #: to ``notifications.public_url`` at send time, never to a request's
     #: Host header — a link built from that is whatever the requester says.
     link_path: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)

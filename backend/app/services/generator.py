@@ -5,7 +5,7 @@ from app.enum_utils import enum_str
 
 def generate_cleanup_tasks(desired_services: list[dict]) -> tuple[list[dict], list[str], list[str]]:
     """
-    Generate Ansible tasks to remove orphaned LabDog-managed unit files and overrides.
+    Generate Ansible tasks to remove orphaned unbork-managed unit files and overrides.
 
     Runs before any deploy tasks so stale files are removed first.
 
@@ -32,27 +32,27 @@ def generate_cleanup_tasks(desired_services: list[dict]) -> tuple[list[dict], li
                 allowed_unit_paths.append(f"/etc/systemd/system/{service_name}.service")
             elif deploy_mode == "override":
                 allowed_override_paths.append(
-                    f"/etc/systemd/system/{service_name}.service.d/labdog.conf"
+                    f"/etc/systemd/system/{service_name}.service.d/unbork.conf"
                 )
 
     tasks: list[dict] = [
         # --- Override drop-in cleanup ---
         {
-            "name": "Find LabDog override files",
+            "name": "Find unbork override files",
             "ansible.builtin.find": {
                 "paths": "/etc/systemd/system",
-                "patterns": "labdog.conf",
+                "patterns": "unbork.conf",
                 "recurse": True,
             },
-            "register": "labdog_overrides",
+            "register": "unbork_overrides",
         },
         {
-            "name": "Remove orphaned LabDog overrides",
+            "name": "Remove orphaned unbork overrides",
             "ansible.builtin.file": {
                 "path": Template("{{ item.path }}"),
                 "state": "absent",
             },
-            "loop": Template("{{ labdog_overrides.files }}"),
+            "loop": Template("{{ unbork_overrides.files }}"),
             "when": "item.path not in allowed_override_paths",
         },
         {
@@ -61,28 +61,28 @@ def generate_cleanup_tasks(desired_services: list[dict]) -> tuple[list[dict], li
                 "path": Template("{{ item.path | dirname }}"),
                 "state": "absent",
             },
-            "loop": Template("{{ labdog_overrides.files }}"),
+            "loop": Template("{{ unbork_overrides.files }}"),
             "when": "item.path not in allowed_override_paths",
         },
         # --- Full unit file cleanup ---
         {
-            "name": "Find LabDog-managed unit files",
+            "name": "Find unbork-managed unit files",
             "ansible.builtin.shell": {
                 "cmd": (
-                    "grep -rl '# Managed by LabDog'"
+                    "grep -rl '# Managed by unbork'"
                     " /etc/systemd/system/*.service 2>/dev/null || true"
                 ),
             },
-            "register": "labdog_units",
+            "register": "unbork_units",
             "changed_when": False,
         },
         {
-            "name": "Remove orphaned LabDog unit files",
+            "name": "Remove orphaned unbork unit files",
             "ansible.builtin.file": {
                 "path": Template("{{ item }}"),
                 "state": "absent",
             },
-            "loop": Template("{{ labdog_units.stdout_lines }}"),
+            "loop": Template("{{ unbork_units.stdout_lines }}"),
             "when": "item not in allowed_unit_paths",
         },
         # --- Daemon reload after cleanup ---
@@ -92,8 +92,8 @@ def generate_cleanup_tasks(desired_services: list[dict]) -> tuple[list[dict], li
                 "daemon_reload": True,
             },
             "when": (
-                "(labdog_overrides.files | length > 0)"
-                " or (labdog_units.stdout_lines | default([]) | length > 0)"
+                "(unbork_overrides.files | length > 0)"
+                " or (unbork_units.stdout_lines | default([]) | length > 0)"
             ),
         },
     ]
@@ -167,7 +167,7 @@ def generate_service_playbook(
                         "name": f"Deploy unit file for {service_name}",
                         "ansible.builtin.copy": {
                             "dest": f"/etc/systemd/system/{service_name}.service",
-                            "content": f"# Managed by LabDog\n{unit_content}",
+                            "content": f"# Managed by unbork\n{unit_content}",
                             "owner": "root",
                             "group": "root",
                             "mode": "0644",
@@ -197,7 +197,7 @@ def generate_service_playbook(
                             "name": f"Deploy override file for {service_name}",
                             "ansible.builtin.copy": {
                                 "dest": (
-                                    f"/etc/systemd/system/{service_name}.service.d/labdog.conf"
+                                    f"/etc/systemd/system/{service_name}.service.d/unbork.conf"
                                 ),
                                 "content": unit_content,
                                 "owner": "root",
@@ -237,7 +237,7 @@ def generate_service_playbook(
 
     playbook = [
         {
-            "name": "LabDog service management",
+            "name": "unbork service management",
             "hosts": "all",
             "become": True,
             "gather_facts": False,

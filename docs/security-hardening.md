@@ -25,8 +25,8 @@ front of it. **Do not expose `0.0.0.0:8000` directly on a public
 interface** — it has no TLS, no rate limiting at the network
 layer, and no request-size cap.
 
-Set `[server] host = "127.0.0.1"` in `/etc/labdog/labdog.toml` (or
-`LABDOG_SERVER__HOST=127.0.0.1` in the environment) on production
+Set `[server] host = "127.0.0.1"` in `/etc/unbork/unbork.toml` (or
+`UNBORK_SERVER__HOST=127.0.0.1` in the environment) on production
 hosts.
 
 ### nginx
@@ -128,8 +128,8 @@ force_https = true          # 301 redirect any plain-HTTP request
 Or via environment:
 
 ```bash
-LABDOG_SECURITY__COOKIE_SECURE=true
-LABDOG_TLS__FORCE_HTTPS=true
+UNBORK_SECURITY__COOKIE_SECURE=true
+UNBORK_TLS__FORCE_HTTPS=true
 ```
 
 When either flag is true, unbork also emits an HSTS header
@@ -315,6 +315,13 @@ granting every operator the autonomy levels you allow.
 Off by default, and worth understanding before turning it on: it is the
 one feature that runs commands nobody wrote in advance.
 
+A server that should never run it can leave it out entirely:
+`[assistant] enabled = false` in the config file, or an image built with
+`--build-arg WITH_ASSISTANT=0`, which has no Agent SDK and cannot be
+switched back on. Then no AI route, task or setting exists for an admin
+session to turn on. See
+[Running without the assistant](ui/assistant.md#running-without-the-assistant).
+
 **What bounds it**
 
 - **`ai.enabled`** gates every entry point — chat, scheduled checks, and
@@ -345,7 +352,8 @@ one feature that runs commands nobody wrote in advance.
 **What to decide deliberately**
 
 - **`ai.allow_cloud_providers`** (default off) is the data-egress
-  control. While off, only local endpoints and the Claude CLI may run.
+  control. While off, only local endpoints may run; the Claude agent and
+  Claude single-shot types count as off-network.
   Turning it on means host state — command output, hostnames, package
   and service inventories — leaves your network. Redaction is a safety
   net, not a guarantee.
@@ -377,9 +385,9 @@ write rows unbork might then spend money investigating. Restrict the path
 at the reverse proxy as well if Grafana reaches unbork over an untrusted
 network.
 
-An alert asks for what it wants with Grafana labels: `labdog_action`
-names an action to run on its host, `labdog_ai=true` an investigation,
-`labdog_ai_automate=true` one that may fix things. **An action runs only
+An alert asks for what it wants with Grafana labels: `unbork_action`
+names an action to run on its host, `unbork_ai=true` an investigation,
+`unbork_ai_automate=true` one that may fix things. **An action runs only
 if it is on the list of actions alerts may run** (Alerts › Handling),
 which starts empty, and only on the hosts its entry allows. Keep that
 list to actions you would be happy to see run at 3 a.m. on any host it
@@ -388,7 +396,7 @@ covers, with the parameters you set there; labels cannot change them.
 Alert-driven sessions are **read-only by default**.
 `ai.alert_autonomy_level` can raise every alert to `approval`. Full auto
 is reached only by an alert marked for it: by default one carrying the
-label `labdog_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled`
+label `unbork_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled`
 on, one matching a rule in `ai.alert_full_auto_rules`. There is no
 instance-wide full auto for alerts. Under the label default, that label
 is all an alert needs. Whoever can edit alert rules in Grafana, or post
@@ -401,7 +409,7 @@ safeguards matter:
 - **Lock the trigger three ways.** The webhook token is always required:
   a webhook-delivered alert is refused full auto while `[alerts]
   webhook_token` is shorter than 32 characters, and the same goes for
-  running the action its [`labdog_action`](ui/alerts.md#running-an-action)
+  running the action its [`unbork_action`](ui/alerts.md#running-an-action)
   label names. Use `openssl rand -hex 16` or longer. Whenever full auto or
   alert-started actions are on, also set `[alerts] allowed_sources` to
   Grafana's address (with `[server] trusted_proxies` behind a reverse
@@ -440,27 +448,27 @@ require TLS on the connection:
 
 ```toml
 [database]
-url = "postgresql+asyncpg://labdog:<password>@db.example.com:5432/labdog?ssl=require"
+url = "postgresql+asyncpg://unbork:<password>@db.example.com:5432/unbork?ssl=require"
 ```
 
 (asyncpg accepts `ssl=require` / `ssl=verify-full` as URL params.
 For `verify-full`, also configure a CA bundle on the unbork host.)
 
-Restrict the `labdog` DB role to the `labdog` schema and database;
+Restrict the `unbork` DB role to the `unbork` schema and database;
 do not give it `SUPERUSER` or `CREATEDB`. A representative grant
 script run as the Postgres superuser:
 
 ```sql
 -- Run as postgres
-CREATE DATABASE labdog;
-CREATE USER labdog WITH PASSWORD '<strong random password>';
-GRANT CONNECT ON DATABASE labdog TO labdog;
-\c labdog
-GRANT USAGE, CREATE ON SCHEMA public TO labdog;
+CREATE DATABASE unbork;
+CREATE USER unbork WITH PASSWORD '<strong random password>';
+GRANT CONNECT ON DATABASE unbork TO unbork;
+\c unbork
+GRANT USAGE, CREATE ON SCHEMA public TO unbork;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO labdog;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO unbork;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO labdog;
+  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO unbork;
 ```
 
 Alembic migrations run as this role, so it needs DDL on its own
@@ -478,7 +486,7 @@ guidance still applies.
 (SSH private keys, Proxmox API tokens, git HTTPS PATs, Grafana bearer
 tokens). It is the single most sensitive piece of state in the system.
 
-- **Never commit** `/etc/labdog/labdog.toml` or any backup of it to
+- **Never commit** `/etc/unbork/unbork.toml` or any backup of it to
   a git repo. If it lands in git history, treat every stored
   credential as compromised and rotate.
 - **Never paste** the key into chat, email, ticket attachments,
@@ -486,7 +494,7 @@ tokens). It is the single most sensitive piece of state in the system.
 - **Store** the key in a secret manager (HashiCorp Vault, AWS
   Secrets Manager, GCP Secret Manager, Bitwarden, 1Password, etc.)
   alongside your other production secrets. Inject it into the
-  process via `LABDOG_SECURITY__ENCRYPTION_KEY` rather than leaving
+  process via `UNBORK_SECURITY__ENCRYPTION_KEY` rather than leaving
   it in the on-disk TOML — file-system perms are easier to get
   wrong than a secrets-manager IAM policy.
 - **Back it up** together with the database (see

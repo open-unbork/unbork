@@ -10,19 +10,19 @@ containers (300 hosts used about 6 GB RAM in total).
 
 ```sh
 ./prepare.sh                     # SSH key, .env secrets, ansible.posix, fakehost image
-LABDOG_IMAGE=unbork/unbork:dev-<sha> ./run_one.sh S2 300 default
+UNBORK_IMAGE=unbork/unbork:dev-<sha> ./run_one.sh S2 300 default
 ./run_matrix.sh                  # S1-S5 x default/raised at 300, then S1 at 50/150
 ```
 
 Results land in `results/<SID>-n<N>-<cfg>/`: `measure.txt` (the
 `measure_live.sql` queries over the window), `samples.csv` (every 10 s),
-`drift_samples.csv`, `marks.json`, `seed.log`, `labdog-log.gz`.
+`drift_samples.csv`, `marks.json`, `seed.log`, `unbork-log.gz`.
 
 ## Pieces
 
 | File | What it does |
 |---|---|
-| `docker-compose.yml` | postgres, redis, labdog, `fakehost` (scaled to N) on 172.30.0.0/16; API on 127.0.0.1:8000 only |
+| `docker-compose.yml` | postgres, redis, unbork, `fakehost` (scaled to N) on 172.30.0.0/16; API on 127.0.0.1:8000 only |
 | `fakehost/` | Debian slim with sshd, sudo, cron, python3-apt; `netem` adds `NETEM_DELAY_MS` (20 ms); memory limit `FAKEHOST_MEM_LIMIT` (128m) |
 | `pack/` | local pack with action `loadtest-sleep` (gather facts, sleep, write a marker) |
 | `seed.py N` | admin, SSH key, hosts, overlapping groups with config for packages, hosts-file, cron, linux-users, resolver; drift on; initial bulk sync, then checks it applied |

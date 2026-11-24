@@ -1,6 +1,6 @@
 """BUG-57: a clash is settled by priority, at every level.
 
-LabDog's merge model is priority-ordered: groups are walked highest
+unbork's merge model is priority-ordered: groups are walked highest
 priority first, and the first entry to claim a merge key wins. The
 per-entry ``priority`` column was not part of that. BUG-69 wired it in
 for group-level entries — those reads are ordered ``priority DESC,

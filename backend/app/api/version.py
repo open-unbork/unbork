@@ -9,6 +9,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 
+from app.features import features
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["version"])
@@ -28,7 +30,7 @@ _UNKNOWN_VERSION = "0.0.0+unknown"
 
 def _resolve_commit_sha() -> str | None:
     """Return the full commit SHA, or None when unavailable."""
-    value = os.environ.get("LABDOG_COMMIT_SHA", "").strip()
+    value = os.environ.get("UNBORK_COMMIT_SHA", "").strip()
     if value:
         return value
     try:
@@ -44,7 +46,7 @@ def _resolve_commit_sha() -> str | None:
 
 def _resolve_build_date() -> str | None:
     """Return a validated ISO 8601 build-date string, or None when unavailable."""
-    raw = os.environ.get("LABDOG_BUILD_DATE", "").strip()
+    raw = os.environ.get("UNBORK_BUILD_DATE", "").strip()
     if not raw:
         try:
             from app._build_info import BUILD_DATE  # type: ignore[import-not-found]
@@ -58,7 +60,7 @@ def _resolve_build_date() -> str | None:
         datetime.fromisoformat(raw.replace("Z", "+00:00"))
         return raw
     except ValueError:
-        logger.warning("LABDOG_BUILD_DATE %r is not valid ISO 8601 — returning null", raw)
+        logger.warning("UNBORK_BUILD_DATE %r is not valid ISO 8601 — returning null", raw)
         return None
 
 
@@ -68,10 +70,10 @@ def _resolve_version() -> str:
     Resolution order:
       1. installed package metadata — the canonical source for pip/uv
          installs (and the .deb/.rpm packages);
-      2. ``LABDOG_VERSION`` env override;
+      2. ``UNBORK_VERSION`` env override;
       3. the ``VERSION`` file bundled at the app root — the container runs
          from source with deps installed via ``--no-emit-project``, so the
-         ``labdog-backend`` ``.dist-info`` is absent and step 1 fails there;
+         ``unbork-backend`` ``.dist-info`` is absent and step 1 fails there;
       4. ``app._build_info.VERSION`` if a build stamped one;
       5. a last-resort sentinel.
 
@@ -80,11 +82,11 @@ def _resolve_version() -> str:
     must degrade to a sentinel, not a 500.
     """
     try:
-        return importlib.metadata.version("labdog-backend")
+        return importlib.metadata.version("unbork-backend")
     except importlib.metadata.PackageNotFoundError:
         pass
 
-    env = os.environ.get("LABDOG_VERSION", "").strip()
+    env = os.environ.get("UNBORK_VERSION", "").strip()
     if env:
         return env
 
@@ -107,7 +109,7 @@ def _resolve_version() -> str:
         pass
 
     logger.warning(
-        "labdog-backend version unresolved (no dist metadata, LABDOG_VERSION, "
+        "unbork-backend version unresolved (no dist metadata, UNBORK_VERSION, "
         "VERSION file, or _build_info) — reporting %r",
         _UNKNOWN_VERSION,
     )
@@ -132,6 +134,9 @@ class VersionResponse(BaseModel):
     build_date: str | None
     license: str
     repo_url: str
+    #: Optional parts this server loads (C-026), known before sign-in so
+    #: the login page and the shell can leave out what is absent.
+    features: dict[str, bool]
 
 
 # ---------------------------------------------------------------------------
@@ -153,4 +158,5 @@ async def get_version() -> VersionResponse:
         build_date=_BUILD_DATE,
         license=_LICENSE,
         repo_url=_REPO_URL,
+        features=features(),
     )

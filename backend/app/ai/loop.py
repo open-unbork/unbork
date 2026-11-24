@@ -592,7 +592,7 @@ class AgentLoop:
         """Count the command against the cap and add it to the audit log."""
         self.session.command_count += 1
         # Commands against managed hosts belong in the same audit trail
-        # as any other change LabDog makes to them.
+        # as any other change unbork makes to them.
         await log_action(
             self.db,
             action="ai_command",

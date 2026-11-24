@@ -4,7 +4,7 @@ Migration 0038 dropped ``firewall_rules.is_system`` and
 ``hosts_entries.is_system`` because no code path had ever written either:
 the create schemas do not accept the field, the GitOps importers strip
 ``system: true`` before a row is built, and the only system rules and
-entries LabDog has are synthesised at merge time. Five API guards, four
+entries unbork has are synthesised at merge time. Five API guards, four
 importer filters and two UI branches were protecting rows that could only
 be made by hand.
 

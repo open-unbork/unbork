@@ -1,6 +1,6 @@
 # Which commands an AI session may run without anyone approving them.
 #
-# LabDog parses every command an AI session issues (app/ai/safety.py) and
+# unbork parses every command an AI session issues (app/ai/safety.py) and
 # looks it up here. A command this file calls read-only runs in a read-only
 # session and needs no approval in an approval session. Anything else is
 # treated as a change: refused at read-only, held for approval at approval.
@@ -40,7 +40,7 @@
 #
 # An option that is not declared, before the subcommand or anywhere in an
 # `operands` or `exact` command, makes the command a change. Declaring a
-# flag as taking a value, or a value option as a flag, would make LabDog
+# flag as taking a value, or a value option as a flag, would make unbork
 # read a different subcommand from the one the tool runs, so every entry
 # here was checked against the tool's own --help.
 #

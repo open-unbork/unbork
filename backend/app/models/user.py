@@ -28,7 +28,7 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     #: Mirror of ``role == "admin"``, written by :meth:`_mirror_role`.
     #: Kept so fastapi-users' own superuser checks and the
-    #: ``labdog_superusers`` metric keep working. New code reads ``role``
+    #: ``unbork_superusers`` metric keep working. New code reads ``role``
     #: through ``app.auth.permissions``, never this.
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     #: ``admin`` | ``operator`` | ``viewer``, or NULL for no direct role

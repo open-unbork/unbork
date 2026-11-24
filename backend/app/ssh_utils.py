@@ -465,22 +465,22 @@ async def shared_host_connection(
 
 
 async def get_source_ip(conn: "BoundedConnection | asyncssh.SSHClientConnection") -> str | None:
-    """Where the remote host sees LabDog connecting from, as it should be
-    stored in ``Host.labdog_source_ip``.
+    """Where the remote host sees unbork connecting from, as it should be
+    stored in ``Host.unbork_source_ip``.
 
     Uses SSH_CLIENT on the remote side, which is authoritative even when
-    labdog runs inside a Docker container (NAT/bridge). Falls back to the
+    unbork runs inside a Docker container (NAT/bridge). Falls back to the
     local socket address if SSH_CLIENT is unavailable.
 
-    On the host LabDog itself runs on, a bridged container reaches the host
+    On the host unbork itself runs on, a bridged container reaches the host
     without NAT, so SSH_CLIENT holds the container's own bridge address.
     Docker hands that out again on every restart, and the anti-lockout rule
-    built from it would then lock LabDog out of its own host — with the
+    built from it would then lock unbork out of its own host — with the
     probe that would notice the change blocked by that very rule. So when
     the address sits inside a container bridge on the remote host, the
     bridge's network (``172.18.0.0/16``) is returned instead of the address.
     """
-    from app.ai.labdog_host import PROBE_COMMAND, bridge_network, parse_probe
+    from app.ai.unbork_host import PROBE_COMMAND, bridge_network, parse_probe
 
     try:
         # Not gated on the exit status: it is ``ip``'s, and a host without

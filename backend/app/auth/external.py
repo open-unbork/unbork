@@ -10,7 +10,7 @@ revocation and the same audit trail as password login:
 * :func:`resolve_external_user` turns "the directory vouches for this
   person" into a ``users`` row: an existing link, a link made by verified
   email, or a newly provisioned account with no password and no role.
-* :func:`issue_session` mints the normal ``labdog_auth`` cookie and the CSRF
+* :func:`issue_session` mints the normal ``unbork_auth`` cookie and the CSRF
   cookie, and records the login, exactly as password login does.
 
 Part of the plugin contract versioned by ``app.auth.permissions.PLUGIN_API``.
@@ -296,7 +296,7 @@ async def issue_session(
 ) -> None:
     """Sign *user* in on *response*, the same way password login does.
 
-    Sets the ``labdog_auth`` cookie (a token carrying the user's current
+    Sets the ``unbork_auth`` cookie (a token carrying the user's current
     ``token_version``, so logout, disabling and role changes revoke it like
     any other) and runs ``UserManager.on_after_login``, which sets the CSRF
     cookie and ``last_login_at``. Without the CSRF cookie every later

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session, SessionTransaction
 
 logger = logging.getLogger(__name__)
 
-_KEY = "labdog_after_commit"
+_KEY = "unbork_after_commit"
 
 
 def run_after_commit(db: AsyncSession | Session, callback: Callable[[], object]) -> None:

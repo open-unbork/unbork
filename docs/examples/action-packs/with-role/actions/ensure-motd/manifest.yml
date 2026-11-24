@@ -14,5 +14,5 @@ parameters:
   - key: banner
     label: Banner text
     type: string
-    default: "Managed by LabDog"
+    default: "Managed by unbork"
     help_text: Shown to every user who logs into the host.

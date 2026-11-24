@@ -169,7 +169,7 @@ async def _seed_proxmox_node(db) -> int:
     node = ProxmoxNode(
         name=f"pve-{id(db)}",
         api_url="https://pve.test:8006",
-        token_id="labdog@pve!ci",
+        token_id="unbork@pve!ci",
         encrypted_token_secret=encrypt_ssh_key("token-secret", get_master_key()),
         verify_ssl=False,
     )

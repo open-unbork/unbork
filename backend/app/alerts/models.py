@@ -1,6 +1,6 @@
 """The actions alerts may run, and what each alert did with one.
 
-An alert asks for an action with the Grafana label ``labdog_action``
+An alert asks for an action with the Grafana label ``unbork_action``
 (:mod:`app.alerts.labels`). :class:`AlertAction` is unbork's side of that
 decision: the list of actions an alert is allowed to start, each with the
 hosts it may run on and the parameters it runs with. The list starts
@@ -37,7 +37,7 @@ DISPATCH_OUTCOMES = (
     "started",
     "not_allowed",  # not on the list, paused there, or the host is outside its scope
     "unknown_action",  # no action has this key
-    "skipped_no_host",  # the alert names no host LabDog manages
+    "skipped_no_host",  # the alert names no host unbork manages
     "skipped_token",  # a webhook alert, and the token is too short to act on
     "skipped_in_flight",  # a run of this action on this host is still going
     "skipped_cooldown",  # an alert ran this action on this host too recently

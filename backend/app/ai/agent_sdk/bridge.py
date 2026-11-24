@@ -31,7 +31,7 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle only matters to type checke
 
 #: MCP server name. The SDK derives the tool names the model sees from
 #: it, so changing this renames every tool.
-MCP_SERVER_NAME = "labdog"
+MCP_SERVER_NAME = "unbork"
 
 _PREFIX = f"mcp__{MCP_SERVER_NAME}__"
 

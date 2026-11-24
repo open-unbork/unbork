@@ -4,11 +4,12 @@ from celery import Celery
 from celery.signals import beat_init, import_modules, worker_process_init, worker_ready
 
 from app.config import settings
+from app.features import assistant_enabled
 
 logger = logging.getLogger(__name__)
 
 celery_app = Celery(
-    "labdog",
+    "unbork",
     broker=settings.redis.url,
     backend=settings.redis.url,
 )
@@ -70,11 +71,6 @@ celery_app.conf.update(
         "app.tasks.builtin_dispatchers.*": {"queue": "actions"},
         "app.tasks.scheduled_action_schedule.*": {"queue": "long_running"},
         "app.tasks.facts.*": {"queue": "long_running"},
-        "app.tasks.ai_task.*": {"queue": "long_running"},
-        # The sweep is quick and stays on default; the check and a rollback
-        # wait on SSH and on Proxmox restarting a VM.
-        "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
-        "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
         "discovery.*": {"queue": "long_running"},
         "gitops.*": {"queue": "long_running"},
         "scans.check_scheduled": {"queue": "default"},
@@ -88,6 +84,20 @@ celery_app.conf.update(
     task_time_limit=1800,
     task_soft_time_limit=1500,
 )
+
+
+#: The assistant's routes, added only when it is loaded (C-026).
+AI_TASK_ROUTES = {
+    "app.tasks.ai_task.*": {"queue": "long_running"},
+    "app.tasks.ai_runtime.*": {"queue": "long_running"},
+    # The sweep is quick and stays on default; the check and a rollback
+    # wait on SSH and on Proxmox restarting a VM.
+    "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
+    "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
+}
+
+if assistant_enabled():
+    celery_app.conf.task_routes.update(AI_TASK_ROUTES)
 
 
 @worker_process_init.connect
@@ -183,7 +193,7 @@ def _is_orchestrator_worker(sender) -> bool:
 def _sibling_syncs_packs() -> bool:
     """True when another worker in this container syncs the pack checkouts.
 
-    ``LABDOG_ROLE`` is set by the CeleryManager that spawned this worker.
+    ``UNBORK_ROLE`` is set by the CeleryManager that spawned this worker.
     In the default ``all`` role (or with no role, e.g. a worker started by
     hand) the ``work`` sibling shares this disk and syncs. An
     ``orchestrator`` container of its own has no such sibling and must
@@ -194,7 +204,7 @@ def _sibling_syncs_packs() -> bool:
     """
     import os  # noqa: PLC0415
 
-    roles = {r.strip() for r in os.environ.get("LABDOG_ROLE", "all").split(",")}
+    roles = {r.strip() for r in os.environ.get("UNBORK_ROLE", "all").split(",")}
     return bool(roles & {"all", "worker", "worker-drift", "worker-actions"})
 
 
@@ -259,7 +269,8 @@ def _register_beat_schedules_on_beat_start(sender=None, **_kwargs):
     from app.tasks.beat_registry import register_all  # noqa: PLC0415
 
     results = register_all(celery_app)
-    failed = sorted(k for k, v in results.items() if v != "ok")
+    # "removed" and "absent" are the assistant-off deletions doing their job.
+    failed = sorted(k for k, v in results.items() if v not in ("ok", "removed", "absent"))
     if failed:
         logger.error("beat schedule registration failed for: %s", ", ".join(failed))
     else:
@@ -288,7 +299,7 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
         import redis as redis_lib  # noqa: PLC0415
 
         if not redis_lib.from_url(settings.redis.url).set(
-            "labdog:startup-orphan-sweep", "1", nx=True, ex=60
+            "unbork:startup-orphan-sweep", "1", nx=True, ex=60
         ):
             return
 
@@ -299,7 +310,7 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
 
 
 # Auto-discover tasks
-celery_app.conf.include = [
+BASE_TASK_MODULES = [
     "app.tasks.discovery",
     "app.tasks.gitops",
     "app.tasks.sync",
@@ -335,13 +346,28 @@ celery_app.conf.include = [
     "app.tasks.audit_retention",
     "app.tasks.run_retention",
     "app.tasks.drift_retention",
-    "app.tasks.ai_task",
-    "app.tasks.ai_approvals",
-    "app.tasks.ai_snapshots",
     "app.tasks.snapshot_reaper",
-    "app.tasks.ai_sessions",
-    "app.tasks.ai_alerts",
     "app.tasks.alert_handling",
-    "app.tasks.ai_remediation",
+    "app.tasks.alert_poll",
     "app.tasks.notifications",
 ]
+
+#: Loaded only with the assistant (C-026). With it off no ``app.tasks.ai_*``
+#: task is registered, and beat deletes their schedules
+#: (``beat_registry.remove_assistant_entries``).
+AI_TASK_MODULES = [
+    "app.tasks.ai_task",
+    "app.tasks.ai_runtime",
+    "app.tasks.ai_approvals",
+    "app.tasks.ai_snapshots",
+    "app.tasks.ai_sessions",
+    "app.tasks.ai_alerts",
+    "app.tasks.ai_remediation",
+]
+
+
+def task_modules(with_assistant: bool) -> list[str]:
+    return BASE_TASK_MODULES + (AI_TASK_MODULES if with_assistant else [])
+
+
+celery_app.conf.include = task_modules(assistant_enabled())

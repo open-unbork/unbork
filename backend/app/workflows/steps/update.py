@@ -60,7 +60,7 @@ def run_system_update(
 
     inventory_json = generate_inventory(host_ip, ssh_port, ssh_key_path, ssh_user)
 
-    private_data_dir = tempfile.mkdtemp(prefix="labdog-update-")
+    private_data_dir = tempfile.mkdtemp(prefix="unbork-update-")
 
     try:
         runner = run_ansible(

@@ -347,7 +347,7 @@ async def probe_reachable(db: AsyncSession, host: Any) -> str | None:
             return None
         except HostKeyMismatchError:
             # Not retried: a changed host key does not change back. The fix
-            # may have regenerated it, and LabDog will not connect until
+            # may have regenerated it, and unbork will not connect until
             # someone trusts the new one — the host is out of its reach.
             return "its SSH host key has changed, so unbork refuses to connect"
         except Exception as exc:
@@ -677,7 +677,7 @@ async def _passed_over(
         )
     ).all()
     for rollback, taken_at in rows:
-        # A snapshot LabDog has no record of is assumed to be older.
+        # A snapshot unbork has no record of is assumed to be older.
         if taken_at is None or taken_at < first.started_at:
             return rollback
     return None
@@ -703,7 +703,7 @@ async def check_rollback(
     worker's own ``running`` row. Reads the database only (and, with
     ``ask``, the host): Proxmox is asked when the rollback is carried out.
     """
-    from app.ai.labdog_host import labdog_runs_on
+    from app.ai.unbork_host import unbork_runs_on
 
     if session.status not in TERMINAL_SESSION_STATUSES:
         raise RollbackRefused(
@@ -749,7 +749,7 @@ async def check_rollback(
             f"what that rollback undid."
         )
 
-    if await labdog_runs_on(db, host, ask=ask):
+    if await unbork_runs_on(db, host, ask=ask):
         raise RollbackRefused(
             f"unbork runs on {host.hostname}. Rolling it back would stop unbork half-way, "
             f"with nothing left to start the machine again, and put unbork's own database "

@@ -3,8 +3,8 @@
 ansible-core templates task arguments on the controller. Every generator
 placed operator data (cron commands, firewall comments, ``/etc/hosts``,
 unit files, user fields) into task arguments as plain scalars, so a Jinja
-delimiter in any of them ran on the LabDog host. ``dump_playbook`` now tags
-every string with a delimiter ``!unsafe`` unless LabDog marked it as its own
+delimiter in any of them ran on the unbork host. ``dump_playbook`` now tags
+every string with a delimiter ``!unsafe`` unless unbork marked it as its own
 template.
 """
 
@@ -46,7 +46,7 @@ def _assert_operator_values_unsafe(text: str) -> None:
             seen += 1
             assert node.tag == "!unsafe", node.value
         elif "{{" in node.value:
-            # LabDog's own expressions stay templated.
+            # unbork's own expressions stay templated.
             assert node.tag != "!unsafe", node.value
     assert seen, "the operator value did not reach the playbook"
 
@@ -108,7 +108,7 @@ def test_operator_values_are_tagged_unsafe(fragment):
     _assert_operator_values_unsafe(compose_playbook([fragment()]))
 
 
-def test_labdog_templates_survive_a_round_trip():
+def test_unbork_templates_survive_a_round_trip():
     text = dump_playbook([{"a": Template("{{ x }}"), "b": EVIL, "c": "plain"}])
     again = dump_playbook(load_playbook(text))
     assert again == text

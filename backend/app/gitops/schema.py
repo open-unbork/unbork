@@ -19,7 +19,7 @@ Missing section semantics
 
 Forward compatibility
 ----------------------
-``LabDogGroupYAML`` is configured with ``extra="allow"``, so unknown
+``UnborkGroupYAML`` is configured with ``extra="allow"``, so unknown
 top-level keys are silently ignored.  This lets future module phases add new
 sections to YAML files without breaking older importer versions.
 """
@@ -289,7 +289,7 @@ class DiscoveryYAML(BaseModel):
         return self
 
 
-class LabDogGlobalYAML(BaseModel):
+class UnborkGlobalYAML(BaseModel):
     """Root model for ``_global.yaml`` at the repo root.
 
     Phase-1 GitOps imports a per-group YAML keyed by ``HostGroup.name``;
@@ -311,7 +311,7 @@ class LabDogGlobalYAML(BaseModel):
     model_config = ConfigDict(extra="allow")  # Forward-compat
 
 
-class LabDogGroupYAML(BaseModel):
+class UnborkGroupYAML(BaseModel):
     group: str  # Human-readable name
     priority: int | None = None  # Informational
     firewall: FirewallModuleYAML | None = None

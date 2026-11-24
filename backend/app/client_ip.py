@@ -58,7 +58,7 @@ def get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if trusted and request.client:
         # SEC-49: the header is only as trustworthy as the peer that sent
-        # it. A client reaching LabDog around the proxy could otherwise
+        # it. A client reaching unbork around the proxy could otherwise
         # name any address it liked, defeating the login limiter's IP key
         # and falsifying audit IPs.
         if forwarded and is_trusted_proxy(request.client.host, trusted):
@@ -69,7 +69,7 @@ def get_client_ip(request: Request) -> str:
                     return ip
     elif forwarded:
         # A reverse proxy is forwarding the real client address and
-        # LabDog is discarding it, so every request looks like it came
+        # unbork is discarding it, so every request looks like it came
         # from the proxy — which is what collapsed the login rate limit
         # into a single shared bucket (SEC-32).
         _warn_untrusted_forwarding()

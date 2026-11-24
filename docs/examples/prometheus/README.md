@@ -5,9 +5,9 @@ useful dashboards and alerts out of it.
 
 | File | What it is |
 |------|------------|
-| [`labdog.alloy`](labdog.alloy) | Grafana Alloy `prometheus.scrape` block for unbork (plus commented `remote_write` and basic-auth variants) |
-| [`labdog-alerts.yml`](labdog-alerts.yml) | 14 alerting rules — availability, fleet state, sync health, scheduling, certificate expiry |
-| [`labdog-overview.json`](labdog-overview.json) | Grafana dashboard — fleet, sync, drift, actions, certificates, exporter health |
+| [`unbork.alloy`](unbork.alloy) | Grafana Alloy `prometheus.scrape` block for unbork (plus commented `remote_write` and basic-auth variants) |
+| [`unbork-alerts.yml`](unbork-alerts.yml) | 14 alerting rules — availability, fleet state, sync health, scheduling, certificate expiry |
+| [`unbork-overview.json`](unbork-overview.json) | Grafana dashboard — fleet, sync, drift, actions, certificates, exporter health |
 
 Scraping is shown with **Alloy**, since unbork already deploys it to managed
 hosts via the `alloy-install` action from `unbork-playbooks`. The endpoint serves standard
@@ -24,7 +24,7 @@ Full reference: [`docs/metrics-export.md`](../../metrics-export.md).
 ## 60-second quickstart
 
 **1. Enable the endpoint.** It is disabled by default. In
-`/etc/labdog/labdog.toml`:
+`/etc/unbork/unbork.toml`:
 
 ```toml
 [metrics]
@@ -37,7 +37,7 @@ Restart unbork, then verify:
 curl -s http://unbork.example.com:8000/metrics | head -20
 ```
 
-You should get `text/plain` starting with `# HELP labdog_build_info ...`. If you
+You should get `text/plain` starting with `# HELP unbork_build_info ...`. If you
 get HTML back, the endpoint is disabled (unbork returns 404, and your browser or
 proxy may be serving the SPA fallback page instead).
 
@@ -46,19 +46,19 @@ proxy may be serving the SPA fallback page instead).
 > [`docs/security-hardening.md`](../../security-hardening.md).
 
 **2. Point Alloy at it.** Copy the `prometheus.scrape` block from
-[`labdog.alloy`](labdog.alloy) into your Alloy config, replacing the target host
+[`unbork.alloy`](unbork.alloy) into your Alloy config, replacing the target host
 and pointing `forward_to` at the `remote_write` component you already have.
 Reload Alloy and confirm the target is up on its `/-/targets` page (or in
 Mimir, once the series land).
 
-**3. Load the alerts.** [`labdog-alerts.yml`](labdog-alerts.yml) is a standard
+**3. Load the alerts.** [`unbork-alerts.yml`](unbork-alerts.yml) is a standard
 Prometheus rule group — load it into the Mimir ruler, or reference it under
 `rule_files:` if you run Prometheus. Review the thresholds first: they are tuned
-for a small fleet, and `LabDogHostsOutOfSync` will be noisy if you routinely
+for a small fleet, and `UnborkHostsOutOfSync` will be noisy if you routinely
 leave hosts drifted.
 
 **4. Import the dashboard.** In Grafana: **Dashboards → New → Import → Upload
-JSON file**, choose [`labdog-overview.json`](labdog-overview.json), then pick
+JSON file**, choose [`unbork-overview.json`](unbork-overview.json), then pick
 your Prometheus datasource when prompted.
 
 ## Notes on the dashboard
@@ -68,7 +68,7 @@ your Prometheus datasource when prompted.
   re-export via **Share → Export → "Export for sharing externally"** and commit
   that — a real export is more faithful than hand-edited JSON.
 - The `Module` template variable is populated from
-  `label_values(labdog_host_modules, module)`, so it shows unbork's **database**
+  `label_values(unbork_host_modules, module)`, so it shows unbork's **database**
   module vocabulary (`linux_user`, `hosts_file`) rather than the playbook
   spelling (`linux-users`, `hosts-file`). That is intentional — the metrics
   expose the column values verbatim.
@@ -90,7 +90,7 @@ of thousands of series). Per-host telemetry belongs to the Alloy → Mimir path
 documented in [`docs/ui/host-metrics.md`](../../ui/host-metrics.md).
 
 The one knob that can grow the series count is the `action_key` label on
-`labdog_action_runs_total`. If you run a very large number of distinct actions
+`unbork_action_runs_total`. If you run a very large number of distinct actions
 and want to trade that detail away:
 
 ```toml

@@ -123,11 +123,11 @@ class HostResponse(BaseModel):
     ssh_user: str
     firewall_backend: FirewallBackend
     sync_status: SyncStatus
-    labdog_source_ip: str | None
+    unbork_source_ip: str | None
     drift_check_enabled: bool
     last_sync_at: datetime | None
     last_drift_check_at: datetime | None
-    #: When LabDog last confirmed the host's state; see
+    #: When unbork last confirmed the host's state; see
     #: ``app.models.host_module_status._last_verified_at``.
     last_verified_at: datetime | None = None
     ssh_key_id: int | None

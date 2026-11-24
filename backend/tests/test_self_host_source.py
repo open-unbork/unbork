@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.ai import labdog_host
+from app.ai import unbork_host
 from app.rules.merge import _make_ssh_lockout_rule, merge_group_rules
 from app.ssh_utils import get_source_ip
 
@@ -45,8 +45,8 @@ def _conn(stdout: str, exit_status: int = 0) -> MagicMock:
     ],
 )
 def test_bridge_network(client, expected) -> None:
-    _, addresses = labdog_host.parse_probe("x 1 22\n" + DOCKER_HOST)
-    network = labdog_host.bridge_network(client, addresses)
+    _, addresses = unbork_host.parse_probe("x 1 22\n" + DOCKER_HOST)
+    network = unbork_host.bridge_network(client, addresses)
     assert (str(network) if network else None) == expected
 
 

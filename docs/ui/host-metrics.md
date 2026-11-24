@@ -57,8 +57,8 @@ automatically.
      them). The run dialog's destination pickers start on **Each host's
      assigned destination**; picking an instance there sends every host in
      that run to it instead, and
-   - injects two identity labels — `labdog_host_id` (the stable host id) and
-     `labdog_hostname` — which Alloy stamps on every series it ships.
+   - injects two identity labels — `unbork_host_id` (the stable host id) and
+     `unbork_hostname` — which Alloy stamps on every series it ships.
 
 3. **Open the host's page.** Once a Mimir instance is registered, three
    meters — cpu, memory and disk `/` — appear at the top of the Overview
@@ -69,7 +69,7 @@ automatically.
    Until metrics arrive, the Overview shows nothing and the Metrics tab says
    what is missing — see below.
 
-Because metrics are matched on `labdog_host_id`, renaming a host or changing
+Because metrics are matched on `unbork_host_id`, renaming a host or changing
 its IP never detaches its metrics.
 
 ## Per-host and per-group destinations
@@ -117,7 +117,7 @@ front page, and a set-up prompt on every host would be noise. The
 The run button offers any action whose manifest maps a Prometheus push URL
 (`metrics_backend.prometheus_push_var`), not the Alloy action by name. With
 no such action in any pack, the tab says what the agent needs to do instead:
-label its series with `labdog_host_id`.
+label its series with `unbork_host_id`.
 
 ## Thresholds
 

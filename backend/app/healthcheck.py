@@ -1,7 +1,7 @@
 """Container health check for every role: ``python -m app.healthcheck``.
 
 The image's ``HEALTHCHECK`` runs this. Which checks apply depends on
-``LABDOG_ROLE`` (see :mod:`app.celery_manager`):
+``UNBORK_ROLE`` (see :mod:`app.celery_manager`):
 
 * ``all`` / ``api``: ``/health/ready`` on the local API, as before. In
   ``all`` that already covers the Celery children (BUG-72).
@@ -65,7 +65,7 @@ def _beat_lock_held() -> str | None:
 def main() -> int:
     from app.celery_manager import API_ROLES, parse_roles, processes_for  # noqa: PLC0415
 
-    roles = parse_roles(os.environ.get("LABDOG_ROLE"))
+    roles = parse_roles(os.environ.get("UNBORK_ROLE"))
     failures: list[str] = []
     if any(r in API_ROLES for r in roles):
         failures.append(_api_ready())

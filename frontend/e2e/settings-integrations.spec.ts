@@ -52,7 +52,7 @@ test.describe("Alert intake card", () => {
     const card = await open(page, { intake_enabled: true })
     await expect(card).toContainText("needs attention")
     await expect(card).toContainText("the webhook refuses every alert: no token")
-    await expect(card).toContainText("set [alerts] webhook_token in labdog.toml")
+    await expect(card).toContainText("set [alerts] webhook_token in unbork.toml")
   })
 
   test("on, with a token: the URL for Grafana and the last alert", async ({ page }) => {

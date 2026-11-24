@@ -1,18 +1,18 @@
 """What an alert's Grafana labels ask unbork to do.
 
 Three labels, set on the alert rule in Grafana, where a template can make
-them depend on the host (``$labels.labdog_hostname``, which the
+them depend on the host (``$labels.unbork_hostname``, which the
 alloy-install action stamps on every series):
 
-* ``labdog_action=<action key>`` — run this action on the alert's host
+* ``unbork_action=<action key>`` — run this action on the alert's host
   first. Only actions on unbork's list of actions alerts may run
   (:class:`app.alerts.models.AlertAction`) are started, and only on the
   hosts the list allows; the list starts empty.
-* ``labdog_ai=true`` — have the AI investigate, when there is no action or
+* ``unbork_ai=true`` — have the AI investigate, when there is no action or
   the action did not fix the alert.
-* ``labdog_ai_automate=true`` — the same, and the AI may fix what it finds
+* ``unbork_ai_automate=true`` — the same, and the AI may fix what it finds
   (full auto, behind the safeguards in :mod:`app.ai.alert_autonomy`).
-  Implies ``labdog_ai``. With ``ai.alert_full_auto_rules_enabled`` on,
+  Implies ``unbork_ai``. With ``ai.alert_full_auto_rules_enabled`` on,
   unbork's own rules decide this instead (:mod:`app.ai.full_auto_rules`).
 
 The AI values must be exactly ``true``.
@@ -56,8 +56,8 @@ from app.ai.full_auto_rules import AUTOMATE_LABEL
 
 logger = logging.getLogger(__name__)
 
-ACTION_LABEL = "labdog_action"
-AI_LABEL = "labdog_ai"
+ACTION_LABEL = "unbork_action"
+AI_LABEL = "unbork_ai"
 AI_AUTOMATE_LABEL = AUTOMATE_LABEL
 
 #: Run states that count as "still going" for the in-flight guard.
@@ -75,7 +75,7 @@ def is_true(labels: Mapping[str, Any] | None, key: str) -> bool:
 
 
 def requested_action(labels: Mapping[str, Any] | None) -> str | None:
-    """The action key the alert's ``labdog_action`` label names, if any."""
+    """The action key the alert's ``unbork_action`` label names, if any."""
     value = (labels or {}).get(ACTION_LABEL)
     if not isinstance(value, str):
         return None
@@ -83,12 +83,18 @@ def requested_action(labels: Mapping[str, Any] | None) -> str | None:
 
 
 async def wants_ai(db: AsyncSession, event: Any) -> bool:
-    """Whether the alert asks for the AI: ``labdog_ai=true``, or full auto.
+    """Whether the alert asks for the AI: ``unbork_ai=true``, or full auto.
 
-    Full auto is the label ``labdog_ai_automate=true`` — or, with the
+    Full auto is the label ``unbork_ai_automate=true`` — or, with the
     rules on, a matching rule — so an alert allowed to be fixed is also
     one that gets investigated.
+
+    Never, when the assistant is left out (C-026).
     """
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        return False
     if is_true(event.labels, AI_LABEL):
         return True
     from app.ai.full_auto_rules import first_match
@@ -177,7 +183,7 @@ async def _guard(db: AsyncSession, entry: Any, event: Any, now: datetime) -> tup
 
 
 async def dispatch_for(db: AsyncSession, event: Any) -> Any | None:
-    """Act on ``event``'s ``labdog_action`` label, if it has one.
+    """Act on ``event``'s ``unbork_action`` label, if it has one.
 
     Returns the dispatch row, or ``None`` when the alert asks for no
     action. Creates the run, flushes, and does not commit: the caller

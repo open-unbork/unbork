@@ -1,4 +1,4 @@
-# Managed by LabDog -- /etc/hosts entries reference
+# Managed by unbork -- /etc/hosts entries reference
 #
 # Two variants per entry:
 #   1. LITERAL entry -- supply both `ip_address` and `hostname`.

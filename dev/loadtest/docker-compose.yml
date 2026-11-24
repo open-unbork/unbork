@@ -1,6 +1,6 @@
 # Load-test stack. Never point this at a live install or real hosts.
 # See README.md. unbork runs the published image of the code under test.
-name: labdog-loadtest
+name: unbork-loadtest
 
 x-fakehost-log: &small-log
   driver: json-file
@@ -12,13 +12,13 @@ services:
     # 100 (the default) is too few for the raised config: run_one.sh sets 400 there.
     command: ["postgres", "-c", "max_connections=${PG_MAX_CONNECTIONS:-100}"]
     environment:
-      POSTGRES_USER: labdog
+      POSTGRES_USER: unbork
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./prepare.sh first}
-      POSTGRES_DB: labdog
+      POSTGRES_DB: unbork
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labdog"]
+      test: ["CMD-SHELL", "pg_isready -U unbork"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,18 +33,18 @@ services:
       retries: 10
     networks: [loadtest]
 
-  labdog:
-    container_name: labdog-loadtest
-    image: ${LABDOG_IMAGE:-openlabdog/labdog:dev-5cb85d7}
+  unbork:
+    container_name: unbork-loadtest
+    image: ${UNBORK_IMAGE:-openlabdog/labdog:dev-5cb85d7}  # old-name-ok: this tag was published there
     environment:
-      LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:${POSTGRES_PASSWORD}@postgres:5432/labdog
-      LABDOG_REDIS__URL: redis://redis:6379/0
-      LABDOG_SECURITY__SECRET_KEY: ${LABDOG_SECURITY__SECRET_KEY:?run ./prepare.sh first}
-      LABDOG_SECURITY__ENCRYPTION_KEY: ${LABDOG_SECURITY__ENCRYPTION_KEY:?run ./prepare.sh first}
-      LABDOG_SECURITY__COOKIE_SECURE: "false"
-      LABDOG_RATE_LIMIT__ENABLED: "false"
-      LABDOG_CELERY__CONCURRENCY: ${CELERY_CONCURRENCY:-4}
-      LABDOG_CELERY__ORCHESTRATOR_CONCURRENCY: ${ORCHESTRATOR_CONCURRENCY:-4}
+      UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:${POSTGRES_PASSWORD}@postgres:5432/unbork
+      UNBORK_REDIS__URL: redis://redis:6379/0
+      UNBORK_SECURITY__SECRET_KEY: ${UNBORK_SECURITY__SECRET_KEY:?run ./prepare.sh first}
+      UNBORK_SECURITY__ENCRYPTION_KEY: ${UNBORK_SECURITY__ENCRYPTION_KEY:?run ./prepare.sh first}
+      UNBORK_SECURITY__COOKIE_SECURE: "false"
+      UNBORK_RATE_LIMIT__ENABLED: "false"
+      UNBORK_CELERY__CONCURRENCY: ${CELERY_CONCURRENCY:-4}
+      UNBORK_CELERY__ORCHESTRATOR_CONCURRENCY: ${ORCHESTRATOR_CONCURRENCY:-4}
     volumes:
       - ./pack:/srv/loadtest-pack:ro
       # Images before the BUG-128 fix need ansible.posix for linux-user
@@ -62,7 +62,7 @@ services:
     networks: [loadtest]
 
   fakehost:
-    image: labdog-loadtest-fakehost:latest
+    image: unbork-loadtest-fakehost:latest
     build:
       context: .
       dockerfile: fakehost/Dockerfile

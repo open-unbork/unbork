@@ -8,6 +8,7 @@ import { useNow } from "@/hooks/use-now"
 import { apiFetch } from "@/lib/api"
 import { can, useAuth } from "@/lib/auth"
 import { cronToHuman } from "@/lib/cron"
+import { useFeatures } from "@/lib/features"
 import { plural, shortAgo, untilLabel } from "@/lib/fleet"
 import { avgDuration, clock, durationLabel, failStreak, isOrphaned, outcomeTone, overlaps, reach, scheduleName, scheduleTarget, type Overlap } from "@/lib/overview"
 import type {
@@ -290,6 +291,7 @@ export function UpcomingTab({
 
 function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
   const { user } = useAuth()
+  const { assistant } = useFeatures()
   const q = { retry: false, refetchInterval: 60_000 }
   // AI providers and usage need ai.use, which a viewer lacks.
   const ai = { ...q, enabled: can(user, "ai.use") }
@@ -310,7 +312,7 @@ function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
   const enabledProviders = (providers ?? []).filter((p) => p.enabled)
   const lastRepoSync = repos?.map((r) => r.last_sync_at).filter(Boolean).sort().at(-1) ?? null
 
-  const rows: { name: string; detail: string; state: Tone; meta: string; href: string }[] = [
+  const allRows: { name: string; detail: string; state: Tone; meta: string; href: string }[] = [
     {
       name: "Proxmox",
       detail: nodes?.length ? nodes.map((n) => n.name).join(", ") : "not configured",
@@ -358,6 +360,8 @@ function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
       href: "/settings?section=system",
     },
   ]
+  // No AI provider row on a server without the assistant (C-026).
+  const rows = assistant ? allRows : allRows.filter((r) => r.href !== "/ai-providers")
   return (
     <Panel title="integration health" meta="what scheduled runs depend on">
       {rows.map((i) => (

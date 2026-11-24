@@ -82,9 +82,14 @@ def test_default_queue_is_consumed():
 @pytest.mark.parametrize(
     "task_name",
     [
-        "app.tasks.ai_alerts.investigate_alert",
-        "app.tasks.ai_approvals.expire_stale_approvals",
-        "app.tasks.ai_snapshots.prune_ai_snapshots",
+        # Not loaded without the assistant (C-026).
+        pytest.param("app.tasks.ai_alerts.investigate_alert", marks=pytest.mark.needs_assistant),
+        pytest.param(
+            "app.tasks.ai_approvals.expire_stale_approvals", marks=pytest.mark.needs_assistant
+        ),
+        pytest.param(
+            "app.tasks.ai_snapshots.prune_ai_snapshots", marks=pytest.mark.needs_assistant
+        ),
         "app.tasks.audit_retention.prune_old_audit_logs",
         "app.tasks.audit_retention.prune_old_ssh_transcripts",
         "app.tasks.action_sweeper.sweep_stale_action_runs",
@@ -117,7 +122,15 @@ def _dispatched_by_name() -> set[str]:
     }
 
 
-@pytest.mark.parametrize("task_name", sorted(_dispatched_by_name()))
+@pytest.mark.parametrize(
+    "task_name",
+    [
+        # The AI built-ins' tasks are not loaded without the assistant, and
+        # those built-ins are not offered then either (C-026).
+        pytest.param(n, marks=pytest.mark.needs_assistant) if n.startswith("app.tasks.ai_") else n
+        for n in sorted(_dispatched_by_name())
+    ],
+)
 def test_every_task_dispatched_by_name_is_registered(task_name):
     """BUG-127: ``run_action_group`` was dispatched by name but its module
     was missing from ``conf.include``, so workers dropped every

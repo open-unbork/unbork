@@ -518,7 +518,7 @@ class TestTheResumePrompt:
             decision_note=note,
         )
 
-    def test_approved_says_labdog_ran_it(self) -> None:
+    def test_approved_says_unbork_ran_it(self) -> None:
         """Phrased as narration because that is what it is. Feeding it back
         as a tool result would misrepresent who acted, in the one place
         where who acted is the whole point."""

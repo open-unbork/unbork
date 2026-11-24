@@ -217,7 +217,7 @@ class TestNftablesParser:
                             "family": "inet",
                             "table": "filter",
                             "chain": "input",
-                            "comment": "LabDog: SSH lockout rule",
+                            "comment": "unbork: SSH lockout rule",
                             "expr": [
                                 {
                                     "match": {
@@ -234,7 +234,7 @@ class TestNftablesParser:
         )
         rules = parse_nftables_json(data)
         assert len(rules) == 1
-        assert rules[0].comment == "LabDog: SSH lockout rule"
+        assert rules[0].comment == "unbork: SSH lockout rule"
 
     def test_parse_nftables_expr_level_comment(self):
         """Older nftables puts comments as expressions — ensure fallback works."""
@@ -382,9 +382,9 @@ COMMIT
         assert rules[0].direction == "output"
         assert rules[0].port_start == 8080
 
-    def test_parse_iptables_labdog_jump_chains(self):
-        """LabDog never writes rules directly into INPUT/OUTPUT — it jumps to its
-        own LABDOG-INPUT/LABDOG-OUTPUT chains (renderers/iptables.py) so reapply
+    def test_parse_iptables_unbork_jump_chains(self):
+        """unbork never writes rules directly into INPUT/OUTPUT — it jumps to its
+        own UNBORK-INPUT/UNBORK-OUTPUT chains (renderers/iptables.py) so reapply
         stays idempotent without touching Docker's or other tools' base-chain
         rules. The collector must follow that indirection or it always reports
         zero rules for every iptables-backend host."""
@@ -393,16 +393,16 @@ COMMIT
 :INPUT ACCEPT [0:0]
 :FORWARD DROP [0:0]
 :OUTPUT ACCEPT [0:0]
-:LABDOG-INPUT - [0:0]
-:LABDOG-OUTPUT - [0:0]
--A INPUT -j LABDOG-INPUT
--A OUTPUT -j LABDOG-OUTPUT
--A LABDOG-INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
--A LABDOG-INPUT -i lo -j ACCEPT
--A LABDOG-INPUT -s 192.0.2.0/28 -p tcp --dport 22 -m comment --comment "Allow SSH" -j ACCEPT
--A LABDOG-INPUT -p tcp --dport 22 -m comment --comment "Managed by LabDog" -j DROP
--A LABDOG-INPUT -m comment --comment "Managed by LabDog: default policy" -j DROP
--A LABDOG-OUTPUT -m comment --comment "Managed by LabDog: default policy" -j ACCEPT
+:UNBORK-INPUT - [0:0]
+:UNBORK-OUTPUT - [0:0]
+-A INPUT -j UNBORK-INPUT
+-A OUTPUT -j UNBORK-OUTPUT
+-A UNBORK-INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A UNBORK-INPUT -i lo -j ACCEPT
+-A UNBORK-INPUT -s 192.0.2.0/28 -p tcp --dport 22 -m comment --comment "Allow SSH" -j ACCEPT
+-A UNBORK-INPUT -p tcp --dport 22 -m comment --comment "Managed by unbork" -j DROP
+-A UNBORK-INPUT -m comment --comment "Managed by unbork: default policy" -j DROP
+-A UNBORK-OUTPUT -m comment --comment "Managed by unbork: default policy" -j ACCEPT
 COMMIT
 """
         rules = parse_iptables_save(content)
@@ -416,27 +416,27 @@ COMMIT
         # not surface as explicit rules
         assert all("default policy" not in (r.comment or "") for r in rules)
 
-    def test_parse_iptables_policies_reads_labdog_catchall(self):
+    def test_parse_iptables_policies_reads_unbork_catchall(self):
         """Base INPUT/OUTPUT stay ACCEPT regardless (the jump chain handles the
         drop before control returns), so the effective policy must come from
-        LABDOG-INPUT/LABDOG-OUTPUT's catch-all rule, not the base declaration."""
+        UNBORK-INPUT/UNBORK-OUTPUT's catch-all rule, not the base declaration."""
         content = """\
 *filter
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
-:LABDOG-INPUT - [0:0]
-:LABDOG-OUTPUT - [0:0]
--A INPUT -j LABDOG-INPUT
--A OUTPUT -j LABDOG-OUTPUT
--A LABDOG-INPUT -m comment --comment "Managed by LabDog: default policy" -j DROP
--A LABDOG-OUTPUT -m comment --comment "Managed by LabDog: default policy" -j ACCEPT
+:UNBORK-INPUT - [0:0]
+:UNBORK-OUTPUT - [0:0]
+-A INPUT -j UNBORK-INPUT
+-A OUTPUT -j UNBORK-OUTPUT
+-A UNBORK-INPUT -m comment --comment "Managed by unbork: default policy" -j DROP
+-A UNBORK-OUTPUT -m comment --comment "Managed by unbork: default policy" -j ACCEPT
 COMMIT
 """
         policies = parse_iptables_policies(content)
         assert policies.input == "drop"
         assert policies.output == "accept"
 
-    def test_parse_iptables_policies_falls_back_without_labdog_chains(self):
+    def test_parse_iptables_policies_falls_back_without_unbork_chains(self):
         content = """\
 *filter
 :INPUT DROP [0:0]

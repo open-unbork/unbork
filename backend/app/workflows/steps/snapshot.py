@@ -55,7 +55,7 @@ async def create_snapshot(
     run_id: int,
     vm_type: str = "qemu",
     action_key: str = "",
-    name_prefix: str = "labdog",
+    name_prefix: str = "unbork",
     *,
     lock_wait_seconds: int = 0,
     on_lock_wait: Callable[[str], None] | None = None,
@@ -73,7 +73,7 @@ async def create_snapshot(
         run_id: Parent :class:`~app.workflows.models.WorkflowRun` ID, used as
             part of the snapshot name.
         name_prefix: Leading segment of the snapshot name. AI sessions pass
-            ``"labdog-ai"`` so that a snapshot the agent took is
+            ``"unbork-ai"`` so that a snapshot the agent took is
             distinguishable from an action run's at a glance in the Proxmox
             UI — they have different lifetimes (an action deletes its own on
             success; an agent's is kept for a retention window so a human can
@@ -88,7 +88,7 @@ async def create_snapshot(
             live log.
 
     Returns:
-        The snapshot name string (e.g. ``"labdog-42-1711234567"``).
+        The snapshot name string (e.g. ``"unbork-42-1711234567"``).
 
     Raises:
         :class:`~app.proxmox.client.ProxmoxError`: If the Proxmox task fails

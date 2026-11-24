@@ -2,7 +2,7 @@
 
 Covers what the older `test_gitops_workflow.py` doesn't:
 
-* **Multi-module YAML** — every section in `LabDogGroupYAML` (firewall,
+* **Multi-module YAML** — every section in `UnborkGroupYAML` (firewall,
   services, packages, hosts entries, cron jobs, users, linux groups,
   resolver) on a single push, verified end-to-end against
   the live import dispatcher.
@@ -55,7 +55,7 @@ pytestmark = pytest.mark.integration
 
 
 # ---------------------------------------------------------------------------
-# Multi-module YAML covering every section in LabDogGroupYAML
+# Multi-module YAML covering every section in UnborkGroupYAML
 # ---------------------------------------------------------------------------
 
 MULTI_MODULE_YAML = """\
@@ -200,8 +200,8 @@ def _setup_bare_repo() -> tuple[Path, Path]:
 
     Returns ``(bare_dir, clone_dir)``. Caller deletes both in finally.
     """
-    bare_dir = Path(tempfile.mkdtemp(prefix="labdog-e2e-bare-"))
-    clone_dir = Path(tempfile.mkdtemp(prefix="labdog-e2e-clone-"))
+    bare_dir = Path(tempfile.mkdtemp(prefix="unbork-e2e-bare-"))
+    clone_dir = Path(tempfile.mkdtemp(prefix="unbork-e2e-clone-"))
 
     subprocess.run(
         ["git", "-c", "init.defaultBranch=main", "init", "--bare", str(bare_dir)],
@@ -252,7 +252,7 @@ class TestMultiModuleGroupYAML:
 
     async def test_full_module_sweep(self, db):
         bare_dir, clone_dir = _setup_bare_repo()
-        import_dir = Path(tempfile.mkdtemp(prefix="labdog-e2e-import-"))
+        import_dir = Path(tempfile.mkdtemp(prefix="unbork-e2e-import-"))
 
         try:
             # The group YAML references group "e2e-multi" (in YAML's own
@@ -462,7 +462,7 @@ class TestGlobalYAML:
     async def test_drift_and_discovery_round_trip(self, db):
         invalidate_cache()
         bare_dir, clone_dir = _setup_bare_repo()
-        import_dir = Path(tempfile.mkdtemp(prefix="labdog-e2e-import-"))
+        import_dir = Path(tempfile.mkdtemp(prefix="unbork-e2e-import-"))
 
         try:
             # Group + SSH key the YAML will reference.
@@ -561,7 +561,7 @@ def _patch_clone_for_file_url():
 
     def _shim(repo, encrypted_ssh_key=None, target_dir=None):
         if target_dir is None:
-            target_dir = Path(tempfile.mkdtemp(prefix="labdog-e2e-task-clone-"))
+            target_dir = Path(tempfile.mkdtemp(prefix="unbork-e2e-task-clone-"))
         url = repo.url.removeprefix("file://")
         return _local(url, target_dir, branch=repo.branch)
 

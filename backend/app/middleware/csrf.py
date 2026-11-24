@@ -4,7 +4,7 @@ CSRF double-submit-cookie middleware.
 On every state-changing request (POST/PUT/PATCH/DELETE) the middleware
 requires that the request carries:
 
-  - Cookie ``labdog_csrf`` (set by the server at login, readable by JS)
+  - Cookie ``unbork_csrf`` (set by the server at login, readable by JS)
   - Header ``X-CSRF-Token`` with the same value
 
 Both values are compared with ``hmac.compare_digest`` to prevent timing
@@ -40,7 +40,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_CSRF_COOKIE = "labdog_csrf"
+_CSRF_COOKIE = "unbork_csrf"
 _CSRF_HEADER = "X-CSRF-Token"
 
 # Mutating HTTP methods that require the double-submit token.
