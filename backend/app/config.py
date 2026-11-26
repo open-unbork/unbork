@@ -560,6 +560,11 @@ def _validate_required(s: Settings, old_toml_keys: list[str] | None = None) -> N
 #: them is told what it is ignoring.
 _OLD_ENV_PREFIX = "LABDOG_"  # old-name-ok
 _OLD_CONFIG_PATH = Path("/etc/labdog/labdog.toml")  # old-name-ok
+#: Directories the old package used. A path setting under one of them is
+#: named like an old key. Database URLs are not paths and are left alone:
+#: the database keeps whatever name it had.
+_OLD_NAME = _OLD_ENV_PREFIX.lower().rstrip("_")
+_OLD_PATHS = tuple(f"{base}/{_OLD_NAME}" for base in ("/etc", "/var/lib", "/var/log", "/run"))
 
 
 def old_names_in_use(environ: dict[str, str] | None = None) -> list[str]:
@@ -589,7 +594,8 @@ def _old_config_present() -> bool:
 
 
 def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
-    """Keys in the config file that still carry the old name.
+    """Keys in the config file that still carry the old name, and path
+    settings that still point under the old directories.
 
     The settings models ignore unknown keys, so ``[security]`` with the old
     ``*_server_ip`` key would silently fall back to the default.
@@ -599,6 +605,11 @@ def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
         dotted = f"{prefix}{key}"
         if _OLD_ENV_PREFIX.lower().rstrip("_") in key.lower():
             found.append(f"{dotted} (in the config file)")
+        elif isinstance(value, str) and value.startswith(_OLD_PATHS):
+            # A config copied from the old version keeps e.g. its packs
+            # directory under the old data path, which the new service may
+            # not write to (and which the upgrade guide later deletes).
+            found.append(f"{dotted} = {value!r} (an old path, in the config file)")
         if isinstance(value, dict):
             found += old_toml_keys(value, f"{dotted}.")
     return found

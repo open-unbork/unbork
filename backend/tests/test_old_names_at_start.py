@@ -48,6 +48,18 @@ def test_old_keys_in_the_config_file_are_named():
     assert config.old_toml_keys(data) == [f"security.{OLD}_server_ip (in the config file)"]
 
 
+def test_a_path_under_the_old_directories_is_named():
+    """A copied 1.x config keeps packs_root_dir under the old data path."""
+    data = {
+        "actions": {"packs_root_dir": f"/var/lib/{OLD}/packs"},
+        "database": {"url": f"postgresql+asyncpg://{OLD}:x@localhost/{OLD}"},
+        "other": {"dir": "/var/lib/unbork/packs"},
+    }
+    assert config.old_toml_keys(data) == [
+        f"actions.packs_root_dir = '/var/lib/{OLD}/packs' (an old path, in the config file)"
+    ]
+
+
 def test_the_startup_error_lists_them():
     s = config.Settings()
     s.security.secret_key = "short"
