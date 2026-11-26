@@ -119,3 +119,4 @@ Work branch: `claude/project-thread-6heftb`, from `dev` at `2e961d7`. Dennis ask
 ## 2026-11-26 Stage 3 run
 
 Work branch: `claude/project-thread-noz19h` (the session's assigned branch, in place of `roadmap/stage-3`). Base: `94cf763` (dev after #308), with `main` (v1.1.1) merged in. Entry criterion: Dennis said to start ("Go ahead", 2026-11-26). Behaviours read with D-29 (no old-name fallbacks).
+- 2026-11-26 S-007 review 7314e5a. Wording waits for Dennis; no contact link (assumption).
