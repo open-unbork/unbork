@@ -22,7 +22,7 @@ stages:
   - stage: 3
     goal: "Release unbork 2.0.0"
     base_commit: 94cf763
-    status: review
+    status: done
     items: [S-007, C-052, C-001, C-002, C-003]
   - stage: 4
     goal: "Rollback you can trust"
@@ -421,7 +421,7 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-noz19h
     spec: items/S-007-say-in-the-readme-which-parts-are.md
     notes: "Open point of the repository-split item, and it should be true on the day of the first release."
@@ -435,7 +435,7 @@ items:
     depends_on: [C-049]
     autonomy: A
     effort: M
-    status: review
+    status: done
     branch: claude/project-thread-noz19h
     spec: items/C-052-test-the-upgrade-from-1-1-0.md
     notes: "Accepted proposal PR-03: turns C-001 from a one-off manual check into a gate."
@@ -449,7 +449,7 @@ items:
     depends_on: [C-048, C-049, C-050, C-052]
     autonomy: B
     effort: M
-    status: review
+    status: done
     branch: claude/project-thread-noz19h
     spec: items/C-001-verify-and-document-the-upgrade-from-labdog.md
     notes: "Nothing can be released until an existing install is known to survive it; the rename (D-02) makes the upgrade the riskiest step."
@@ -463,7 +463,7 @@ items:
     depends_on: [C-001, S-007, S-008, S-009, S-014, C-051]
     autonomy: B
     effort: S
-    status: review
+    status: done
     branch: claude/project-thread-noz19h
     spec: items/C-002-release-dev-to-main-as-unbork-2.md
     notes: "632 unreleased commits is the largest single risk on the board; version decided in D-03. Dennis merges the PR."
@@ -477,7 +477,7 @@ items:
     depends_on: [C-002]
     autonomy: A
     effort: S
-    status: in_progress
+    status: done
     branch: claude/project-thread-noz19h
     spec: items/C-003-bring-the-docs-site-back.md
     notes: "README links to a site that does not exist; cheap once the release is out. PR #295 already covers a manual deploy from dev."

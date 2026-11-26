@@ -125,3 +125,7 @@ Work branch: `claude/project-thread-noz19h` (the session's assigned branch, in p
 - 2026-11-26 C-001 review 04e08c7. Upgrade runs in `planning/reviews/stage-3-upgrade.md`; Docker and the first sync of a "test" host not verified (no Docker Hub, no SSH).
 - 2026-11-26 C-002 review 15dd8eb. VERSION 2.0.0, changelog closed. The dev→main PR opens after this branch merges into dev; Dennis merges it.
 - 2026-11-26 Stage 3 review: pass pending CI (planning/reviews/stage-3.md). 22 findings: 19 fixed, 1 deferred, 2 rejected. Four local packaging targets pass in about 100 s in parallel.
+
+## 2026-11-26 Stage 3 released
+
+- #313 merged into dev (`766dcc1`), #314 into main (`a984548`). Release v2.0.0 published: `.deb`, `.rpm`, tarball, images `unbork/unbork:2.0.0`, `2.0`, `2`, `latest`. Docs site deployed; `check-readme-links.mjs --live` passes all 14 links (C-003). S-007, C-052, C-001, C-002 and C-003 done. Stage 3 done.
