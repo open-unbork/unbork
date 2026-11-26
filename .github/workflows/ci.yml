@@ -665,7 +665,7 @@ jobs:
             pull_request)
               BASE="${{ github.event.pull_request.base.sha }}"
               if git diff --name-only "$BASE" HEAD \
-                   | grep -qE '^(packaging/|backend/pyproject\.toml|backend/uv\.lock|VERSION|\.github/workflows/ci\.yml)'; then
+                   | grep -qE '^(packaging/|backend/pyproject\.toml|backend/uv\.lock|backend/alembic/|VERSION|\.github/workflows/ci\.yml)'; then
                 RUN=true
               fi ;;
           esac
@@ -705,8 +705,30 @@ jobs:
       - name: Build artifacts
         if: steps.decide.outputs.run == 'true'
         run: ./packaging/build.sh --version="$(tr -d '[:space:]' < VERSION)"
-      - name: Smoke-test artifacts in target-OS containers
+      - name: Download the 1.1.0 artifacts for the upgrade test
+        # The upgrade targets start from the last release before the
+        # rename. Verified against the release's own SHA256SUMS: a
+        # mismatch fails the job, and so does a GitHub outage, which is
+        # the right direction for a release gate.
         if: steps.decide.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p packaging/dist-old
+          gh release download v1.1.0 --repo "${{ github.repository }}" \
+            --dir packaging/dist-old \
+            --pattern '*_1.1.0-1_amd64.deb' --pattern '*-1.1.0-1.x86_64.rpm' \
+            --pattern '*-1.1.0-linux-amd64.tar.gz' --pattern SHA256SUMS
+          cd packaging/dist-old && sha256sum -c --ignore-missing SHA256SUMS
+          test "$(ls *.deb *.rpm *.tar.gz | wc -l)" -eq 3
+      - name: Smoke-test artifacts in target-OS containers
+        # The fresh installs, then the upgrade from 1.1.0 with data
+        # (packaging/tests/upgrade.sh).
+        if: steps.decide.outputs.run == 'true'
+        env:
+          TARGETS: deb rpm tarball upgrade-deb upgrade-rpm upgrade-tarball
+          OLD_VERSION: 1.1.0
         run: ./packaging/tests/run-smoke.sh
       - name: systemd-analyze security
         # The unit went from 7.4 MEDIUM to 1.8 OK when the hardening

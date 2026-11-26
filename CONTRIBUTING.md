@@ -229,7 +229,8 @@ Then the flow:
    upstream.
 4. Merge the PR. On `main`, the `packaging-smoke` job first builds and
    install-tests the `.deb` / `.rpm` / tarball in clean target-OS
-   containers (Ubuntu 24.04, Rocky 9); `release-artifacts` **needs** it,
+   containers (Ubuntu 24.04, Rocky 9), and upgrades a 1.1.0 package
+   install with data to them; `release-artifacts` **needs** it,
    so a broken install path blocks the release rather than shipping.
    Once it passes, `release-artifacts` runs and:
    - syncs `backend/pyproject.toml` and `frontend/package.json`
