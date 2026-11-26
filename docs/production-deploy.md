@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   unbork:
-    image: unbork/unbork:1.0.0    # pin a real version
+    image: unbork/unbork:2.0.0    # pin a real version
     environment:
       UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:${POSTGRES_PASSWORD}@postgres:5432/unbork
       UNBORK_REDIS__URL: redis://redis:6379/0
