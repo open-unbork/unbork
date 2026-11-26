@@ -4,7 +4,7 @@ CSRF double-submit-cookie middleware.
 On every state-changing request (POST/PUT/PATCH/DELETE) the middleware
 requires that the request carries:
 
-  - Cookie ``labdog_csrf`` (set by the server at login, readable by JS)
+  - Cookie ``unbork_csrf`` (set by the server at login, readable by JS)
   - Header ``X-CSRF-Token`` with the same value
 
 Both values are compared with ``hmac.compare_digest`` to prevent timing
@@ -12,7 +12,8 @@ attacks.  A mismatch returns 403.
 
 Exempt paths (the CSRF token does not yet exist at these points, or
 clearing the session must succeed regardless of token state):
-  - POST /api/auth/jwt/login
+  - POST /api/auth/jwt/login, and any password login an extension
+    registers in ``app.auth.login_paths``
   - POST /api/auth/register
   - POST /api/auth/forgot-password
   - POST /api/auth/reset-password
@@ -34,11 +35,12 @@ import logging
 
 from fastapi import Request, Response
 
+from app.auth.login_paths import is_password_login_path
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_CSRF_COOKIE = "labdog_csrf"
+_CSRF_COOKIE = "unbork_csrf"
 _CSRF_HEADER = "X-CSRF-Token"
 
 # Mutating HTTP methods that require the double-submit token.
@@ -99,7 +101,11 @@ class CSRFMiddleware:
 
         if method in _GUARDED_METHODS:
             path = request.url.path
-            if path not in _EXEMPT_PATHS and not path.startswith(_EXEMPT_PREFIXES):
+            if (
+                path not in _EXEMPT_PATHS
+                and not path.startswith(_EXEMPT_PREFIXES)
+                and not is_password_login_path(path)
+            ):
                 cookie_val = request.cookies.get(_CSRF_COOKIE, "")
                 header_val = request.headers.get(_CSRF_HEADER, "")
 

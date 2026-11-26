@@ -23,8 +23,8 @@ const KIND_STYLE: Partial<Record<LineKind, CSSProperties>> = {
   fatal: { color: DANGER },
   unreachable: { color: DANGER },
   error: { color: DANGER },
-  "labdog-failed": { color: DANGER },
-  labdog: { color: toneVar("accent") },
+  "unbork-failed": { color: DANGER },
+  unbork: { color: toneVar("accent") },
 }
 
 /** A recap count's colour: what it counts, and only when it is not zero. */
@@ -86,7 +86,7 @@ function structured(line: LogLine): ReactNode {
 
 /**
  * An Ansible log, coloured by what each line says: results in the status
- * tones, task and play headers set apart, LabDog's own step lines in the
+ * tones, task and play headers set apart, unbork's own step lines in the
  * accent, the recap's non-zero counts in their colours.
  *
  * The text is untouched — every line is a span followed by a newline text

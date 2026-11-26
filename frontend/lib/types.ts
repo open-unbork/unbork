@@ -109,10 +109,10 @@ export interface ChainPolicies {
 export interface Host {
   id: number; hostname: string; ip_address: string; ssh_port: number; ssh_user: string
   firewall_backend: FirewallBackend; sync_status: SyncStatus
-  labdog_source_ip: string | null
+  unbork_source_ip: string | null
   drift_check_enabled: boolean; last_sync_at: string | null
   last_drift_check_at: string | null; ssh_key_id: number | null
-  /** When LabDog last confirmed the host's state: a successful collection,
+  /** When unbork last confirmed the host's state: a successful collection,
    *  drift check or sync. What "stale" is measured against. */
   last_verified_at: string | null
   group_ids: number[]
@@ -231,7 +231,7 @@ export interface GrafanaInstance {
   kind: GrafanaKind
   /** The ingest/remote-write URL the operator enters (handed to Alloy). */
   url: string
-  /** Derived, read-only: the base LabDog queries (host + kind prefix). */
+  /** Derived, read-only: the base unbork queries (host + kind prefix). */
   query_url: string
   org_id: string | null
   auth_type: GrafanaAuthType
@@ -294,7 +294,7 @@ export interface ActionPack {
   local_path: string | null
   enabled: boolean
   /**
-   * Whether this pack may ship content that runs on the LabDog host —
+   * Whether this pack may ship content that runs on the unbork host —
    * ansible plugin directories, or plays targeting localhost. An untrusted
    * pack containing either is refused by the loader and contributes no
    * actions. Not a privilege boundary: the model is flat and any user can
@@ -490,9 +490,14 @@ export interface EffectiveFirewallRule {
 export interface AdminUser {
   id: number
   email: string
+  display_name: string | null
+  /** `null` = no role: the account can sign in but do nothing. */
+  role: "admin" | "operator" | "viewer" | null
   is_active: boolean
   is_superuser: boolean
   is_verified: boolean
+  must_change_password: boolean
+  last_login_at: string | null
   created_at: string
   updated_at: string
 }
@@ -833,6 +838,10 @@ export interface ActionDefinition {
   /** Whether the action makes sense across the entire fleet. Drives the
    *  Fleet target option on the schedule dialog. Conservative default. */
   supports_fleet: boolean
+  /** Whether the manifest declares quiesce and unquiesce playbooks: when a
+   *  snapshot is taken, the application is closed to writes for the whole
+   *  run. Optional so older backends still type-check. */
+  quiesces?: boolean
   parameters: ActionParameter[]
   /** Pack whose manifest provided this action. */
   pack_name: string
@@ -854,7 +863,7 @@ export interface ActionDefinition {
    * operator knows the side effect of running this action. */
   post_run_sync: string[]
   /** Resources the action's manifest declares it installs. After a
-   * successful run labdog inserts these as host-scope override rows
+   * successful run unbork inserts these as host-scope override rows
    * so the resources are managed going forward. Keys are canonical
    * module names; values are pre-validated dicts. Surface as a chip
    * counting items per module so the operator sees the side effect. */
@@ -901,7 +910,7 @@ export interface ActionRun {
   /** NULL for ad-hoc runs; populated when the run was dispatched by the
    *  unified scheduler or POST /api/scheduled-actions/{id}/run-now. */
   scheduled_action_id: number | null
-  /** Set when an alert's labdog_action label started the run; the name
+  /** Set when an alert's unbork_action label started the run; the name
    *  is filled in by the run detail endpoint only. */
   alert_event_id?: number | null
   alertname?: string | null
@@ -953,7 +962,7 @@ export interface HostRunEntry {
   error_message: string | null
   /** The first failed task's message from this host's log. */
   reason: string | null
-  /** Failed here, and LabDog restored the pre-run snapshot. */
+  /** Failed here, and unbork restored the pre-run snapshot. */
   rolled_back: boolean
 }
 
@@ -1030,6 +1039,11 @@ export interface ScheduledAction {
   /** The schedule's newest runs, newest first (8 unless the list was asked
    *  for another number with `?recent_runs=`). */
   recent_runs?: ScheduledActionRunSummary[]
+  /** Whose rights each run is checked against; null on older schedules. */
+  owner_user_id?: number | null
+  owner_email?: string | null
+  /** Set while runs are skipped because of the owner. */
+  owner_blocked_reason?: "owner_removed" | "owner_inactive" | "owner_lacks_permission" | null
 }
 
 // GET /api/scheduled-actions/runs — flat, newest-first feed of individual
@@ -1085,6 +1099,13 @@ export interface VersionInfo {
   build_date: string | null
   license: string
   repo_url: string
+  /** Optional parts this server loads (C-026). Older servers omit it. */
+  features?: Features
+}
+
+export interface Features {
+  /** False when the server leaves the AI assistant out ([assistant] enabled = false). */
+  assistant: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -1165,16 +1186,36 @@ export interface AIProvider {
   uses_subscription: boolean
   /**
    * When the stored credential stops working, for backends whose credential
-   * expires. `claude setup-token` mints a one-year token; API-key providers
-   * get null because their keys do not expire on a schedule.
+   * expires: a one-year subscription token saved by an earlier version
+   * (S-014). Null otherwise, including API-key providers, whose keys do not
+   * expire on a schedule.
    */
   credential_expires_at: string | null
+  /** Why an extension's provider policy refuses this type (S-017); null when allowed. */
+  refused_reason: string | null
+  /**
+   * The Claude Code program's install state for the two program-backed
+   * types (S-009); null for API-key types, which need no program.
+   */
+  runtime: AIProviderRuntime | null
   input_cost_per_mtok: number
   output_cost_per_mtok: number
   monthly_budget: number
   enabled: boolean
   created_at: string
   updated_at: string
+}
+
+export interface AIProviderRuntime {
+  state: "ready" | "missing" | "installing" | "failed"
+  detail: string
+}
+
+/** One row of GET /api/ai/provider-types: whether this install accepts the type. */
+export interface AIProviderTypeInfo {
+  type: AIProviderType
+  allowed: boolean
+  reason: string | null
 }
 
 export interface AIProviderTestResult {
@@ -1226,6 +1267,10 @@ export interface AISession {
   /** The run this session investigates, when it was started from the run
    *  page. Null once that run is pruned. */
   investigates_action_run_id?: number | null
+  /** What an Investigate with AI button elsewhere started it about, and
+   *  that subject's key ("resource:7:disk"). Null for other sessions. */
+  subject_kind?: InvestigationSubject["kind"] | null
+  subject_key?: string | null
   iterations: number
   prompt_tokens: number
   completion_tokens: number
@@ -1347,14 +1392,14 @@ export interface AIUsageSummary {
   reason: string
   /**
    * ISO currency code for every amount above (the `ai.currency` setting).
-   * A display unit only — LabDog stores rates exactly as entered and never
+   * A display unit only — unbork stores rates exactly as entered and never
    * converts, so changing it relabels figures rather than recalculating them.
    */
   currency: string
   days: AIUsageDay[]
 }
 
-/** GET /api/alerts/intake — whether alerts can reach LabDog and what they
+/** GET /api/alerts/intake — whether alerts can reach unbork and what they
  *  can set off. The token itself is never returned, only whether it is
  *  set and long enough. */
 export interface AlertIntakeStatus {
@@ -1364,9 +1409,13 @@ export interface AlertIntakeStatus {
   /** At least 32 characters: below it a webhook alert runs no action and
    *  no full auto. */
   token_long_enough_for_full_auto: boolean
+  /** `[alerts] allowed_sources` is set: only listed addresses may send. */
+  source_allowlist: boolean
+  /** `[alerts] webhook_hmac_secret` is set: a body signature is required. */
+  body_signature: boolean
   ai_enabled: boolean
   auto_investigate_enabled: boolean
-  /** Off: the labdog_ai_automate=true label decides; on: the rules. */
+  /** Off: the unbork_ai_automate=true label decides; on: the rules. */
   full_auto_rules_enabled: boolean
   /** Rules in force: 1 (the label) while the rules are off. */
   full_auto_rules: number
@@ -1419,7 +1468,7 @@ export type AlertActionEntryIn = Pick<
   "action_key" | "target_kind" | "target_id" | "parameters" | "snapshot_enabled" | "verify_enabled" | "auto_rollback" | "cooldown_minutes" | "enabled"
 >
 
-/** What one alert's labdog_action label came to. */
+/** What one alert's unbork_action label came to. */
 export interface AlertDispatch {
   id: number
   alert_action_id: number | null
@@ -1434,7 +1483,7 @@ export interface AlertDispatch {
   checked_at: string | null
 }
 
-/** One alert as LabDog received it, deduplicated by fingerprint. */
+/** One alert as unbork received it, deduplicated by fingerprint. */
 export interface AlertEvent {
   id: number
   source: "grafana_webhook" | "alertmanager_poll"
@@ -1446,7 +1495,7 @@ export interface AlertEvent {
   annotations: Record<string, unknown> | null
   starts_at: string
   ends_at: string | null
-  /** How many times LabDog has been told about this same firing. */
+  /** How many times unbork has been told about this same firing. */
   dedup_count: number
   host_id: number | null
   investigation_session_id: number | null
@@ -1492,7 +1541,7 @@ export interface AlertEvent {
   investigation_autonomy: AIAutonomyLevel | null
   investigation_autonomy_note: string | null
   /**
-   * Whether a full-auto fix worked, as LabDog checked it afterwards. Null
+   * Whether a full-auto fix worked, as unbork checked it afterwards. Null
    * when there was nothing to check — the session could not change the
    * host, or did not.
    */
@@ -1502,7 +1551,7 @@ export interface AlertEvent {
   /** The latest rollback of this alert's session, if there was one. */
   rollback_status: AIRollbackStatus | null
   rollback_detail: string | null
-  /** What the alert's labdog_action label came to: at most one entry. */
+  /** What the alert's unbork_action label came to: at most one entry. */
   actions: AlertDispatch[]
   created_at: string
 }
@@ -1608,4 +1657,25 @@ export interface FleetMetrics {
   sampled_at: string | null
   hosts: FleetHostMetrics[]
   error: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Investigate with AI (POST /api/ai/investigations)
+// ---------------------------------------------------------------------------
+
+/** What an Investigate with AI button is about. Ids only: the server
+ *  writes the mission from its own rows (app/ai/subject_investigation.py). */
+export type InvestigationSubject =
+  | { kind: "resource"; host_id: number; metric: "cpu" | "memory" | "disk" }
+  | { kind: "sync"; sync_job_id: number }
+  | { kind: "stuck"; op: "sync" | "action"; id: number }
+  | { kind: "drift"; host_id: number; module?: string | null }
+  | { kind: "host"; host_id: number }
+
+/** The session a button would reopen instead of starting another. */
+export interface InvestigationRef {
+  subject_key: string
+  session_id: number
+  status: string
+  created_at: string
 }

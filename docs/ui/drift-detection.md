@@ -1,7 +1,7 @@
 # Drift detection
 
 Drift detection asks a host "does your live configuration still match what
-LabDog says it should be?" and records the answer. It is read-only — a drift
+unbork says it should be?" and records the answer. It is read-only — a drift
 check never changes anything on the host. Fixing drift is a sync.
 
 Checks run on a timer (`drift.check_interval_minutes`, default 30, see
@@ -13,7 +13,7 @@ module's tab or **collect all** on a host's page, **Re-check** on the
 ## It is off by default, and the Add Host form asks
 
 `drift_check_enabled` defaults to **off**. That is deliberate: drift checking
-means LabDog connects to the host on a timer, and a tool should not start
+means unbork connects to the host on a timer, and a tool should not start
 doing that to a machine because nobody said otherwise.
 
 What was missing was being *asked*. The **Add Host** form now carries a
@@ -40,9 +40,9 @@ quiet too. The UI says so where it can; the exporter cannot:
 | Overview → drift trend | "Drift checking is off on all *n* hosts — nothing is being checked", with a way to turn it on |
 | Operations → Drift | The same banner above an empty findings list: "Nothing is being checked, so nothing can be found" |
 | Hosts list | `off` in every row's drift check column |
-| `/metrics` exporter | No `labdog_drift_*` series at all — absent, not zero |
+| `/metrics` exporter | No `unbork_drift_*` series at all — absent, not zero |
 
-The exporter's `labdog_hosts_drift_check_enabled` gauge is the quickest way to
+The exporter's `unbork_hosts_drift_check_enabled` gauge is the quickest way to
 see the fleet-wide answer. See [Metrics export](../metrics-export.md).
 
 ## The two flags
@@ -114,5 +114,5 @@ it writes the host record rather than a module row.
 - [Overview](dashboard.md) — the fleet-wide drift trend
 - [Operations › Drift](operations.md#drift) — the findings list
 - [Settings](settings.md) — `drift.check_interval_minutes`
-- [Metrics export](../metrics-export.md) — `labdog_drift_*` and
-  `labdog_hosts_drift_check_enabled`
+- [Metrics export](../metrics-export.md) — `unbork_drift_*` and
+  `unbork_hosts_drift_check_enabled`

@@ -40,7 +40,7 @@ def clone_repo(
         Tuple of (git.Repo object, path to cloned directory).
     """
     if target_dir is None:
-        target_dir = Path(tempfile.mkdtemp(prefix="labdog-git-"))
+        target_dir = Path(tempfile.mkdtemp(prefix="unbork-git-"))
 
     if repo.auth_type == GitAuthType.ssh_key:
         return _clone_ssh(repo, target_dir, encrypted_ssh_key)
@@ -68,7 +68,7 @@ def _clone_ssh(
             f" (repo '{repo.name}', ssh_key_id={repo.ssh_key_id})"
         )
 
-    fd, ssh_key_path = tempfile.mkstemp(dir="/dev/shm", prefix="labdog-", suffix=".key")
+    fd, ssh_key_path = tempfile.mkstemp(dir="/dev/shm", prefix="unbork-", suffix=".key")
     os.close(fd)
     known_hosts_path = f"{ssh_key_path}.known_hosts"
     try:

@@ -41,7 +41,7 @@ export function MetricsTab({ hostId, host }: { hostId: number; host?: Host }) {
     body = (
       <Empty
         title="No default Mimir instance"
-        note="Several Mimir instances are registered and none is marked as the default, so LabDog doesn't know which one to ask. Edit one and tick default."
+        note="Several Mimir instances are registered and none is marked as the default, so unbork doesn't know which one to ask. Edit one and tick default."
         action={<Link href="/grafana" className="btn btn-sm btn-primary hover:no-underline">Grafana instances →</Link>}
       />
     )
@@ -67,7 +67,7 @@ export function MetricsTab({ hostId, host }: { hostId: number; host?: Host }) {
           ) : (
             <>
               Mimir is set up, but nothing labelled with this host has arrived. Add an action pack with an agent that
-              labels its series with <span className="mono">labdog_host_id</span> — the default pack&apos;s{" "}
+              labels its series with <span className="mono">unbork_host_id</span> — the default pack&apos;s{" "}
               <b>Install Alloy agent</b> does — and run it on this host.
             </>
           )
@@ -92,7 +92,7 @@ export function MetricsTab({ hostId, host }: { hostId: number; host?: Host }) {
             unreachable from it.
           </Banner>
         )}
-        <MetricMeters data={data} dim={stale} detail />
+        <MetricMeters data={data} dim={stale} detail investigate={host ? { hostId, hostname: host.hostname } : undefined} />
       </>
     )
   }

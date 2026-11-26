@@ -13,9 +13,9 @@ from app.models.base import Base
 class PackSourceType(enum.StrEnum):
     """Where the pack's manifests live.
 
-    ``git`` — the pack references a configured ``GitRepository``. LabDog
+    ``git`` — the pack references a configured ``GitRepository``. unbork
     clones that repo and reads the pack from a subpath within it.
-    ``local`` — the pack is a pre-existing directory on the LabDog host;
+    ``local`` — the pack is a pre-existing directory on the unbork host;
     nothing is cloned. Useful for BYO playbooks you maintain outside a
     git workflow, or for local dev against a working copy.
     """
@@ -25,7 +25,7 @@ class PackSourceType(enum.StrEnum):
 
 
 class ActionPack(Base):
-    """A pack of playbooks LabDog treats as a source of action
+    """A pack of playbooks unbork treats as a source of action
     definitions.
 
     For git packs: ``git_repository_id`` references a configured
@@ -35,7 +35,7 @@ class ActionPack(Base):
     here.
 
     For local packs: ``local_path`` is the absolute filesystem path on
-    the LabDog host where the pack directory lives. No clone, no auth.
+    the unbork host where the pack directory lives. No clone, no auth.
 
     Packs have **no inherent precedence**. When multiple packs declare
     the same action key, the operator pins the winner via an
@@ -69,13 +69,13 @@ class ActionPack(Base):
     #: lives; empty string = repo root. For 'local': ignored.
     path: Mapped[str] = mapped_column(String(500), default="", server_default="")
 
-    #: For source_type='local': absolute filesystem path on the LabDog
+    #: For source_type='local': absolute filesystem path on the unbork
     #: host. For 'git': NULL.
     local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    #: Whether this pack may ship content that runs on the LabDog host —
+    #: Whether this pack may ship content that runs on the unbork host —
     #: ansible plugin directories, or plays targeting localhost. Not a
     #: privilege boundary (the model is flat; any user can set it), but it
     #: makes loading controller-side code deliberate and audited rather

@@ -2,7 +2,7 @@
 
 Two tasks:
 
-* ``handle_alert`` — one new firing alert. Acts on its ``labdog_action``
+* ``handle_alert`` — one new firing alert. Acts on its ``unbork_action``
   label (:mod:`app.alerts.labels`). If that started a run, the AI waits
   for it: ``waiting_on_action`` when the labels also ask for the AI,
   ``handled_by_action`` when the action alone handles the alert. If no
@@ -23,6 +23,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,6 @@ async def _handle(alert_event_id: int) -> dict:
     from app.ai.models import AlertEvent
     from app.alerts.labels import dispatch_for
     from app.db import task_session
-    from app.tasks.ai_alerts import _decide_and_run
 
     async with task_session() as db:
         event = await db.get(AlertEvent, alert_event_id)
@@ -73,8 +73,8 @@ async def _handle(alert_event_id: int) -> dict:
             event.investigation_detail = f"{dispatch.action_key}: {_why_not(dispatch)}"[:2000]
         elif dispatch is not None:
             already_tried = (
-                f"The alert's labdog_action label asked for the action {dispatch.action_key}, "
-                f"but LabDog did not run it: {_why_not(dispatch)}."
+                f"The alert's unbork_action label asked for the action {dispatch.action_key}, "
+                f"but unbork did not run it: {_why_not(dispatch)}."
             )
         await db.commit()
         summary = (
@@ -94,14 +94,21 @@ async def _handle(alert_event_id: int) -> dict:
 
     if handled:
         return {"alert_event_id": alert_event_id, "outcome": "action", "actions": summary}
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        # Nothing to hand it to (C-026): the alert stays recorded.
+        return {"alert_event_id": alert_event_id, "outcome": "no_assistant", "actions": summary}
+    from app.tasks.ai_alerts import _decide_and_run
+
     result = await _decide_and_run(alert_event_id, already_tried=already_tried)
     return {**result, "actions": summary}
 
 
 @celery_app.task(name="app.tasks.alert_handling.handle_alert")
 def handle_alert(alert_event_id: int) -> dict:
-    """Act on one alert's labdog_action label, then apply the AI policy."""
-    return asyncio.run(_handle(alert_event_id))
+    """Act on one alert's unbork_action label, then apply the AI policy."""
+    return asyncio.run(with_task_engine(_handle(alert_event_id)))
 
 
 async def _output_tail(db, run_id: int) -> str:  # noqa: ANN001
@@ -124,15 +131,15 @@ async def _tried(db, dispatch, run, event, verdict: str, host: str) -> str:  # n
     action = ACTION_REGISTRY.get(dispatch.action_key)
     name = f"{action.name} ({dispatch.action_key})" if action else dispatch.action_key
     if run is None:
-        return f"LabDog ran the action {name} on {host} for this alert, but its run is gone."
+        return f"unbork ran the action {name} on {host} for this alert, but its run is gone."
     if verdict == "not_effective":
         ending = "The run succeeded, but the alert is still firing."
     else:
         why = f": {run.error_message}" if run.error_message else ""
         ending = f"The run {run.status}{why}."
     text = [
-        f"When this alert fired, LabDog ran the action {name} on {host} as run #{run.id}, "
-        f"as the alert's labdog_action label asked. {ending}"
+        f"When this alert fired, unbork ran the action {name} on {host} as run #{run.id}, "
+        f"as the alert's unbork_action label asked. {ending}"
     ]
     tail = await _output_tail(db, run.id)
     if tail:
@@ -150,7 +157,6 @@ async def _check(now: datetime | None = None) -> dict:
     from app.models.host import Host
     from app.notifications.service import notify_alert_action
     from app.settings_service import get_setting_typed
-    from app.tasks.ai_alerts import _decide_and_run
 
     now = now or datetime.now(UTC)
     judged = 0
@@ -213,6 +219,11 @@ async def _check(now: datetime | None = None) -> dict:
             await notify_alert_action(db, dispatch, run, event, host=host, handed_to_ai=hand_over)
         await db.commit()
 
+    if fallbacks:
+        # Only a dispatch with hand_to_ai set gets here, which wants_ai()
+        # never sets without the assistant (C-026).
+        from app.tasks.ai_alerts import _decide_and_run
+
     for event_id, tried in fallbacks.items():
         try:
             await _decide_and_run(event_id, already_tried=tried)
@@ -224,7 +235,7 @@ async def _check(now: datetime | None = None) -> dict:
 @celery_app.task(name="app.tasks.alert_handling.check_alert_actions", queue="default")
 def check_alert_actions() -> dict:
     """Judge finished runs that alerts started — see the module docstring."""
-    return asyncio.run(_check())
+    return asyncio.run(with_task_engine(_check()))
 
 
 def _register_beat_schedules() -> None:

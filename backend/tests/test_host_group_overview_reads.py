@@ -97,7 +97,7 @@ async def test_host_runs_include_group_runs_with_this_hosts_own_result(superuser
                 status="failed",
                 exit_code=2,
                 error_message="ansible-runner exited with status=failed, rc=2",
-                output=FAILED_LOG + "[rollback] restoring labdog-1\n[rollback] success=True\n",
+                output=FAILED_LOG + "[rollback] restoring unbork-1\n[rollback] success=True\n",
             ),
             ActionHostRun(
                 action_run_id=newer.id, host_id=other.id, hostname="other", status="succeeded"
@@ -142,7 +142,7 @@ async def test_host_runs_require_a_host(superuser_client):
     assert resp.status_code == 422
 
 
-async def test_alerts_and_sessions_filter_by_host(superuser_client, db):
+async def test_alerts_filter_by_host(superuser_client, db):
     a = await create_host(db, hostname="a")
     b = await create_host(db, hostname="b")
     for host_id, name in ((a.id, "OnA"), (b.id, "OnB"), (None, "Cluster")):
@@ -159,6 +159,17 @@ async def test_alerts_and_sessions_filter_by_host(superuser_client, db):
                 host_id=host_id,
             )
         )
+    await db.flush()
+
+    alerts = (await superuser_client.get(f"/api/alerts?host_id={a.id}")).json()
+    assert [x["alertname"] for x in alerts] == ["OnA"]
+    assert len((await superuser_client.get("/api/alerts")).json()) == 3
+
+
+@pytest.mark.needs_assistant
+async def test_sessions_filter_by_host(superuser_client, db):
+    a = await create_host(db, hostname="a")
+    b = await create_host(db, hostname="b")
     db.add_all(
         [
             AISession(mode="chat", mission="a and b", target_host_ids=[a.id, b.id]),
@@ -167,10 +178,6 @@ async def test_alerts_and_sessions_filter_by_host(superuser_client, db):
         ]
     )
     await db.flush()
-
-    alerts = (await superuser_client.get(f"/api/alerts?host_id={a.id}")).json()
-    assert [x["alertname"] for x in alerts] == ["OnA"]
-    assert len((await superuser_client.get("/api/alerts")).json()) == 3
 
     resp = await superuser_client.get(f"/api/ai/sessions?host_id={a.id}&view=all")
     assert resp.status_code == 200, resp.text

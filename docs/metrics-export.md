@@ -1,13 +1,13 @@
 # Metrics export (Prometheus)
 
-LabDog can expose its own fleet state and internal health in the Prometheus
+unbork can expose its own fleet state and internal health in the Prometheus
 text exposition format, so an existing Prometheus + Grafana stack can scrape it
 directly — no extra agent, no extra database.
 
 > **Two different features share the word "metrics".**
-> This page is about LabDog **exposing** metrics *outward* (Prometheus scrapes
-> LabDog).
-> For LabDog **reading** per-host CPU / memory / disk *inward* from a Grafana
+> This page is about unbork **exposing** metrics *outward* (Prometheus scrapes
+> unbork).
+> For unbork **reading** per-host CPU / memory / disk *inward* from a Grafana
 > Mimir backend, see [Live host metrics](ui/host-metrics.md).
 > They are independent — you can use either, both, or neither.
 
@@ -18,7 +18,7 @@ Ready-made scrape config, alert rules and a Grafana dashboard live in
 
 ## Enabling
 
-The endpoint is **disabled by default**. In `/etc/labdog/labdog.toml`:
+The endpoint is **disabled by default**. In `/etc/unbork/unbork.toml`:
 
 ```toml
 [metrics]
@@ -32,13 +32,13 @@ enabled = true
 or via environment variable:
 
 ```bash
-LABDOG_METRICS__ENABLED=true
+UNBORK_METRICS__ENABLED=true
 ```
 
-Restart LabDog, then verify:
+Restart unbork, then verify:
 
 ```bash
-curl -i http://labdog.example.com:8000/metrics
+curl -i http://unbork.example.com:8000/metrics
 ```
 
 Expect `HTTP/1.1 200` and
@@ -51,7 +51,7 @@ panel (Settings › Integrations lists it too).
 ### Why this is a config-file setting and not a UI toggle
 
 Enabling the endpoint publishes fleet-wide information to the network without
-authentication. LabDog's in-app settings API is available to *any* signed-in
+authentication. unbork's in-app settings API is available to *any* signed-in
 user, not just superusers — so a UI toggle would let any authenticated session
 (or a hijacked one) expose that data with a single request. Requiring a config
 file edit and a restart keeps that decision at the same trust level as the
@@ -62,7 +62,7 @@ reverse-proxy configuration that protects it.
 ## Security
 
 **When enabled, `/metrics` is unauthenticated**, exactly like `GET /api/version`.
-Prometheus cannot use LabDog's cookie session auth, and shipping a
+Prometheus cannot use unbork's cookie session auth, and shipping a
 half-authenticated scrape path invites misconfiguration, so the endpoint is
 deliberately open-and-opt-in rather than gated.
 
@@ -88,18 +88,18 @@ your fleet.
 
 ## Scraping
 
-Examples use **Grafana Alloy**, since LabDog already deploys it to managed hosts
-via the `alloy-install` action from `labdog-playbooks` — scraping LabDog itself is usually one
+Examples use **Grafana Alloy**, since unbork already deploys it to managed hosts
+via the `alloy-install` action from `unbork-playbooks` — scraping unbork itself is usually one
 extra block. The endpoint serves standard Prometheus text exposition, so any
 compatible scraper works; point it at the same URL.
 
 Minimal config (full version, with `remote_write` and basic-auth variants, in
-[`examples/prometheus/labdog.alloy`](examples/prometheus/labdog.alloy)):
+[`examples/prometheus/unbork.alloy`](examples/prometheus/unbork.alloy)):
 
 ```alloy
-prometheus.scrape "labdog" {
-  targets         = [{ __address__ = "labdog.example.com" }]
-  job_name        = "labdog"
+prometheus.scrape "unbork" {
+  targets         = [{ __address__ = "unbork.example.com" }]
+  job_name        = "unbork"
   scheme          = "https"
   metrics_path    = "/metrics"
   scrape_interval = "30s"
@@ -109,11 +109,11 @@ prometheus.scrape "labdog" {
 }
 ```
 
-LabDog aggregates from PostgreSQL on each scrape and caches the result for
+unbork aggregates from PostgreSQL on each scrape and caches the result for
 `cache_ttl_seconds` (default 15s). Scraping faster than the TTL is harmless but
 pointless; multiple scrapers hitting the same instance share the cache.
 
-`/metrics` is exempt from LabDog's global API rate limit. Without that
+`/metrics` is exempt from unbork's global API rate limit. Without that
 exemption a scraper arriving through the same reverse proxy as user traffic
 would share one rate-limit bucket with every logged-in operator, and monitoring
 would break exactly when the UI was busiest.
@@ -122,11 +122,11 @@ would break exactly when the UI was busiest.
 
 ## Metric reference
 
-All metric names are prefixed `labdog_`. Counters carry `_total`, durations are
+All metric names are prefixed `unbork_`. Counters carry `_total`, durations are
 in seconds, and absolute times are Unix timestamps in seconds.
 
 Label values for `module`, `action_key` and module-level `sync_status` are
-emitted **verbatim from the database**. Note LabDog carries two module
+emitted **verbatim from the database**. Note unbork carries two module
 spellings: the database uses `firewall`, `package`, `service`, `cron`,
 `linux_user`, `hosts_file`, `resolver` (and `bulk` for coalesced syncs), whereas
 playbooks use `packages`, `hosts-file`, `linux-users`. Metrics always use the
@@ -136,43 +136,43 @@ database spelling.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `labdog_build_info` | gauge | `version`, `commit`, `build_date` | Always `1`; build metadata carried on labels |
-| `labdog_hosts` | gauge | `sync_status` | Managed hosts by aggregate status (`pending`, `in_sync`, `out_of_sync`, `unknown`, `error`) |
-| `labdog_hosts_firewall_backend` | gauge | `backend` | Hosts by detected backend (`nftables`, `iptables`, `unknown`) |
-| `labdog_hosts_drift_check_enabled` | gauge | — | Hosts with automatic drift checking enabled |
-| `labdog_hosts_never_synced` | gauge | — | Hosts that have never completed a sync |
-| `labdog_hosts_never_drift_checked` | gauge | — | Hosts that have never been drift-checked |
-| `labdog_host_last_sync_age_seconds_max` | gauge | — | Age of the least-recently-synced host |
-| `labdog_host_last_drift_check_age_seconds_max` | gauge | — | Age of the least-recently-checked host |
-| `labdog_host_modules` | gauge | `module`, `sync_status` | Per-host per-module state, counted |
-| `labdog_module_rules` | gauge | `module` | Desired-state rules defined per module |
-| `labdog_groups` | gauge | — | Host groups |
-| `labdog_groups_gitops` | gauge | `status` | Groups by GitOps status |
-| `labdog_group_gitops_last_import_age_seconds_max` | gauge | — | Stalest GitOps import among enabled groups |
-| `labdog_ca_cert_not_after_timestamp_seconds` | gauge | `name`, `fingerprint` | CA certificate expiry, as a Unix timestamp |
-| `labdog_scan_pending_hosts` | gauge | — | Discovered hosts awaiting review |
-| `labdog_scan_configs` | gauge | `state` | Scan configurations enabled/disabled |
-| `labdog_scan_config_last_run` | gauge | `status` | Scan configs by last-run outcome |
-| `labdog_users` | gauge | `state` | User accounts active/inactive |
-| `labdog_superusers` | gauge | — | Accounts with superuser rights |
-| `labdog_git_repositories` | gauge | `auth_type` | Configured Git repositories |
-| `labdog_grafana_instances` | gauge | `kind` | Registered Mimir/Loki backends |
-| `labdog_vm_mappings` | gauge | — | Hosts mapped to a Proxmox VM (snapshot-capable) |
+| `unbork_build_info` | gauge | `version`, `commit`, `build_date` | Always `1`; build metadata carried on labels |
+| `unbork_hosts` | gauge | `sync_status` | Managed hosts by aggregate status (`pending`, `in_sync`, `out_of_sync`, `unknown`, `error`) |
+| `unbork_hosts_firewall_backend` | gauge | `backend` | Hosts by detected backend (`nftables`, `iptables`, `unknown`) |
+| `unbork_hosts_drift_check_enabled` | gauge | — | Hosts with automatic drift checking enabled |
+| `unbork_hosts_never_synced` | gauge | — | Hosts that have never completed a sync |
+| `unbork_hosts_never_drift_checked` | gauge | — | Hosts that have never been drift-checked |
+| `unbork_host_last_sync_age_seconds_max` | gauge | — | Age of the least-recently-synced host |
+| `unbork_host_last_drift_check_age_seconds_max` | gauge | — | Age of the least-recently-checked host |
+| `unbork_host_modules` | gauge | `module`, `sync_status` | Per-host per-module state, counted |
+| `unbork_module_rules` | gauge | `module` | Desired-state rules defined per module |
+| `unbork_groups` | gauge | — | Host groups |
+| `unbork_groups_gitops` | gauge | `status` | Groups by GitOps status |
+| `unbork_group_gitops_last_import_age_seconds_max` | gauge | — | Stalest GitOps import among enabled groups |
+| `unbork_ca_cert_not_after_timestamp_seconds` | gauge | `name`, `fingerprint` | CA certificate expiry, as a Unix timestamp |
+| `unbork_scan_pending_hosts` | gauge | — | Discovered hosts awaiting review |
+| `unbork_scan_configs` | gauge | `state` | Scan configurations enabled/disabled |
+| `unbork_scan_config_last_run` | gauge | `status` | Scan configs by last-run outcome |
+| `unbork_users` | gauge | `state` | User accounts active/inactive |
+| `unbork_superusers` | gauge | — | Accounts with superuser rights |
+| `unbork_git_repositories` | gauge | `auth_type` | Configured Git repositories |
+| `unbork_grafana_instances` | gauge | `kind` | Registered Mimir/Loki backends |
+| `unbork_vm_mappings` | gauge | — | Hosts mapped to a Proxmox VM (snapshot-capable) |
 
 ### Sync and drift
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `labdog_sync_jobs_total` | counter | `status`, `module` | Sync jobs ever recorded |
-| `labdog_sync_jobs_inflight` | gauge | `status`, `module` | Sync jobs currently `pending` or `running` |
-| `labdog_sync_job_duration_seconds` | histogram | — | Wall time from start to completion |
-| `labdog_stale_sync_jobs` | gauge | — | Jobs stuck `running` past the sweeper threshold |
-| `labdog_hosts_queue_blocked` | gauge | — | Hosts with a backed-up operation queue |
-| `labdog_drift_checks_total` | counter | `module`, `result` | Drift checks ever performed |
-| `labdog_drift_changes_total` | counter | `module`, `kind` | Individual drift deltas (`add`, `remove`, `policy_change`) |
-| `labdog_drift_check_duration_seconds` | histogram | `module` | Drift-check wall time |
+| `unbork_sync_jobs_total` | counter | `status`, `module` | Sync jobs ever recorded |
+| `unbork_sync_jobs_inflight` | gauge | `status`, `module` | Sync jobs currently `pending` or `running` |
+| `unbork_sync_job_duration_seconds` | histogram | — | Wall time from start to completion |
+| `unbork_stale_sync_jobs` | gauge | — | Jobs stuck `running` past the sweeper threshold |
+| `unbork_hosts_queue_blocked` | gauge | — | Hosts with a backed-up operation queue |
+| `unbork_drift_checks_total` | counter | `module`, `result` | Drift checks ever performed |
+| `unbork_drift_changes_total` | counter | `module`, `kind` | Individual drift deltas (`add`, `remove`, `policy_change`) |
+| `unbork_drift_check_duration_seconds` | histogram | `module` | Drift-check wall time |
 
-`labdog_drift_checks_total`'s `result` label is the recorded outcome verbatim,
+`unbork_drift_checks_total`'s `result` label is the recorded outcome verbatim,
 which includes **`error`** — a check that failed to run. An erroring check is
 *not* the same as detected drift: the host's true state is unknown. This is
 worth alerting on, and it is a signal the in-app drift trend does not surface.
@@ -181,21 +181,21 @@ worth alerting on, and it is a signal the in-app drift trend does not surface.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `labdog_action_runs_total` | counter | `action_key`, `status` | Action runs ever dispatched |
-| `labdog_action_runs_inflight` | gauge | `status` | Action runs queued/pending/running |
-| `labdog_action_runs_scheduled_total` | counter | `origin` | Runs dispatched from a schedule, split by what triggered them: `cron` (the scheduler tick) or `manual` (someone pressed *Run now*) |
-| `labdog_action_host_runs_total` | counter | `status` | Per-host action executions ever |
-| `labdog_action_host_runs_nonzero_exit_total` | counter | — | Per-host executions with a non-zero exit code |
-| `labdog_scheduled_actions` | gauge | `target_kind`, `state` | Schedules by target and enabled state |
-| `labdog_scheduled_actions_orphaned` | gauge | — | **Enabled schedules whose action has no registry winner** |
-| `labdog_scheduled_action_last_dispatch_age_seconds_max` | gauge | — | Stalest enabled schedule's last dispatch |
-| `labdog_action_packs` | gauge | `sync_status` | Enabled packs by last sync outcome |
-| `labdog_action_pack_last_sync_age_seconds_max` | gauge | — | Stalest enabled pack sync |
-| `labdog_action_registry_keys` | gauge | — | Action keys with a resolved winner |
-| `labdog_action_registry_computed_timestamp_seconds` | gauge | — | Last registry rebuild |
-| `labdog_action_resolutions` | gauge | `origin` | Action-key conflict pins: `user` (an operator picked the winning pack) or `frozen` (auto-pinned when a sync introduced a fresh conflict, so behaviour didn't silently flip — these are the ones nobody has reviewed) |
+| `unbork_action_runs_total` | counter | `action_key`, `status` | Action runs ever dispatched |
+| `unbork_action_runs_inflight` | gauge | `status` | Action runs queued/pending/running |
+| `unbork_action_runs_scheduled_total` | counter | `origin` | Runs dispatched from a schedule, split by what triggered them: `cron` (the scheduler tick) or `manual` (someone pressed *Run now*) |
+| `unbork_action_host_runs_total` | counter | `status` | Per-host action executions ever |
+| `unbork_action_host_runs_nonzero_exit_total` | counter | — | Per-host executions with a non-zero exit code |
+| `unbork_scheduled_actions` | gauge | `target_kind`, `state` | Schedules by target and enabled state |
+| `unbork_scheduled_actions_orphaned` | gauge | — | **Enabled schedules whose action has no registry winner** |
+| `unbork_scheduled_action_last_dispatch_age_seconds_max` | gauge | — | Stalest enabled schedule's last dispatch |
+| `unbork_action_packs` | gauge | `sync_status` | Enabled packs by last sync outcome |
+| `unbork_action_pack_last_sync_age_seconds_max` | gauge | — | Stalest enabled pack sync |
+| `unbork_action_registry_keys` | gauge | — | Action keys with a resolved winner |
+| `unbork_action_registry_computed_timestamp_seconds` | gauge | — | Last registry rebuild |
+| `unbork_action_resolutions` | gauge | `origin` | Action-key conflict pins: `user` (an operator picked the winning pack) or `frozen` (auto-pinned when a sync introduced a fresh conflict, so behaviour didn't silently flip — these are the ones nobody has reviewed) |
 
-`labdog_scheduled_actions_orphaned` is the highest-value alert here: an
+`unbork_scheduled_actions_orphaned` is the highest-value alert here: an
 orphaned schedule fires on time and silently does nothing, because its
 `action_key` has no winner in the registry.
 
@@ -203,23 +203,23 @@ orphaned schedule fires on time and silently does nothing, because its
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `labdog_broker_reachable` | gauge | — | `1` if the Celery broker answered within its timeout, `0` otherwise |
-| `labdog_broker_queue_depth` | gauge | `queue` | Tasks **waiting** in each Celery queue. Absent when the broker is unreachable |
+| `unbork_broker_reachable` | gauge | — | `1` if the Celery broker answered within its timeout, `0` otherwise |
+| `unbork_broker_queue_depth` | gauge | `queue` | Tasks **waiting** in each Celery queue. Absent when the broker is unreachable |
 
 These are the only families not derived from PostgreSQL, which has two
 consequences worth knowing before you alert on them.
 
-**`labdog_broker_queue_depth` is absent, not zero, when the broker is
+**`unbork_broker_queue_depth` is absent, not zero, when the broker is
 down.** A zero would read as "the queues are empty" — the opposite of what
 is known — and would silence a backlog alert at exactly the moment it
-should fire. Join on `labdog_broker_reachable`, or use `absent()`:
+should fire. Join on `unbork_broker_reachable`, or use `absent()`:
 
 ```promql
 # Work piling up — only meaningful when we could actually read the queue.
-labdog_broker_queue_depth > 100
+unbork_broker_queue_depth > 100
 
 # The broker itself is the problem.
-labdog_broker_reachable == 0
+unbork_broker_reachable == 0
 ```
 
 **The probe has a hard timeout** (`metrics.broker_timeout_seconds`,
@@ -240,9 +240,9 @@ no place in a scrape path. Run [celery-exporter] alongside if you need it.
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `labdog_metrics_scrape_duration_seconds` | gauge | Wall time of the last full collection |
-| `labdog_metrics_cache_age_seconds` | gauge | Age of the snapshot served (0 on a fresh collection) |
-| `labdog_metrics_scrape_errors_total` | counter | Collections that raised — **process-local**, resets on restart |
+| `unbork_metrics_scrape_duration_seconds` | gauge | Wall time of the last full collection |
+| `unbork_metrics_cache_age_seconds` | gauge | Age of the snapshot served (0 on a fresh collection) |
+| `unbork_metrics_scrape_errors_total` | counter | Collections that raised — **process-local**, resets on restart |
 
 ---
 
@@ -254,8 +254,8 @@ daily by `logging.drift_retention_days` (default 90, `0` = keep forever).
 Deleting rows from it is not as simple as it looks, and the mechanism is
 worth knowing before you read the drift counters:
 
-`labdog_drift_checks_total`, `labdog_drift_changes_total` and
-`labdog_drift_check_duration_seconds` are all derived from the whole table
+`unbork_drift_checks_total`, `unbork_drift_changes_total` and
+`unbork_drift_check_duration_seconds` are all derived from the whole table
 with no time window, and all three are **counters**. A plain delete would
 make them decrease, which Prometheus reads as a process restart — `rate()`
 copes, `increase()` across the deletion silently under-reports, and nothing
@@ -283,7 +283,7 @@ whose positions now mean different durations.
 
 ## Counter semantics
 
-Every counter except `labdog_metrics_scrape_errors_total` is computed as a
+Every counter except `unbork_metrics_scrape_errors_total` is computed as a
 `COUNT(*)` or `SUM()` over the whole table with **no time window**. That has
 three useful consequences:
 
@@ -302,9 +302,9 @@ under-reports):
 2. **Future history pruning**, if retention is added to those tables.
 3. **Restoring the database** from an older backup.
 
-`labdog_metrics_scrape_errors_total` is the deliberate exception: it counts
+`unbork_metrics_scrape_errors_total` is the deliberate exception: it counts
 failures inside the exporter itself, lives in process memory, and resets when
-LabDog restarts.
+unbork restarts.
 
 ### Why all-time counters still give you recent dashboards
 
@@ -313,7 +313,7 @@ Because Prometheus differentiates them. `rate()` and `increase()` operate on the
 what they want. The same applies to histograms:
 
 ```promql
-histogram_quantile(0.95, sum(rate(labdog_sync_job_duration_seconds_bucket[15m])) by (le))
+histogram_quantile(0.95, sum(rate(unbork_sync_job_duration_seconds_bucket[15m])) by (le))
 ```
 
 gives p95 sync duration **over the last 15 minutes**, even though the underlying
@@ -323,15 +323,15 @@ bucket counters are cumulative since the beginning of time.
 
 ## Histogram caveat
 
-`labdog_drift_check_duration_seconds_count` is **not** the number of drift
+`unbork_drift_check_duration_seconds_count` is **not** the number of drift
 checks. Drift-check duration is nullable — checks recorded before timing was
 added, or by code paths that don't time themselves, have no duration and are
 excluded from the histogram.
 
-Use `labdog_drift_checks_total` to count checks, and
-`labdog_drift_check_duration_seconds` only for latency.
+Use `unbork_drift_checks_total` to count checks, and
+`unbork_drift_check_duration_seconds` only for latency.
 
-Similarly, `labdog_sync_job_duration_seconds` covers only jobs that recorded
+Similarly, `unbork_sync_job_duration_seconds` covers only jobs that recorded
 both a start and a completion time.
 
 ---
@@ -343,13 +343,13 @@ per-host label anywhere**. Adding one would multiply out badly: a 10,000-host
 fleet with 7 modules and 5 states would produce 350,000 series from a single
 metric family. Per-host telemetry has its own home — the Grafana Alloy → Mimir
 path documented in [Live host metrics](ui/host-metrics.md), where each series is
-already tagged with `labdog_host_id`.
+already tagged with `unbork_host_id`.
 
 Free-text values are never used as labels either: error messages, pending
 reasons, session IDs, IP addresses, package names and usernames are all
 unbounded, and would turn a scrape into a cardinality incident.
 
-The one adjustable dimension is `action_key` on `labdog_action_runs_total`,
+The one adjustable dimension is `action_key` on `unbork_action_runs_total`,
 which scales with the number of distinct actions you run (typically 10–100).
 To trade it away:
 
@@ -362,12 +362,12 @@ action_key_label = false
 
 ## Grafana dashboard and alerts
 
-- **Dashboard:** [`examples/prometheus/labdog-overview.json`](examples/prometheus/labdog-overview.json)
+- **Dashboard:** [`examples/prometheus/unbork-overview.json`](examples/prometheus/unbork-overview.json)
   — import via **Dashboards → New → Import**, then select your Prometheus
   datasource. Covers fleet state, sync throughput and latency, queue health,
   drift (including the error rate), action failures, scheduling and pack health,
   certificate expiry, and exporter cost.
-- **Alerts:** [`examples/prometheus/labdog-alerts.yml`](examples/prometheus/labdog-alerts.yml)
+- **Alerts:** [`examples/prometheus/unbork-alerts.yml`](examples/prometheus/unbork-alerts.yml)
   — 14 rules. Review the thresholds before relying on them; they assume a small
   fleet where persistent drift is unusual.
 
@@ -375,64 +375,64 @@ action_key_label = false
 
 ## Troubleshooting
 
-**`/metrics` returns HTML.** The endpoint is disabled, so LabDog returns 404 and
+**`/metrics` returns HTML.** The endpoint is disabled, so unbork returns 404 and
 something upstream (or your browser) is showing the SPA fallback. Check
-`[metrics] enabled` and that LabDog was restarted after the change.
+`[metrics] enabled` and that unbork was restarted after the change.
 
 **`/metrics` returns `{"detail":"Metrics exporter is disabled"}`.** The endpoint
 is present and reachable; the feature is simply off. That JSON body (rather than
 an HTML page) confirms your build *has* the exporter — see below if you believe
 you enabled it.
 
-**I set `LABDOG_METRICS__ENABLED=true` but it's still disabled.** Two things to
+**I set `UNBORK_METRICS__ENABLED=true` but it's still disabled.** Two things to
 check, in this order:
 
 1. **Does the service actually receive the variable?** For `.deb` / `.rpm`
-   installs the systemd unit passes only `PATH` and `LABDOG_CONFIG` and has no
+   installs the systemd unit passes only `PATH` and `UNBORK_CONFIG` and has no
    `EnvironmentFile`, so a variable exported in your shell — or set with
-   `sudo LABDOG_METRICS__ENABLED=true systemctl restart labdog` — is **not**
+   `sudo UNBORK_METRICS__ENABLED=true systemctl restart unbork` — is **not**
    inherited by the service. Either set it on the unit:
 
    ```bash
-   sudo systemctl edit labdog     # adds a drop-in
+   sudo systemctl edit unbork     # adds a drop-in
    ```
    ```ini
    [Service]
-   Environment=LABDOG_METRICS__ENABLED=true
+   Environment=UNBORK_METRICS__ENABLED=true
    ```
 
    or, more simply, use the config file (recommended — it's the documented
    surface and survives unit changes):
 
    ```toml
-   # /etc/labdog/labdog.toml
+   # /etc/unbork/unbork.toml
    [metrics]
    enabled = true
    ```
 
-   Note that an existing `/etc/labdog/labdog.toml` is a package conffile and is
+   Note that an existing `/etc/unbork/unbork.toml` is a package conffile and is
    **not** rewritten on upgrade, so it will not gain the `[metrics]` block
    automatically — add it by hand. For Docker, put the variable in the
    container's `environment:` / `env_file:`, not the host shell.
 
-2. **Restart LabDog.** Settings are read once at process start, so changing the
+2. **Restart unbork.** Settings are read once at process start, so changing the
    environment or the config file has no effect on a running instance.
 
 ```bash
-sudo systemctl restart labdog
+sudo systemctl restart unbork
 curl -i http://localhost:8000/metrics | head -3
 ```
 
 **Target is `DOWN` with a 429.** Rate limiting shouldn't apply to `/metrics`, so
-this usually means a proxy in front of LabDog is doing its own limiting.
+this usually means a proxy in front of unbork is doing its own limiting.
 
-**Collection is slow** (`labdog_metrics_scrape_duration_seconds` climbing).
+**Collection is slow** (`unbork_metrics_scrape_duration_seconds` climbing).
 Collection runs roughly a dozen aggregate queries. Sustained slowness normally
 means a large history table would benefit from pruning or an index; raising
 `cache_ttl_seconds` reduces how often the work happens.
 
 **Values look stale by a few seconds.** Expected — that's `cache_ttl_seconds`.
-`labdog_metrics_cache_age_seconds` tells you the age of the snapshot you got.
+`unbork_metrics_cache_age_seconds` tells you the age of the snapshot you got.
 
 ---
 
@@ -455,15 +455,15 @@ means a large history table would benefit from pruning or an index; raising
   `_total` is invalid as an OpenMetrics counter, so the mapping has to be
   deliberate rather than a suffix swap.
 - **No `prometheus_client` dependency.** That library's value is its in-process
-  registry, which doesn't fit here: LabDog derives every value from SQL at
+  registry, which doesn't fit here: unbork derives every value from SQL at
   scrape time, and in-process counters would be *wrong* under multiple uvicorn
   workers (each worker would hold its own partial counts). The renderer is a
   small dependency-free module; the library is used in the test suite only, to
-  validate that LabDog's output parses correctly.
+  validate that unbork's output parses correctly.
 - **The snapshot cache is per-process, and that is correct** rather than merely
   tolerable — since every value is read from the database, all workers produce
   identical output regardless of which one serves a given scrape.
 - **Celery worker internals are not exported.** Inspecting live workers requires
   a broadcast RPC with a multi-second timeout, which has no place in a scrape
   path. Use [`celery-exporter`](https://github.com/danihodovic/celery-exporter)
-  alongside LabDog if you need queue and worker telemetry.
+  alongside unbork if you need queue and worker telemetry.

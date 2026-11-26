@@ -3,21 +3,23 @@ import logging
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
 from app.gitops.schema import (
     CronJobYAML,
     FirewallRuleYAML,
     HostsEntryYAML,
-    LabDogGlobalYAML,
-    LabDogGroupYAML,
     LinuxGroupYAML,
     LinuxUserYAML,
     PackageRepositoryYAML,
     PackageYAML,
     ServiceYAML,
+    UnborkGlobalYAML,
+    UnborkGroupYAML,
 )
 from app.resolver.models import ResolverConfig
 from app.rules.model import FirewallRuleSpec
+from app.schemas.rules import RuleCreate
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,8 @@ class YAMLParseError(Exception):
     pass
 
 
-def parse_yaml(yaml_str: str) -> LabDogGroupYAML:
-    """Parse YAML string into validated LabDogGroupYAML model.
+def parse_yaml(yaml_str: str) -> UnborkGroupYAML:
+    """Parse YAML string into validated UnborkGroupYAML model.
 
     Raises YAMLParseError with descriptive message on failure.
     Silently ignores unknown top-level keys (future modules).
@@ -43,13 +45,13 @@ def parse_yaml(yaml_str: str) -> LabDogGroupYAML:
         raise YAMLParseError("YAML must be a mapping (key-value pairs)")
 
     try:
-        return LabDogGroupYAML.model_validate(data)
+        return UnborkGroupYAML.model_validate(data)
     except Exception as e:
         raise YAMLParseError(f"YAML validation failed: {e}") from e
 
 
-def parse_global_yaml(yaml_str: str) -> LabDogGlobalYAML:
-    """Parse a ``_global.yaml`` payload into validated LabDogGlobalYAML.
+def parse_global_yaml(yaml_str: str) -> UnborkGlobalYAML:
+    """Parse a ``_global.yaml`` payload into validated UnborkGlobalYAML.
 
     Same error semantics as :func:`parse_yaml` — raises ``YAMLParseError``
     for syntax failures, missing-mapping payloads, and pydantic validation
@@ -69,7 +71,7 @@ def parse_global_yaml(yaml_str: str) -> LabDogGlobalYAML:
         raise YAMLParseError("YAML must be a mapping (key-value pairs)")
 
     try:
-        return LabDogGlobalYAML.model_validate(data)
+        return UnborkGlobalYAML.model_validate(data)
     except Exception as e:
         raise YAMLParseError(f"YAML validation failed: {e}") from e
 
@@ -126,6 +128,21 @@ def yaml_rules_to_specs(rules: list[FirewallRuleYAML]) -> list[FirewallRuleSpec]
         # ICMP + port conflict
         if rule.protocol == "icmp" and rule.port is not None:
             raise YAMLParseError("ICMP protocol cannot have a port specified")
+
+        # SEC-43: the same rules as the API (port range, CIDRs, sides).
+        try:
+            RuleCreate(
+                action=rule.action,
+                protocol=rule.protocol,
+                direction=rule.direction,
+                source_cidr=rule.source,
+                destination_cidr=rule.dest,
+                port_start=port_start,
+                port_end=port_end,
+                comment=rule.comment,
+            )
+        except ValidationError as exc:
+            raise YAMLParseError(f"Invalid rule: {exc}") from exc
 
         specs.append(
             FirewallRuleSpec(
@@ -184,7 +201,7 @@ def specs_to_yaml(
         "priority": priority,
         "firewall": firewall,
     }
-    return f"# Managed by LabDog\n{yaml.dump(data, default_flow_style=False, sort_keys=False)}"
+    return f"# Managed by unbork\n{yaml.dump(data, default_flow_style=False, sort_keys=False)}"
 
 
 def package_specs_to_yaml(specs: list[PackageYAML]) -> list[dict[str, Any]]:

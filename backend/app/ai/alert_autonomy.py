@@ -4,9 +4,9 @@ An alert investigation used to be read-only by construction. This module
 decides the level instead:
 
 * ``ai.alert_autonomy_level`` — ``read_only`` or ``approval``. What every
-  alert that asks for the AI (``labdog_ai=true``) gets.
+  alert that asks for the AI (``unbork_ai=true``) gets.
 * Which alerts may go further and change the host with nobody asked:
-  those labelled ``labdog_ai_automate=true`` in Grafana, or, with
+  those labelled ``unbork_ai_automate=true`` in Grafana, or, with
   ``ai.alert_full_auto_rules_enabled`` on, those matching
   ``ai.alert_full_auto_rules`` — see :mod:`app.ai.full_auto_rules`.
 
@@ -50,7 +50,7 @@ BASE_LEVELS = ("read_only", "approval")
 #: Shortest webhook token that may let an alert change a host.
 #:
 #: With full auto on, ``POST /api/webhooks/grafana-alerts`` is a way to make
-#: LabDog run commands as root, and the shared token is all that guards
+#: unbork run commands as root, and the shared token is all that guards
 #: it. The endpoint already refuses everything while the token is unset;
 #: this refuses the next weakest thing, a token someone could guess. 32
 #: characters is ``openssl rand -hex 16``.
@@ -149,7 +149,7 @@ async def _full_auto_refusal(db: AsyncSession, event: Any) -> str | None:
         return "the alert has already resolved"
 
     if event.host_id is None:
-        return "the alert does not name a host LabDog manages"
+        return "the alert does not name a host unbork manages"
 
     if (
         event.source == "grafana_webhook"
@@ -166,10 +166,10 @@ async def _full_auto_refusal(db: AsyncSession, event: Any) -> str | None:
             return refusal
 
     # Before the lock: the live half of this test is an SSH connection,
-    # though its answer is cached (see app.ai.labdog_host).
-    if await _is_labdog_host(db, event.host_id):
+    # though its answer is cached (see app.ai.unbork_host).
+    if await _is_unbork_host(db, event.host_id):
         return (
-            "LabDog runs on this host, so a fix could take LabDog down with it, and LabDog "
+            "unbork runs on this host, so a fix could take unbork down with it, and unbork "
             "cannot roll back the machine it runs on"
         )
 
@@ -239,12 +239,12 @@ async def snapshot_refusal(db: AsyncSession, host_id: int) -> str | None:
     return None
 
 
-async def _is_labdog_host(db: AsyncSession, host_id: int) -> bool:
-    from app.ai.labdog_host import labdog_runs_on
+async def _is_unbork_host(db: AsyncSession, host_id: int) -> bool:
+    from app.ai.unbork_host import unbork_runs_on
     from app.models.host import Host
 
     host = await db.get(Host, host_id)
-    return host is not None and await labdog_runs_on(db, host)
+    return host is not None and await unbork_runs_on(db, host)
 
 
 def _full_auto_sessions():
@@ -316,7 +316,7 @@ async def _sessions_that_changed(db: AsyncSession, host_id: int, since: datetime
 async def busy_refusal(
     db: AsyncSession, session: Any, *, classification: str, arguments: dict
 ) -> str | None:
-    """Refuse an unattended change while LabDog itself is changing the host.
+    """Refuse an unattended change while unbork itself is changing the host.
 
     Alert sessions are not part of the per-host queue that syncs and
     action runs share, so without this a remediation could restart a
@@ -353,7 +353,7 @@ async def busy_refusal(
     if blocker.action_key:
         what += f" ({blocker.action_key})"
     return (
-        f"Not run: LabDog's {what} is working on this host right now, and an automatic "
-        f"remediation does not change a host while LabDog is changing it. Report the change "
+        f"Not run: unbork's {what} is working on this host right now, and an automatic "
+        f"remediation does not change a host while unbork is changing it. Report the change "
         f"you would make instead."
     )

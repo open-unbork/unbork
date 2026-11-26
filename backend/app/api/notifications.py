@@ -15,11 +15,11 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.logger import log_action
-from app.auth.users import current_active_user
+from app.auth.permissions import require
 from app.db import get_db
 from app.models.user import User
 from app.notifications import email as smtp
-from app.notifications.events import EVENT_KEYS, EVENT_TYPES
+from app.notifications.events import EVENT_KEYS, offered_event_types
 from app.notifications.models import (
     SMTP_SETTINGS_ID,
     Notification,
@@ -76,7 +76,7 @@ async def _response(db: AsyncSession, row: SMTPSettings | None) -> EmailSettings
 
 @router.get("/email", response_model=EmailSettingsResponse)
 async def get_email_settings(
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     return await _response(db, await load_smtp(db))
@@ -85,7 +85,7 @@ async def get_email_settings(
 @router.put("/email", response_model=EmailSettingsResponse)
 async def update_email_settings(
     body: EmailSettingsUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("integrations.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     from app.crypto import encrypt_ssh_key, get_master_key
@@ -136,7 +136,7 @@ async def update_email_settings(
 @router.post("/email/test", response_model=EmailTestResponse)
 async def send_test_email(
     body: EmailTestRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("integrations.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Send one email with the settings in the form, saved or not.
@@ -171,14 +171,14 @@ async def send_test_email(
     to = body.to or user.email
     message = smtp.OutgoingEmail(
         to=to,
-        subject="[LabDog] Test email",
+        subject="[unbork] Test email",
         body=(
-            f"This is a test from LabDog, sent by {user.email}.\n\n"
+            f"This is a test from unbork, sent by {user.email}.\n\n"
             + (
                 f"Links in notifications will point at {url}"
                 if url
                 else "notifications.public_url is not set, so real notifications will not "
-                "be sent yet: every one links back to LabDog."
+                "be sent yet: every one links back to unbork."
             )
         ),
     )
@@ -188,20 +188,21 @@ async def send_test_email(
         return EmailTestResponse(success=False, message=str(exc))
     if error:
         return EmailTestResponse(success=False, message=error)
-    note = "" if url else " Set LabDog's address below before relying on it."
+    note = "" if url else " Set unbork's address below before relying on it."
     return EmailTestResponse(success=True, message=f"Sent to {to}.{note}")
 
 
 @router.get("/events", response_model=list[EventTypeResponse])
-async def list_event_types(_: User = Depends(current_active_user)):
+async def list_event_types(_: User = Depends(require("hosts.view"))):
     return [
-        EventTypeResponse(key=e.key, label=e.label, description=e.description) for e in EVENT_TYPES
+        EventTypeResponse(key=e.key, label=e.label, description=e.description)
+        for e in offered_event_types()
     ]
 
 
 @router.get("/subscriptions", response_model=SubscriptionsBody)
 async def get_my_subscriptions(
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     rows = await db.execute(
@@ -216,7 +217,7 @@ async def get_my_subscriptions(
 @router.put("/subscriptions", response_model=SubscriptionsBody)
 async def set_my_subscriptions(
     body: SubscriptionsBody,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Replace the signed-in user's email subscriptions.
@@ -246,7 +247,7 @@ async def set_my_subscriptions(
 async def list_deliveries(
     limit: int = 50,
     status: str | None = None,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Recent notifications, newest first: what was sent, to whom, and

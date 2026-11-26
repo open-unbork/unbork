@@ -1,6 +1,6 @@
 """Strip secrets from command output before it reaches an LLM.
 
-The host inventory LabDog manages holds no plaintext secrets, but command
+The host inventory unbork manages holds no plaintext secrets, but command
 *output* routinely does — ``cat`` a config file, dump an environment,
 read a unit file. Everything a tool returns passes through
 :func:`redact` on its way into the transcript, so a secret is neither
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-PLACEHOLDER = "[redacted by labdog]"
+PLACEHOLDER = "[redacted by unbork]"
 
 # Ordered most- to least-specific: the first match wins for a given span.
 _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

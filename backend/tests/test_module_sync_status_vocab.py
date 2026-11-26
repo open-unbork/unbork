@@ -23,7 +23,7 @@ from tests.conftest import create_host
 
 _APP = pathlib.Path(__file__).resolve().parent.parent / "app"
 
-#: Vendored at build time from labdog-playbooks; not ours to lint.
+#: Vendored at build time from unbork-playbooks; not ours to lint.
 _SKIP_DIRS = {"ansible"}
 
 

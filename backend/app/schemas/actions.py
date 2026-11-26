@@ -29,6 +29,10 @@ class ActionDefinitionOut(BaseModel):
     #: Whether this action makes sense across the entire fleet. Drives
     #: the Fleet target option in the schedule dialog.
     supports_fleet: bool = False
+    #: Whether the manifest declares quiesce and unquiesce playbooks: the
+    #: application is closed to writes for the whole run when a snapshot
+    #: is taken. The run dialog says so.
+    quiesces: bool = False
     parameters: list[ActionParameterOut]
     #: Pack whose manifest is currently active for this action key.
     pack_name: str
@@ -54,7 +58,7 @@ class ActionDefinitionOut(BaseModel):
     #: action card / run detail so operators see the side effect.
     post_run_sync: list[str] = []
     #: Resources the action's manifest declares it installs. After a
-    #: successful run labdog inserts these as host-scope overrides so
+    #: successful run unbork inserts these as host-scope overrides so
     #: the resources are managed going forward. Keys are canonical
     #: module names; values are per-item dicts validated against the
     #: module's Create schema. See ``ActionManifest.post_run_register``.
@@ -166,7 +170,7 @@ class HostRunEntry(BaseModel):
     error_message: str | None = None
     #: The first failed task's message from this host's log, when it failed.
     reason: str | None = None
-    #: The run failed here and LabDog restored the pre-run snapshot.
+    #: The run failed here and unbork restored the pre-run snapshot.
     rolled_back: bool = False
 
 
@@ -184,7 +188,7 @@ class ActionRunOut(BaseModel):
     #: NULL for ad-hoc runs; populated when the run was dispatched by
     #: the unified scheduler or POST /api/scheduled-actions/{id}/run-now.
     scheduled_action_id: int | None = None
-    #: Set when an alert's labdog_action label started the run. The name
+    #: Set when an alert's unbork_action label started the run. The name
     #: is filled in by the run detail endpoint.
     alert_event_id: int | None = None
     alertname: str | None = None

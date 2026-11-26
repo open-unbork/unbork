@@ -1,5 +1,6 @@
 "use client"
 
+import { useCan } from "@/lib/auth"
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query"
@@ -10,6 +11,7 @@ import { useSyncTray } from "@/lib/sync-tray"
 import { statusDef, ageLabel } from "@/lib/fleet"
 import { MODULES } from "@/lib/modules"
 import { Banner, Confirm, Dot, PageHead, Seg, Status, Tabs } from "@/components/ld"
+import { InvestigateButton } from "@/components/investigate-button"
 import { RunActionButton } from "@/components/run-action-button"
 import { moduleLabel } from "@/components/module-diff-view"
 import type { Host, HostGroup, ModuleCurrentState, ModuleDiff, SSHKey } from "@/lib/types"
@@ -61,6 +63,7 @@ export default function HostDetailPage() {
   const [activeTab, setActiveTab] = useState<HostTab>(initialTab)
   const [lastModuleTab, setLastModuleTab] = useState<HostTab>(MODULE_TABS.includes(initialTab) ? initialTab : "rules")
   const [primaryTab, setPrimaryTab] = useState<PrimaryTab>(searchParams.get("tab") === "terminal" ? "terminal" : primaryOf(initialTab))
+  const canTerminal = useCan("terminal.open")
 
   const { data: host, isLoading: hostLoading, error: hostError } = useQuery<Host>({
     queryKey: ["host", id],
@@ -229,6 +232,12 @@ export default function HostDetailPage() {
           host && (
             <>
               <RunActionButton scope="host" targetId={id} targetLabel={host.hostname} host={host} />
+              <InvestigateButton
+                label="Ask AI about this host"
+                subject={{ kind: "host", host_id: id }}
+                about={host.hostname}
+                sends={`${host.hostname}'s status, recent failures, firing alerts and current metrics`}
+              />
               <button type="button" className="btn btn-sm btn-ghost" disabled={refreshing} title="Refresh data for the current tab" onClick={handleRefresh}>
                 {refreshing ? "refreshing…" : "refresh"}
               </button>
@@ -258,7 +267,7 @@ export default function HostDetailPage() {
               { k: "overview", label: "Overview" },
               { k: "config", label: "Config" },
               { k: "metrics", label: "Metrics" },
-              { k: "terminal", label: "Terminal" },
+              ...(canTerminal ? [{ k: "terminal" as const, label: "Terminal" }] : []),
               { k: "activity", label: "Activity" },
             ]}
             value={primaryTab}
@@ -337,7 +346,7 @@ export default function HostDetailPage() {
       )}
 
       {primaryTab === "metrics" && <MetricsTab hostId={id} host={host} />}
-      {primaryTab === "terminal" && host && <TerminalTab hostId={id} hostname={host.hostname} />}
+      {primaryTab === "terminal" && host && canTerminal && <TerminalTab hostId={id} hostname={host.hostname} />}
       {primaryTab === "activity" && <ActivityTab hostId={id} host={host} view={activeTab === "schedules" ? "schedules" : "actions"} />}
 
       {editOpen && host && <EditHostDialog hostId={id} host={host} sshKeys={sshKeys} groups={groups} onClose={() => setEditOpen(false)} />}

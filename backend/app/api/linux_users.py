@@ -1,13 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._gitops_lock import check_gitops_lock
-from app.audit.logger import log_action
-from app.auth.users import current_active_user
+from app.api._scoped_rules import (
+    RuleAudit,
+    apply_fields,
+    commit_created,
+    commit_updated,
+    delete_and_commit,
+    require_group,
+    require_host,
+    scoped_row_or_404,
+)
+from app.auth.permissions import require
 from app.db import get_db
-from app.models.host import Host
-from app.models.host_group import HostGroup
 from app.models.user import User
 from app.user_mgmt.merge import get_effective_users
 from app.user_mgmt.models import LinuxUser
@@ -20,6 +27,15 @@ from app.user_mgmt.schemas import (
 
 router = APIRouter(tags=["linux-users"])
 
+_NOT_FOUND = "Linux user rule not found"
+
+
+def _audit_state(rule: LinuxUser) -> dict:
+    return {"username": rule.username, "state": str(rule.state)}
+
+
+_AUDIT = RuleAudit("linux_user", _audit_state)
+
 
 # ---------------------------------------------------------------------------
 # Group-level CRUD
@@ -29,12 +45,10 @@ router = APIRouter(tags=["linux-users"])
 @router.get("/groups/{group_id}/linux-users", response_model=list[LinuxUserResponse])
 async def list_group_linux_users(
     group_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    group = await db.scalar(select(HostGroup).where(HostGroup.id == group_id))
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+    await require_group(db, group_id)
 
     result = await db.execute(
         select(LinuxUser)
@@ -52,29 +66,16 @@ async def list_group_linux_users(
 async def create_group_linux_user(
     group_id: int,
     body: LinuxUserCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
-    group = await db.scalar(select(HostGroup).where(HostGroup.id == group_id))
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+    await require_group(db, group_id)
 
     rule = LinuxUser(group_id=group_id, **body.model_dump())
     db.add(rule)
     await db.flush()
-
-    await log_action(
-        db=db,
-        action="create",
-        entity_type="linux_user",
-        entity_id=rule.id,
-        user_id=user.id,
-        after_state={"username": rule.username, "state": str(rule.state)},
-    )
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    return await commit_created(db, rule, _AUDIT, user)
 
 
 @router.put(
@@ -85,74 +86,31 @@ async def update_group_linux_user(
     group_id: int,
     rule_id: int,
     body: LinuxUserUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
-    result = await db.execute(
-        select(LinuxUser).where(
-            LinuxUser.id == rule_id,
-            LinuxUser.group_id == group_id,
-        )
+    rule = await scoped_row_or_404(
+        db, LinuxUser, rule_id, LinuxUser.group_id == group_id, detail=_NOT_FOUND
     )
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Linux user rule not found")
-
-    before = {"username": rule.username, "state": str(rule.state)}
-
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(rule, field, value)
-
+    before = _audit_state(rule)
+    apply_fields(rule, body.model_dump(exclude_unset=True))
     await db.flush()
-
-    await log_action(
-        db=db,
-        action="update",
-        entity_type="linux_user",
-        entity_id=rule.id,
-        user_id=user.id,
-        before_state=before,
-        after_state={"username": rule.username, "state": str(rule.state)},
-    )
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    return await commit_updated(db, rule, _AUDIT, user, before)
 
 
 @router.delete("/groups/{group_id}/linux-users/{rule_id}", status_code=204)
 async def delete_group_linux_user(
     group_id: int,
     rule_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     await check_gitops_lock(group_id, db)
-    result = await db.execute(
-        select(LinuxUser).where(
-            LinuxUser.id == rule_id,
-            LinuxUser.group_id == group_id,
-        )
+    rule = await scoped_row_or_404(
+        db, LinuxUser, rule_id, LinuxUser.group_id == group_id, detail=_NOT_FOUND
     )
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Linux user rule not found")
-
-    before = {"username": rule.username, "state": str(rule.state)}
-    rule_id_for_log = rule.id
-
-    await db.delete(rule)
-    await db.flush()
-
-    await log_action(
-        db=db,
-        action="delete",
-        entity_type="linux_user",
-        entity_id=rule_id_for_log,
-        user_id=user.id,
-        before_state=before,
-    )
-    await db.commit()
+    await delete_and_commit(db, rule, _AUDIT, user)
 
 
 # ---------------------------------------------------------------------------
@@ -163,12 +121,10 @@ async def delete_group_linux_user(
 @router.get("/hosts/{host_id}/linux-users", response_model=list[LinuxUserResponse])
 async def list_host_linux_users(
     host_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    host = await db.scalar(select(Host).where(Host.id == host_id))
-    if not host:
-        raise HTTPException(status_code=404, detail="Host not found")
+    await require_host(db, host_id)
 
     result = await db.execute(
         select(LinuxUser)
@@ -186,28 +142,15 @@ async def list_host_linux_users(
 async def create_host_linux_user(
     host_id: int,
     body: LinuxUserCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
-    host = await db.scalar(select(Host).where(Host.id == host_id))
-    if not host:
-        raise HTTPException(status_code=404, detail="Host not found")
+    await require_host(db, host_id)
 
     rule = LinuxUser(host_id=host_id, **body.model_dump())
     db.add(rule)
     await db.flush()
-
-    await log_action(
-        db=db,
-        action="create",
-        entity_type="linux_user",
-        entity_id=rule.id,
-        user_id=user.id,
-        after_state={"username": rule.username, "state": str(rule.state)},
-    )
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    return await commit_created(db, rule, _AUDIT, user)
 
 
 @router.put(
@@ -218,72 +161,29 @@ async def update_host_linux_user(
     host_id: int,
     rule_id: int,
     body: LinuxUserUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(LinuxUser).where(
-            LinuxUser.id == rule_id,
-            LinuxUser.host_id == host_id,
-        )
+    rule = await scoped_row_or_404(
+        db, LinuxUser, rule_id, LinuxUser.host_id == host_id, detail=_NOT_FOUND
     )
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Linux user rule not found")
-
-    before = {"username": rule.username, "state": str(rule.state)}
-
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(rule, field, value)
-
+    before = _audit_state(rule)
+    apply_fields(rule, body.model_dump(exclude_unset=True))
     await db.flush()
-
-    await log_action(
-        db=db,
-        action="update",
-        entity_type="linux_user",
-        entity_id=rule.id,
-        user_id=user.id,
-        before_state=before,
-        after_state={"username": rule.username, "state": str(rule.state)},
-    )
-    await db.commit()
-    await db.refresh(rule)
-    return rule
+    return await commit_updated(db, rule, _AUDIT, user, before)
 
 
 @router.delete("/hosts/{host_id}/linux-users/{rule_id}", status_code=204)
 async def delete_host_linux_user(
     host_id: int,
     rule_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(LinuxUser).where(
-            LinuxUser.id == rule_id,
-            LinuxUser.host_id == host_id,
-        )
+    rule = await scoped_row_or_404(
+        db, LinuxUser, rule_id, LinuxUser.host_id == host_id, detail=_NOT_FOUND
     )
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Linux user rule not found")
-
-    before = {"username": rule.username, "state": str(rule.state)}
-    rule_id_for_log = rule.id
-
-    await db.delete(rule)
-    await db.flush()
-
-    await log_action(
-        db=db,
-        action="delete",
-        entity_type="linux_user",
-        entity_id=rule_id_for_log,
-        user_id=user.id,
-        before_state=before,
-    )
-    await db.commit()
+    await delete_and_commit(db, rule, _AUDIT, user)
 
 
 # ---------------------------------------------------------------------------
@@ -297,11 +197,9 @@ async def delete_host_linux_user(
 )
 async def effective_users(
     host_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    host = await db.scalar(select(Host).where(Host.id == host_id))
-    if not host:
-        raise HTTPException(status_code=404, detail="Host not found")
+    await require_host(db, host_id)
 
     return await get_effective_users(host_id, db)

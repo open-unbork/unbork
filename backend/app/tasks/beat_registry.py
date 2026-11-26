@@ -57,7 +57,7 @@ def ensure_entry(name: str, task: str, run_every_seconds: float, app: Any, **kwa
     new_schedule = schedule(run_every=run_every_seconds)
 
     try:
-        existing = RedBeatSchedulerEntry.from_key(f"redbeat:{name}", app=app)
+        existing = RedBeatSchedulerEntry.from_key(f"{_prefix(app)}{name}", app=app)
     except Exception:
         # Missing (KeyError) or unreadable — either way, write it.
         existing = None
@@ -79,9 +79,50 @@ def ensure_entry(name: str, task: str, run_every_seconds: float, app: Any, **kwa
     return True
 
 
+def _prefix(app) -> str:
+    """RedBeat's key prefix, as the scheduler itself reads it."""
+    return app.conf.get("redbeat_key_prefix") or "redbeat:"
+
+
+def remove_entry(name: str, app: Any) -> bool:
+    """Delete one RedBeat entry if it exists. Returns True if it did."""
+    from redbeat import RedBeatSchedulerEntry
+
+    try:
+        entry = RedBeatSchedulerEntry.from_key(f"{_prefix(app)}{name}", app=app)
+    except KeyError:
+        return False
+    entry.delete()
+    logger.info("beat entry %r removed", name)
+    return True
+
+
 def registrars_in(module) -> list[str]:
     """Names of the schedule-registering functions a module exposes."""
     return sorted(n for n in dir(module) if _REGISTRAR_RE.match(n) and callable(getattr(module, n)))
+
+
+#: RedBeat entries the assistant's task modules register. With the
+#: assistant left out (C-026) their modules are not loaded, so beat deletes
+#: these rather than fire them into tasks no worker has.
+AI_ENTRY_NAMES = (
+    "expire-stale-ai-approvals",
+    "check-due-remediations",
+    "archive-old-ai-sessions",
+    "prune-ai-snapshots",
+)
+
+
+def remove_assistant_entries(app) -> dict[str, str]:
+    """Delete the assistant's schedules; one status per entry."""
+    results: dict[str, str] = {}
+    for name in AI_ENTRY_NAMES:
+        try:
+            results[f"assistant-off:{name}"] = "removed" if remove_entry(name, app) else "absent"
+        except Exception:
+            logger.exception("beat registration: could not remove %s", name)
+            results[f"assistant-off:{name}"] = "failed"
+    return results
 
 
 def register_all(app) -> dict[str, str]:
@@ -115,4 +156,56 @@ def register_all(app) -> dict[str, str]:
                 # whole module exists to remove.
                 logger.exception("beat registration failed: %s", key)
                 results[key] = "failed"
+    _register_extension_entries(app, results)
+    from app.features import assistant_enabled
+
+    if not assistant_enabled():
+        results.update(remove_assistant_entries(app))
     return results
+
+
+def _stored_extension_entries(app) -> list[str]:
+    """Names of the ``ext-`` entries RedBeat holds now."""
+    from redbeat.schedulers import get_redis
+
+    from app.tasks.extensions import EXTENSION_ENTRY_PREFIX
+
+    prefix = _prefix(app)
+    pattern = f"{prefix}{EXTENSION_ENTRY_PREFIX}*"
+    names = []
+    for key in get_redis(app).scan_iter(match=pattern):
+        key = key.decode() if isinstance(key, bytes) else key
+        names.append(key[len(prefix) :])
+    return sorted(names)
+
+
+def _register_extension_entries(app, results: dict[str, str]) -> None:
+    """Write the periodic entries extensions registered (``ext-<name>``),
+    then delete every ``ext-`` entry none of them registers any more: an
+    uninstalled extension's entry would otherwise keep sending a task no
+    worker knows. Core entries are never touched."""
+    from app.tasks.extensions import periodic_tasks
+
+    wanted = set()
+    for p in periodic_tasks():
+        wanted.add(p.entry_name)
+        key = f"extension:{p.name}"
+        try:
+            ensure_entry(p.entry_name, p.task, p.every_seconds, app)
+            results[key] = "ok"
+        except Exception:
+            logger.exception("beat registration failed: %s", key)
+            results[key] = "failed"
+
+    try:
+        stored = _stored_extension_entries(app)
+    except Exception:
+        logger.exception("beat registration: could not list extension entries")
+        return
+    for name in stored:
+        if name in wanted:
+            continue
+        try:
+            remove_entry(name, app)
+        except Exception:
+            logger.exception("beat registration: could not remove %s", name)

@@ -31,7 +31,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 
-from app.db import task_session
+from app.db import task_session, with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -312,7 +312,7 @@ async def _take_over(db, run, now: datetime, stale_after: int) -> bool:
 
     The orchestrator writes ``heartbeat_at`` every few seconds while it
     drives the run, and clears it when it stops driving it, so a stale one
-    means it died mid-run — LabDog's own host upgrading Docker and
+    means it died mid-run — unbork's own host upgrading Docker and
     restarting the container under it, on lin-manager. The run then sat
     ``running`` with its remaining hosts ``queued`` until the whole-run
     deadline, hours later, failed it (BUG-101).
@@ -408,7 +408,7 @@ def sweep_stale_action_runs() -> dict:
     """Celery entrypoint. Drives the async sweeper inside ``asyncio.run``."""
     import asyncio
 
-    return asyncio.run(_sweep_stale_action_runs_async())
+    return asyncio.run(with_task_engine(_sweep_stale_action_runs_async()))
 
 
 # ---------------------------------------------------------------------------

@@ -4,17 +4,18 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
+import { useFeatures } from "@/lib/features"
 import { useApiMutation } from "@/lib/mutations"
 import { shortAgo } from "@/lib/fleet"
 import { CodeBlock, Confirm, Copy, Panel, RunStatus, Table, Tag } from "@/components/ld"
 import { AlertActionDialog } from "@/components/alerts/alert-action-dialog"
 import type { AlertActionEntry, AlertIntakeStatus } from "@/lib/types"
 
-const SNIPPET = `labdog_action      = restart-nginx
-labdog_ai          = true
-labdog_ai_automate = {{ if match "^(web-1|web-2)$" $labels.labdog_hostname }}true{{ else }}false{{ end }}`
+const SNIPPET = `unbork_action      = restart-nginx
+unbork_ai          = true
+unbork_ai_automate = {{ if match "^(web-1|web-2)$" $labels.unbork_hostname }}true{{ else }}false{{ end }}`
 
-/** The actions an alert's labdog_action label may start. Starts empty. */
+/** The actions an alert's unbork_action label may start. Starts empty. */
 function ActionsPanel() {
   const [editing, setEditing] = useState<AlertActionEntry | "new" | null>(null)
   const [removing, setRemoving] = useState<AlertActionEntry | null>(null)
@@ -91,7 +92,7 @@ function ActionsPanel() {
             loading={isLoading}
             empty={
               <span>
-                No action is allowed yet, so a <span className="mono">labdog_action</span> label does nothing: the alert is recorded and refused. Allow an action to let alerts run it.
+                No action is allowed yet, so a <span className="mono">unbork_action</span> label does nothing: the alert is recorded and refused. Allow an action to let alerts run it.
               </span>
             }
           />
@@ -114,12 +115,14 @@ function ActionsPanel() {
   )
 }
 
-function LabelsPanel() {
-  const rows: [string, string][] = [
-    ["labdog_action=<key>", "Runs that action on the alert's host, if it is on the list above."],
-    ["labdog_ai=true", "The AI investigates, when there is no action or it did not fix the alert."],
-    ["labdog_ai_automate=true", "The same, and the AI may fix what it finds, behind the full-auto safeguards."],
+function LabelsPanel({ assistant }: { assistant: boolean }) {
+  const all: [string, string][] = [
+    ["unbork_action=<key>", "Runs that action on the alert's host, if it is on the list above."],
+    ["unbork_ai=true", "The AI investigates, when there is no action or it did not fix the alert."],
+    ["unbork_ai_automate=true", "The same, and the AI may fix what it finds, behind the full-auto safeguards."],
   ]
+  // The AI labels mean nothing on a server without the assistant (C-026).
+  const rows = assistant ? all : all.filter(([label]) => !label.startsWith("unbork_ai"))
   return (
     <Panel title="labels" meta="set on the alert rule in Grafana" pad={11}>
       <div className="flex flex-col gap-2.5 text-[11.5px]" data-testid="alert-labels">
@@ -137,7 +140,7 @@ function LabelsPanel() {
         <CodeBlock title="Grafana alert rule labels" actions={<Copy text={SNIPPET} />} maxH={120}>
           {SNIPPET}
         </CodeBlock>
-        <a className="underline hover:text-text-2" href="https://open-labdog.github.io/labdog/ui/alerts/#labels">How the labels combine</a>
+        <a className="underline hover:text-text-2" href="https://open-unbork.github.io/unbork/ui/alerts/#labels">How the labels combine</a>
       </div>
     </Panel>
   )
@@ -158,11 +161,17 @@ function IntakePanel({ s }: { s: AlertIntakeStatus | undefined }) {
             <Copy text={url} />
           </span>
           {!s.token_set ? (
-            <span style={{ color: "var(--danger)" }}>No [alerts] webhook_token in labdog.toml: the webhook refuses every alert.</span>
+            <span style={{ color: "var(--danger)" }}>No [alerts] webhook_token in unbork.toml: the webhook refuses every alert.</span>
           ) : !s.token_long_enough_for_full_auto ? (
             <span style={{ color: "var(--warn)" }}>The webhook token is under 32 characters: webhook alerts run no action and no full auto.</span>
           ) : (
             <span className="text-text-3">Send the token as a bearer token, or as either half of basic auth.</span>
+          )}
+          {s.token_set && (
+            <span className="text-text-3">
+              {s.source_allowlist ? "Only the addresses in [alerts] allowed_sources may send." : "Any source address may send."}{" "}
+              {s.body_signature ? "Each request must carry an HMAC signature of its body." : "No body signature is required."}
+            </span>
           )}
           <span className="text-text-3">
             {last ? `Last alert ${shortAgo(last)} ago.` : "No alert received yet."}
@@ -181,16 +190,16 @@ function AIPanel({ s }: { s: AlertIntakeStatus | undefined }) {
       {s && (
         <div className="flex flex-col gap-1.5 text-[11.5px]" data-testid="alert-ai">
           {!s.ai_enabled ? (
-            <span className="text-text-3">The AI is off, so labdog_ai and labdog_ai_automate do nothing. Actions still run.</span>
+            <span className="text-text-3">The AI is off, so unbork_ai and unbork_ai_automate do nothing. Actions still run.</span>
           ) : !s.auto_investigate_enabled ? (
-            <span className="text-text-3">Auto-investigate is off (ai.auto_investigate_enabled), so labdog_ai and labdog_ai_automate do nothing. The investigate button still works.</span>
+            <span className="text-text-3">Auto-investigate is off (ai.auto_investigate_enabled), so unbork_ai and unbork_ai_automate do nothing. The investigate button still works.</span>
           ) : (
-            <span className="text-text-3">Alerts labelled labdog_ai=true are investigated at ai.alert_autonomy_level.</span>
+            <span className="text-text-3">Alerts labelled unbork_ai=true are investigated at ai.alert_autonomy_level.</span>
           )}
           <span className="text-text-3">
             {s.full_auto_rules_enabled
               ? `Full auto: ${s.full_auto_rules} rule${s.full_auto_rules === 1 ? "" : "s"} in ai.alert_full_auto_rules decide, not the label.`
-              : "Full auto: alerts labelled labdog_ai_automate=true, behind the safeguards."}
+              : "Full auto: alerts labelled unbork_ai_automate=true, behind the safeguards."}
           </span>
         </div>
       )}
@@ -201,13 +210,14 @@ function AIPanel({ s }: { s: AlertIntakeStatus | undefined }) {
 /** Alerts › Handling: what alerts are allowed to do, and whether they can. */
 export function AlertHandling() {
   const { data: intake } = useQuery<AlertIntakeStatus>({ queryKey: ["alert-intake"], queryFn: () => apiFetch<AlertIntakeStatus>("/api/alerts/intake") })
+  const { assistant } = useFeatures()
   return (
     <div className="scroll flex min-h-0 flex-1 flex-col gap-3 p-3.5">
       <ActionsPanel />
-      <div className="grid gap-3 lg:grid-cols-3">
-        <LabelsPanel />
+      <div className={`grid gap-3 ${assistant ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <LabelsPanel assistant={assistant} />
         <IntakePanel s={intake} />
-        <AIPanel s={intake} />
+        {assistant && <AIPanel s={intake} />}
       </div>
     </div>
   )

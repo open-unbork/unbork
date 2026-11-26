@@ -21,8 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.logger import log_action
-from app.gitops.importers.firewall import ModuleImportResult
-from app.gitops.schema import LabDogGlobalYAML
+from app.gitops.importers._common import ModuleImportResult
+from app.gitops.schema import UnborkGlobalYAML
 from app.models.app_setting import AppSetting
 from app.settings_service import SETTING_DEFINITIONS, get_default, invalidate_cache
 
@@ -32,14 +32,14 @@ _KEY = "drift.check_interval_minutes"
 
 
 async def import_drift(
-    parsed: LabDogGlobalYAML,
+    parsed: UnborkGlobalYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:
     """Import the global drift-check interval from ``_global.yaml``.
 
     Args:
-        parsed: Validated ``LabDogGlobalYAML`` payload.
+        parsed: Validated ``UnborkGlobalYAML`` payload.
         commit_sha: Full commit SHA string (for audit trail).
         db: Active async session — caller owns the transaction.
 

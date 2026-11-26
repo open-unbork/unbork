@@ -3,8 +3,8 @@
 ``drift_samples`` is written once per drift check per module and never
 updated. Nothing pruned it, so it grew for the life of the install.
 
-Deleting rows is not as simple as it looks. ``labdog_drift_checks_total``,
-``labdog_drift_changes_total`` and ``labdog_drift_check_duration_seconds``
+Deleting rows is not as simple as it looks. ``unbork_drift_checks_total``,
+``unbork_drift_changes_total`` and ``unbork_drift_check_duration_seconds``
 are all derived from ``COUNT(*)``/``SUM()`` over the whole table with no
 time window, and they are **counters**. A counter that decreases is read by
 Prometheus as a process restart: ``rate()`` copes, ``increase()`` across the
@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def prune_old_drift_samples() -> dict:
     """Fold ``drift_samples`` older than the window into the rollup, then delete."""
     import asyncio  # noqa: PLC0415
 
-    return asyncio.run(_prune_drift_samples())
+    return asyncio.run(with_task_engine(_prune_drift_samples()))
 
 
 async def _get_retention_days(db) -> int:

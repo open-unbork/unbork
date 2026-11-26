@@ -1,4 +1,4 @@
-"""Nothing pack-supplied ships with LabDog.
+"""Nothing pack-supplied ships with unbork.
 
 The bundled pack used to be baked into the image and stood in for a
 winner with ``pack_id NULL``. Every action now comes from an
@@ -28,7 +28,7 @@ async def test_a_winner_must_name_a_pack(db, table):
 
 
 async def test_with_no_pack_on_disk_the_registry_is_the_builtins(db):
-    # The seeded labdog-playbooks pack may be enabled in the test
+    # The seeded unbork-playbooks pack may be enabled in the test
     # database, but nothing has synced it, so it has no checkout.
     try:
         await reload_registry_async(db)

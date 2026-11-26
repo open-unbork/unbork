@@ -1,7 +1,8 @@
-# Contributing to LabDog
+# Contributing to unbork
 
-Thanks for the interest. LabDog is AGPL-3.0-or-later; contributions
-land under the same license (inbound = outbound).
+Thanks for the interest. unbork is AGPL-3.0-or-later. Contributions are
+accepted under a contributor licence agreement (see
+[Licensing & copyright](#licensing--copyright)).
 
 ## Reporting issues
 
@@ -11,9 +12,17 @@ land under the same license (inbound = outbound).
   version/commit you saw it on, and the relevant logs. If you can
   share the exact SQL state + API response, even better.
 - **Feature ideas** — open an issue first so we can discuss scope
-  before you invest significant time. See [`TODO.md`](TODO.md) for
-  what's already on the roadmap and [`BUGS.md`](BUGS.md) for the
-  open bug registry.
+  before you invest significant time. See the
+  [roadmap board](https://github.com/orgs/open-unbork/projects/1) for what's already planned and
+  [`BUGS.md`](BUGS.md) for the open bug registry.
+
+unbork deliberately does not aim to replace Puppet, Chef or Salt, do
+container orchestration (Kubernetes, Nomad), deploy applications (use
+CI/CD), or do monitoring and alerting (use Prometheus, Grafana, Loki).
+Sysctl/kernel parameter management and arbitrary file management are
+out of scope too; write an action pack if you need them. Adjacent
+tools do these better, and unbork would rather integrate than
+replace.
 
 ## Dev setup
 
@@ -35,6 +44,7 @@ spin up Postgres via testcontainers, so you need Docker available.
 # Backend — runs in ~40s
 cd backend && source .venv/bin/activate
 pytest tests/ -q
+pytest tests/ -q --cov --cov-report=term   # with coverage (slower)
 
 # Backend lint + format (still in backend/, ruff comes from .[dev]).
 # `ruff format --check` is a separate CI gate from `ruff check`, so a
@@ -44,17 +54,21 @@ pytest tests/ -q
 ruff check .
 ruff format --check .   # --diff shows what it would change
 
-# Frontend type-check + lint
+# Frontend type-check + lint + unit tests (Vitest, no stack needed)
 cd frontend
 npx tsc --noEmit
 npm run lint
+npm test
 
 # Frontend E2E (Playwright) — requires the full stack running
 npx playwright test
 ```
 
 CI runs all of the above on every PR; expect it to fail if you skip
-them locally.
+them locally. The `backend-test` job also prints the backend coverage
+total (`Backend coverage: NN% of statements`) in its log and on the
+run's summary page, and uploads `coverage.xml` as the `backend-coverage`
+artifact.
 
 ## Code style
 
@@ -91,14 +105,18 @@ the decision points and what was considered and rejected.
   without tests won't merge.
 - Update `docs/` when you change user-visible behaviour. A comment
   on the PR is not a substitute for updating the user guide.
-- If the change touches anything in [`TODO.md`](TODO.md) or fixes a
-  bug listed in [`BUGS.md`](BUGS.md) — tick the item (`[x]`), note
-  the fix and commit hash, or un-check it with an explanation.
+- If the change delivers an item on the [roadmap board](https://github.com/orgs/open-unbork/projects/1),
+  link the PR on that item. If it fixes a bug listed in
+  [`BUGS.md`](BUGS.md), delete the entry and reference the bug ID in
+  the commit.
+- CI publishes a test image for PRs from branches in this repository as
+  `unbork/unbork:test-<short sha>`. There is no floating test tag; use
+  `:dev-latest` to follow `dev`.
 
 ### Working with `plans/` — branch-scoped scratchpad
 
-For substantive design work that needs more than a TODO entry can
-hold, use a temporary `plans/` directory on the work branch. The
+For substantive design work that needs more than a roadmap item
+can hold, use a temporary `plans/` directory on the work branch. The
 workflow:
 
 1. **Branch from `dev`** — `feat/<topic>`, `fix/<bug-id>`, etc.
@@ -113,21 +131,60 @@ workflow:
    never carry it.
 5. **Merge.** Reviewers read commits, not plan files.
 
-Roles of the four top-level tracking files:
+`planning/` is a different directory and is not covered by this rule.
+It holds the staged roadmap (`PLAN.md`, `roadmap.yaml`, `DECISIONS.md`,
+`PROPOSALS.md`, `PROGRESS.md`, `stages/`, `items/`, `reviews/`), is
+committed on `dev` and is updated by the PRs that carry out a stage.
+
+Where work is tracked:
 
 | File | Purpose |
 |---|---|
-| [`ROADMAP.md`](ROADMAP.md) | High-altitude direction — in design, ideas, out of scope. |
-| [`TODO.md`](TODO.md) | Open near-term tasks. Open-only — finished items are deleted, not ticked. |
+| [Roadmap board](https://github.com/orgs/open-unbork/projects/1) | Direction and open tasks, with priority and status. Research and design notes go in each item. |
 | [`BUGS.md`](BUGS.md) | Open bug registry. Open-only — fixed bugs are deleted, with a commit referencing the bug ID. |
+| `planning/` | Staged execution plan: one spec per item, one file per stage, decisions and progress log. Long-lived, kept on `dev`. |
 | `plans/` (work branches) | Private scratchpad for one piece of in-flight work. Created and deleted within a single branch's lifetime. |
 
 ## Licensing & copyright
 
-You retain copyright in your contributions. By submitting a PR you
-agree your contribution is licensed under AGPL-3.0-or-later — same
-as the rest of the project. We don't use a CLA; GitHub's default
-"inbound = outbound" model applies.
+You keep the copyright in your contributions. Pull requests are
+accepted under a contributor licence agreement (CLA), which you sign
+once, by commenting on your first pull request:
+
+- On your first PR the `CLAAssistant` check fails and a bot comments.
+  Read the [individual agreement](legal/cla/v1/ICLA.md), then post the
+  sentence the bot quotes. The check turns green, and the signature
+  covers later PRs here and in `unbork-playbooks`. The email your
+  commits carry must be linked to your GitHub account: on a PR from a
+  fork, the `LinkedCommits` check fails otherwise.
+- The agreement is a licence, not an assignment: you grant the
+  maintainer a licence to use your contribution, and the copyright stays
+  yours.
+- The maintainer promises that your contribution stays available under
+  AGPL-3.0-or-later (or another OSI-approved licence).
+- The agreement also lets the maintainer license the project under
+  other terms as well as the AGPL.
+- A company that owns its employees' work signs the
+  [corporate agreement](legal/cla/v1/CCLA.md) instead.
+
+See [`legal/cla/`](legal/cla/README.md) for both texts, how to sign, and
+what is recorded when you do.
+
+### Dependencies
+
+A new dependency must be under a licence compatible with
+AGPL-3.0-or-later; name the licence in the commit message. The image and
+package builds run `backend/scripts/third_party_notices.py`, which writes
+`THIRD-PARTY-NOTICES` and fails on any Python or npm package whose
+licence it cannot read or does not know to be compatible. When a
+project's metadata is wrong or missing, check its real licence and add it
+to [`packaging/licence-overrides.toml`](packaging/licence-overrides.toml)
+with a `note` saying where you checked. An override states the real
+licence; it cannot make an incompatible one acceptable.
+`tests/test_third_party_notices.py` runs the generator against the test
+environment.
+
+### File headers
 
 Per-file AGPL headers are **not** required. The repository-level
 [LICENSE](LICENSE) covers the whole tree. Don't add headers to new
@@ -172,7 +229,8 @@ Then the flow:
    upstream.
 4. Merge the PR. On `main`, the `packaging-smoke` job first builds and
    install-tests the `.deb` / `.rpm` / tarball in clean target-OS
-   containers (Ubuntu 24.04, Rocky 9); `release-artifacts` **needs** it,
+   containers (Ubuntu 24.04, Rocky 9), and upgrades a 1.1.1 package
+   install with data to them; `release-artifacts` **needs** it,
    so a broken install path blocks the release rather than shipping.
    Once it passes, `release-artifacts` runs and:
    - syncs `backend/pyproject.toml` and `frontend/package.json`
@@ -210,13 +268,15 @@ the human-owned steps it cannot verify:
   release.** This should already be true from each feature PR (see
   [Pull requests](#pull-requests)); the release PR is the backstop
   that catches anything missed.
-- [ ] `TODO.md`: items completed this cycle removed.
+- [ ] Roadmap board: items shipped this cycle set to Done, with the PR linked.
 - [ ] `BUGS.md`: bugs fixed this cycle deleted, fixing commit
   references the bug ID.
-- [ ] `plans/` is absent (never ships on `dev` or `main`).
+- [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
-  `frontend-build-check`, `docs-build-check`, `build-test-image`,
-  trivy.
+  `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`,
+  trivy. `docs-build-check` also checks that every README link into the
+  documentation site names a page and anchor the build has
+  (`website/scripts/check-readme-links.mjs`).
 
 Note: `main` is protected and the `version-check` context is a
 **required** status check, so a release PR cannot merge unless
@@ -229,6 +289,6 @@ required, so confirm those are green yourself before merging. To
 require more contexts, add them to the `main` branch protection:
 
 ```bash
-gh api repos/open-labdog/labdog/branches/main/protection/required_status_checks \
+gh api repos/open-unbork/unbork/branches/main/protection/required_status_checks \
   --jq '.strict, .contexts'   # inspect current required checks
 ```

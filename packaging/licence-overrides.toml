@@ -1,0 +1,25 @@
+# Reviewed licences for third-party components whose package metadata
+# does not state one that backend/scripts/third_party_notices.py can read
+# (S-010). The notices build fails on such a component until it is listed
+# here, so a dependency with an unknown or AGPL-incompatible licence cannot
+# arrive unnoticed.
+#
+# Add an entry only after checking the project's own repository at the
+# version shipped, and say where you looked. Do not guess.
+#
+#   [python."package-name"]
+#   licence = "BSD-3-Clause"            # an SPDX expression
+#   note = "LICENSE in the sdist; metadata says UNKNOWN (checked 2026-11-17, v1.2.3)"
+#   text = """..."""                    # only when the package ships no licence file
+#
+#   [npm."package-name"]
+#   licence = "MIT"
+#   note = "..."
+#
+# An entry states the real licence; it cannot make an incompatible one
+# acceptable. A dependency under such a licence needs a decision in
+# planning/DECISIONS.md and a change to the script's lists first.
+
+[python]
+
+[npm]

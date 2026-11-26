@@ -34,7 +34,7 @@ const atkinsonMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'LabDog',
+  title: 'unbork',
   description: 'Self-hosted Linux configuration management',
 }
 
@@ -45,7 +45,7 @@ export default function RootLayout({
 }>) {
   // No hardcoded theme class here: next-themes (see providers.tsx) writes
   // both `class` and `data-theme` on <html> before hydration, from the
-  // `labdog:theme` key in localStorage. Dark is the default; light is a
+  // `unbork:theme` key in localStorage. Dark is the default; light is a
   // real second theme, not an inversion — see globals.css.
   return (
     <html lang="en" suppressHydrationWarning>

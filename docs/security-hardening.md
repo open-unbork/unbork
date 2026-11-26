@@ -1,6 +1,6 @@
 # Security Hardening
 
-Production checklist for a LabDog install. The defaults are tuned
+Production checklist for an unbork install. The defaults are tuned
 for development — they assume `localhost`, plaintext HTTP, and a
 single trusted user. Before exposing the service beyond the loopback
 interface, work through every section here.
@@ -11,7 +11,7 @@ interface, work through every section here.
 - [Cookie and HTTPS settings](#cookie-and-https-settings)
 - [Security headers and CSP](#security-headers-and-csp)
 - [Rate limiting](#rate-limiting)
-- [Superuser scope](#superuser-scope)
+- [Roles and scope](#roles-and-scope)
 - [Database connection security](#database-connection-security)
 - [Encryption-key handling](#encryption-key-handling)
 
@@ -19,32 +19,32 @@ interface, work through every section here.
 
 ## HTTPS termination
 
-LabDog does not terminate TLS itself in the default deployment.
+unbork does not terminate TLS itself in the default deployment.
 Bind the backend to `127.0.0.1:8000` and put a reverse proxy in
 front of it. **Do not expose `0.0.0.0:8000` directly on a public
 interface** — it has no TLS, no rate limiting at the network
 layer, and no request-size cap.
 
-Set `[server] host = "127.0.0.1"` in `/etc/labdog/labdog.toml` (or
-`LABDOG_SERVER__HOST=127.0.0.1` in the environment) on production
+Set `[server] host = "127.0.0.1"` in `/etc/unbork/unbork.toml` (or
+`UNBORK_SERVER__HOST=127.0.0.1` in the environment) on production
 hosts.
 
 ### nginx
 
 ```nginx
-# /etc/nginx/sites-available/labdog
+# /etc/nginx/sites-available/unbork
 server {
     listen 80;
-    server_name labdog.example.com;
+    server_name unbork.example.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name labdog.example.com;
+    server_name unbork.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/labdog.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/labdog.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/unbork.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/unbork.example.com/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
 
@@ -73,7 +73,7 @@ server {
 }
 ```
 
-Tell LabDog to trust the proxy's `X-Forwarded-*` headers:
+Tell unbork to trust the proxy's `X-Forwarded-*` headers:
 
 ```toml
 [server]
@@ -88,7 +88,7 @@ Caddy provisions and renews ACME certificates automatically:
 
 ```caddy
 # /etc/caddy/Caddyfile
-labdog.example.com {
+unbork.example.com {
     encode gzip
 
     # WebSocket for the SSH terminal
@@ -113,7 +113,7 @@ labdog.example.com {
 
 ## Cookie and HTTPS settings
 
-Once HTTPS is in place, flip the two settings that opt LabDog into
+Once HTTPS is in place, flip the two settings that opt unbork into
 secure-cookie mode and HTTP→HTTPS redirects. Both are disabled by
 default (development uses plain HTTP).
 
@@ -128,11 +128,11 @@ force_https = true          # 301 redirect any plain-HTTP request
 Or via environment:
 
 ```bash
-LABDOG_SECURITY__COOKIE_SECURE=true
-LABDOG_TLS__FORCE_HTTPS=true
+UNBORK_SECURITY__COOKIE_SECURE=true
+UNBORK_TLS__FORCE_HTTPS=true
 ```
 
-When either flag is true, LabDog also emits an HSTS header
+When either flag is true, unbork also emits an HSTS header
 (`Strict-Transport-Security: max-age=63072000; includeSubDomains`).
 Don't enable it before the certificate works — HSTS pinning a
 broken setup locks browsers out for the max-age window.
@@ -144,7 +144,7 @@ high-sensitivity environments; users will re-login more often.
 
 ## Security headers and CSP
 
-LabDog's `SecurityHeadersMiddleware` (in `backend/app/main.py`)
+unbork's `SecurityHeadersMiddleware` (in `backend/app/main.py`)
 already emits a baseline:
 
 - `X-Content-Type-Options: nosniff`
@@ -172,7 +172,7 @@ add_header Content-Security-Policy "default-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
     img-src 'self' data:; \
     font-src 'self' data:; \
-    connect-src 'self' wss://labdog.example.com; \
+    connect-src 'self' wss://unbork.example.com; \
     frame-ancestors 'none'; \
     base-uri 'self'; \
     form-action 'self'" always;
@@ -185,7 +185,7 @@ the in-browser SSH terminal will fail to connect.
 
 ## Rate limiting
 
-LabDog applies application-level rate limits when `[rate_limit]
+unbork applies application-level rate limits when `[rate_limit]
 enabled = true` (the default in production configs). The limits are
 configurable:
 
@@ -200,19 +200,19 @@ Add a network-layer cap at the reverse proxy as a second line of
 defence. nginx `limit_req_zone` for the auth endpoints:
 
 ```nginx
-# /etc/nginx/conf.d/labdog-ratelimit.conf
-limit_req_zone $binary_remote_addr zone=labdog_auth:10m rate=10r/m;
-limit_req_zone $binary_remote_addr zone=labdog_api:10m  rate=120r/m;
+# /etc/nginx/conf.d/unbork-ratelimit.conf
+limit_req_zone $binary_remote_addr zone=unbork_auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=unbork_api:10m  rate=120r/m;
 
-# Inside server { ... } block in the labdog vhost:
+# Inside server { ... } block in the unbork vhost:
 location /api/auth/jwt/login {
-    limit_req zone=labdog_auth burst=5 nodelay;
+    limit_req zone=unbork_auth burst=5 nodelay;
     proxy_pass http://127.0.0.1:8000;
     # ...same proxy_set_header lines as the catch-all location
 }
 
 location /api/ {
-    limit_req zone=labdog_api burst=20 nodelay;
+    limit_req zone=unbork_api burst=20 nodelay;
     proxy_pass http://127.0.0.1:8000;
     # ...same proxy_set_header lines
 }
@@ -234,7 +234,7 @@ was busiest. If you want a cap on it, apply one at the proxy.
 
 The Prometheus metrics endpoint is **disabled by default**. When you
 enable it with `[metrics] enabled = true`, it is served
-**unauthenticated** — Prometheus cannot use LabDog's cookie session
+**unauthenticated** — Prometheus cannot use unbork's cookie session
 auth, so the endpoint is deliberately open-and-opt-in rather than
 half-gated. See [Metrics export](metrics-export.md) for what it does
 and does not disclose (aggregate counts only: no hostnames, no IPs,
@@ -243,7 +243,7 @@ no usernames, no secrets, no free-text error messages).
 Restrict it at the reverse proxy. nginx:
 
 ```nginx
-# Inside server { ... } in the labdog vhost, BEFORE the catch-all location.
+# Inside server { ... } in the unbork vhost, BEFORE the catch-all location.
 location = /metrics {
     allow 10.0.0.0/8;        # your monitoring network
     allow 127.0.0.1;
@@ -266,7 +266,7 @@ handle @metrics {
 
 If your scraper cannot be constrained by source address, put HTTP
 basic auth on that location at the proxy and configure `basic_auth`
-in the Prometheus scrape job — LabDog itself does not implement a
+in the Prometheus scrape job — unbork itself does not implement a
 scrape credential.
 
 Leaving the endpoint enabled but unrestricted on an untrusted network
@@ -276,39 +276,37 @@ expiry dates to anyone who asks. If you are not scraping it, leave
 
 ---
 
-## Superuser scope
+## Roles and scope
 
-LabDog has two user roles. The **only** difference between them is
-the ability to manage other users:
+Every account has one role, set on the Users page:
 
-- **Superuser** (`is_superuser=True`): can create, edit, delete,
-  and reset passwords for other users via the admin UI at
-  `/admin/users` (`backend/app/api/admin_users.py`).
-- **Regular user** (`is_active=True`, `is_superuser=False`): can do
-  everything else — browse hosts, edit groups, manage SSH keys,
-  configure git repos and action packs, trigger syncs, run
-  actions, open SSH terminals, change application settings, view
-  audit logs.
+| Role | Can |
+| --- | --- |
+| **viewer** | see hosts, groups, runs and the audit log |
+| **operator** | everything a viewer can, plus edit configuration, sync, run discovery and actions, manage schedules and alerts, open SSH terminals, and use and approve the AI assistant |
+| **admin** | everything, including users, settings and integrations |
 
-This is the right model for a single-operator homelab install and
-small-team setups. There is **no per-host scope mechanism** — a
-regular user has the same operational access to every managed host
-as a superuser. If you need finer-grained authz (e.g. user X can
-only touch host group Y), it doesn't exist yet; track the request
-via a GitHub issue.
+An account with no role can sign in but does nothing. The mapping lives in
+`backend/app/auth/permissions.py` and is the only place a role name means
+anything.
 
-The first registered user is **atomically promoted** to superuser
-during the same transaction as the user-row insert (see
+In Community a role applies to the whole fleet: an operator can touch every
+managed host. Roles limited to a host group or a single host, custom roles,
+and roles granted to directory groups are part of unbork Enterprise.
+
+The first registered user is **atomically made an admin** during the same
+transaction as the user-row insert (see
 `backend/app/auth/users.py:UserManager.create`). There is no
-setup-time superuser; the registration endpoint closes after the
-first user is created.
+setup-time admin; the registration endpoint closes after the
+first user is created. `python -m app.auth.users_cli` recovers an install
+where no admin can sign in.
 
-**This matters more once the AI assistant is enabled.** Any signed-in
-user can start a session, choose its autonomy level, and approve a
-change it proposes. There is no separate "may use the AI" permission and
-no second-person approval — the operator who asks for a change is the
-one who approves it. Treat enabling `ai.enabled` on a multi-user install
-as granting every user the autonomy levels you allow.
+**This matters more once the AI assistant is enabled.** Every operator can
+start a session, choose its autonomy level, and approve a change it
+proposes on a host they may approve changes for (`ai.approve`). There is
+no second-person approval: the operator who asks for a change is the one
+who approves it. Treat enabling `ai.enabled` on a multi-user install as
+granting every operator the autonomy levels you allow.
 
 ---
 
@@ -316,6 +314,13 @@ as granting every user the autonomy levels you allow.
 
 Off by default, and worth understanding before turning it on: it is the
 one feature that runs commands nobody wrote in advance.
+
+A server that should never run it can leave it out entirely:
+`[assistant] enabled = false` in the config file, or an image built with
+`--build-arg WITH_ASSISTANT=0`, which has no Agent SDK and cannot be
+switched back on. Then no AI route, task or setting exists for an admin
+session to turn on. See
+[Running without the assistant](ui/assistant.md#running-without-the-assistant).
 
 **What bounds it**
 
@@ -338,7 +343,7 @@ one feature that runs commands nobody wrote in advance.
   transcript or reaches the provider.
 - **Two records, with different scopes.** Every SSH command that reaches
   execution writes an `AuditLog` row against the target host, alongside
-  every other change LabDog makes to it. Every *attempt* — including
+  every other change unbork makes to it. Every *attempt* — including
   calls blocked by the allowlist, refused by the classifier, parked for
   approval, or stopped by a failed snapshot — writes an `AIToolCall` row,
   visible in the session transcript. So the transcript shows what the
@@ -347,7 +352,8 @@ one feature that runs commands nobody wrote in advance.
 **What to decide deliberately**
 
 - **`ai.allow_cloud_providers`** (default off) is the data-egress
-  control. While off, only local endpoints and the Claude CLI may run.
+  control. While off, only local endpoints may run; the Claude agent and
+  Claude single-shot types count as off-network.
   Turning it on means host state — command output, hostnames, package
   and service inventories — leaves your network. Redaction is a safety
   net, not a guarantee.
@@ -370,18 +376,18 @@ through the transcript's credential redaction first. See
 
 **Alert intake** adds one unauthenticated-by-default surface and closes
 it deliberately. `POST /api/webhooks/grafana-alerts` is reachable without
-a LabDog session — it has to be, since Grafana has none — so it is gated
+an unbork session — it has to be, since Grafana has none — so it is gated
 on a shared bearer token in `[alerts] webhook_token`. That lives in the
 config file rather than the settings table because `/api/settings` is
 readable by any signed-in user. **An unset token refuses everything**: a
 receiver that accepted anonymous POSTs would let anyone on the network
-write rows LabDog might then spend money investigating. Restrict the path
-at the reverse proxy as well if Grafana reaches LabDog over an untrusted
+write rows unbork might then spend money investigating. Restrict the path
+at the reverse proxy as well if Grafana reaches unbork over an untrusted
 network.
 
-An alert asks for what it wants with Grafana labels: `labdog_action`
-names an action to run on its host, `labdog_ai=true` an investigation,
-`labdog_ai_automate=true` one that may fix things. **An action runs only
+An alert asks for what it wants with Grafana labels: `unbork_action`
+names an action to run on its host, `unbork_ai=true` an investigation,
+`unbork_ai_automate=true` one that may fix things. **An action runs only
 if it is on the list of actions alerts may run** (Alerts › Handling),
 which starts empty, and only on the hosts its entry allows. Keep that
 list to actions you would be happy to see run at 3 a.m. on any host it
@@ -390,21 +396,26 @@ covers, with the parameters you set there; labels cannot change them.
 Alert-driven sessions are **read-only by default**.
 `ai.alert_autonomy_level` can raise every alert to `approval`. Full auto
 is reached only by an alert marked for it: by default one carrying the
-label `labdog_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled`
+label `unbork_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled`
 on, one matching a rule in `ai.alert_full_auto_rules`. There is no
 instance-wide full auto for alerts. Under the label default, that label
 is all an alert needs. Whoever can edit alert rules in Grafana, or post
 to the webhook with its token, can mark any alert, on any host, for full
-auto. To keep that decision in LabDog, turn the rules on and list what
+auto. To keep that decision in unbork, turn the rules on and list what
 may act; an empty list allows nothing. Once any alert can reach full
-auto, the webhook is a way to make LabDog run commands as root, so the
+auto, the webhook is a way to make unbork run commands as root, so the
 safeguards matter:
 
-- **The webhook token is the trigger's only lock.** A webhook-delivered
-  alert is refused full auto while `[alerts] webhook_token` is shorter
-  than 32 characters, and the same goes for running the action its
-  [`labdog_action`](ui/alerts.md#running-an-action) label names. Use `openssl rand -hex 16` or longer, and restrict
-  the path at the reverse proxy to Grafana's address.
+- **Lock the trigger three ways.** The webhook token is always required:
+  a webhook-delivered alert is refused full auto while `[alerts]
+  webhook_token` is shorter than 32 characters, and the same goes for
+  running the action its [`unbork_action`](ui/alerts.md#running-an-action)
+  label names. Use `openssl rand -hex 16` or longer. Whenever full auto or
+  alert-started actions are on, also set `[alerts] allowed_sources` to
+  Grafana's address (with `[server] trusted_proxies` behind a reverse
+  proxy), and set `webhook_hmac_secret` when your Grafana can sign webhook
+  requests, so a leaked token alone is not enough. See
+  [Restricting who may send alerts](ui/alerts.md#restricting-who-may-send-alerts).
 - **Alert text is attacker-controlled.** Whoever writes alert rules or
   annotations, or controls a label value such as a job or instance name,
   is writing text an agent with root reads. It is sanitised and fenced
@@ -413,7 +424,7 @@ safeguards matter:
   denylist is what actually holds, which is why it applies at every
   level.
 - **Blast radius is one host, a few changes.** Full auto needs the alert
-  to name a LabDog host and may touch only that host; it needs a snapshot
+  to name an unbork host and may touch only that host; it needs a snapshot
   first unless `ai.alert_full_auto_requires_snapshot` is off; and a
   per-alert cooldown, a per-host daily cap and lower command and time
   caps bound how much it can do before a person looks.
@@ -432,32 +443,32 @@ that before you decide.
 
 ## Database connection security
 
-If Postgres runs on a separate host from the LabDog backend,
+If Postgres runs on a separate host from the unbork backend,
 require TLS on the connection:
 
 ```toml
 [database]
-url = "postgresql+asyncpg://labdog:<password>@db.example.com:5432/labdog?ssl=require"
+url = "postgresql+asyncpg://unbork:<password>@db.example.com:5432/unbork?ssl=require"
 ```
 
 (asyncpg accepts `ssl=require` / `ssl=verify-full` as URL params.
-For `verify-full`, also configure a CA bundle on the LabDog host.)
+For `verify-full`, also configure a CA bundle on the unbork host.)
 
-Restrict the `labdog` DB role to the `labdog` schema and database;
+Restrict the `unbork` DB role to the `unbork` schema and database;
 do not give it `SUPERUSER` or `CREATEDB`. A representative grant
 script run as the Postgres superuser:
 
 ```sql
 -- Run as postgres
-CREATE DATABASE labdog;
-CREATE USER labdog WITH PASSWORD '<strong random password>';
-GRANT CONNECT ON DATABASE labdog TO labdog;
-\c labdog
-GRANT USAGE, CREATE ON SCHEMA public TO labdog;
+CREATE DATABASE unbork;
+CREATE USER unbork WITH PASSWORD '<strong random password>';
+GRANT CONNECT ON DATABASE unbork TO unbork;
+\c unbork
+GRANT USAGE, CREATE ON SCHEMA public TO unbork;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO labdog;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO unbork;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO labdog;
+  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO unbork;
 ```
 
 Alembic migrations run as this role, so it needs DDL on its own
@@ -471,11 +482,11 @@ guidance still applies.
 
 ## Encryption-key handling
 
-`security.encryption_key` decrypts every credential LabDog stores
+`security.encryption_key` decrypts every credential unbork stores
 (SSH private keys, Proxmox API tokens, git HTTPS PATs, Grafana bearer
 tokens). It is the single most sensitive piece of state in the system.
 
-- **Never commit** `/etc/labdog/labdog.toml` or any backup of it to
+- **Never commit** `/etc/unbork/unbork.toml` or any backup of it to
   a git repo. If it lands in git history, treat every stored
   credential as compromised and rotate.
 - **Never paste** the key into chat, email, ticket attachments,
@@ -483,7 +494,7 @@ tokens). It is the single most sensitive piece of state in the system.
 - **Store** the key in a secret manager (HashiCorp Vault, AWS
   Secrets Manager, GCP Secret Manager, Bitwarden, 1Password, etc.)
   alongside your other production secrets. Inject it into the
-  process via `LABDOG_SECURITY__ENCRYPTION_KEY` rather than leaving
+  process via `UNBORK_SECURITY__ENCRYPTION_KEY` rather than leaving
   it in the on-disk TOML — file-system perms are easier to get
   wrong than a secrets-manager IAM policy.
 - **Back it up** together with the database (see

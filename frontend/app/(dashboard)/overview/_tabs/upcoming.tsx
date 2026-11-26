@@ -6,7 +6,9 @@ import { Dot, Empty, Panel, Tag, type Tone } from "@/components/ld"
 import { toneVar } from "@/components/ld/tone"
 import { useNow } from "@/hooks/use-now"
 import { apiFetch } from "@/lib/api"
+import { can, useAuth } from "@/lib/auth"
 import { cronToHuman } from "@/lib/cron"
+import { useFeatures } from "@/lib/features"
 import { plural, shortAgo, untilLabel } from "@/lib/fleet"
 import { avgDuration, clock, durationLabel, failStreak, isOrphaned, outcomeTone, overlaps, reach, scheduleName, scheduleTarget, type Overlap } from "@/lib/overview"
 import type {
@@ -288,13 +290,17 @@ export function UpcomingTab({
 }
 
 function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
+  const { user } = useAuth()
+  const { assistant } = useFeatures()
   const q = { retry: false, refetchInterval: 60_000 }
+  // AI providers and usage need ai.use, which a viewer lacks.
+  const ai = { ...q, enabled: can(user, "ai.use") }
   const { data: nodes } = useQuery<ProxmoxNode[]>({ queryKey: ["proxmox-nodes"], queryFn: () => apiFetch<ProxmoxNode[]>("/api/proxmox/nodes"), ...q })
   const { data: grafana } = useQuery<GrafanaInstance[]>({ queryKey: ["grafana-instances"], queryFn: () => apiFetch<GrafanaInstance[]>("/api/grafana/instances"), ...q })
   const { data: repos } = useQuery<GitRepository[]>({ queryKey: ["git-repos"], queryFn: () => apiFetch<GitRepository[]>("/api/git-repos"), ...q })
   const { data: packs } = useQuery<ActionPack[]>({ queryKey: ["action-packs"], queryFn: () => apiFetch<ActionPack[]>("/api/action-packs"), ...q })
-  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), ...q })
-  const { data: usage } = useQuery<AIUsageSummary>({ queryKey: ["ai-usage"], queryFn: () => apiFetch<AIUsageSummary>("/api/ai/usage"), ...q })
+  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), ...ai })
+  const { data: usage } = useQuery<AIUsageSummary>({ queryKey: ["ai-usage"], queryFn: () => apiFetch<AIUsageSummary>("/api/ai/usage"), ...ai })
   const { data: metrics } = useQuery<MetricsStatus>({ queryKey: ["metrics-status"], queryFn: () => apiFetch<MetricsStatus>("/api/metrics/status"), ...q })
 
   const enabled = schedules.filter((s) => s.enabled)
@@ -306,7 +312,7 @@ function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
   const enabledProviders = (providers ?? []).filter((p) => p.enabled)
   const lastRepoSync = repos?.map((r) => r.last_sync_at).filter(Boolean).sort().at(-1) ?? null
 
-  const rows: { name: string; detail: string; state: Tone; meta: string; href: string }[] = [
+  const allRows: { name: string; detail: string; state: Tone; meta: string; href: string }[] = [
     {
       name: "Proxmox",
       detail: nodes?.length ? nodes.map((n) => n.name).join(", ") : "not configured",
@@ -354,6 +360,8 @@ function IntegrationHealth({ schedules }: { schedules: ScheduledAction[] }) {
       href: "/settings?section=system",
     },
   ]
+  // No AI provider row on a server without the assistant (C-026).
+  const rows = assistant ? allRows : allRows.filter((r) => r.href !== "/ai-providers")
   return (
     <Panel title="integration health" meta="what scheduled runs depend on">
       {rows.map((i) => (

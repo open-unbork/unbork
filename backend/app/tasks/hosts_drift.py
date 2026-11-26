@@ -7,7 +7,6 @@ decides whether the verdict becomes durable.
 """
 
 import logging
-from datetime import UTC
 
 from app.tasks import celery_app
 
@@ -54,30 +53,25 @@ async def check_hosts_drift_for_one_host(host, hms, db) -> bool:
     nothing is written.
     """
     import time
-    from datetime import datetime
 
     import asyncssh
-    from sqlalchemy import select
 
-    from app.crypto.encryption import decrypt_ssh_key
-    from app.crypto.key_management import get_master_key
-    from app.hosts_mgmt.collector import collect_hosts_file
+    from app.hosts_mgmt.collector import collect_hosts_file, hosts_entry_dict
     from app.hosts_mgmt.diff import compute_hosts_diff
     from app.hosts_mgmt.merge import get_effective_hosts_entries
     from app.metrics.recorder import record_drift_sample
-    from app.models.ssh_key import SSHKey
     from app.ssh_utils import get_source_ip, ssh_connect_host
+    from app.tasks.drift_sweep import (
+        load_private_key_pem,
+        record_check_error,
+        record_unreachable,
+        write_drift_verdict,
+    )
 
     try:
-        if not host.ssh_key_id:
+        private_key_pem = await load_private_key_pem(host, db)
+        if private_key_pem is None:
             return False
-        ssh_key = (
-            await db.execute(select(SSHKey).where(SSHKey.id == host.ssh_key_id))
-        ).scalar_one_or_none()
-        if not ssh_key:
-            return False
-
-        private_key_pem = decrypt_ssh_key(ssh_key.encrypted_private_key, get_master_key())
         desired = await get_effective_hosts_entries(host.id, db)
 
         _t0 = time.monotonic()
@@ -85,14 +79,11 @@ async def check_hosts_drift_for_one_host(host, hms, db) -> bool:
         diff = compute_hosts_diff(current, desired)
         _duration_ms = int((time.monotonic() - _t0) * 1000)
 
-        hms.sync_status = "in_sync" if not diff.has_changes else "out_of_sync"
-        hms.last_drift_check_at = datetime.now(UTC)
-        hms.collected_state = [
-            {"ip_address": e.ip_address, "hostname": e.hostname, "aliases": e.aliases}
-            for e in current
-        ]
-        hms.collected_at = datetime.now(UTC)
-        hms.error_message = None
+        write_drift_verdict(
+            hms,
+            drifted=diff.has_changes,
+            collected_state=[hosts_entry_dict(e) for e in current],
+        )
         await record_drift_sample(
             db,
             host_id=host.id,
@@ -107,34 +98,29 @@ async def check_hosts_drift_for_one_host(host, hms, db) -> bool:
         try:
             imported_key = asyncssh.import_private_key(private_key_pem)
             async with ssh_connect_host(host, db, client_keys=[imported_key]) as probe:
-                if not host.labdog_source_ip:
-                    host.labdog_source_ip = await get_source_ip(probe)
+                if not host.unbork_source_ip:
+                    host.unbork_source_ip = await get_source_ip(probe)
                 await _maybe_update_host_ip(probe, host, db)
         except Exception:
             # Best-effort follow-up probes; the diff above is the verdict.
             logger.debug("source-IP probe failed for host %s", host.id, exc_info=True)
         return True
     except (OSError, asyncssh.Error, TimeoutError) as e:
-        hms.sync_status = "unknown"
-        hms.last_drift_check_at = datetime.now(UTC)
-        hms.error_message = f"Host unreachable: {e or 'connection timed out'}"
+        record_unreachable(hms, e)
         return True
     except Exception as e:
         logger.exception("hosts_file drift check failed for host %s", host.id)
-        hms.sync_status = "error"
-        hms.last_drift_check_at = datetime.now(UTC)
-        hms.error_message = str(e)
+        record_check_error(hms, e)
         return True
 
 
-@celery_app.task(name="app.tasks.hosts_drift.check_all_hosts_drift", queue="long_running")
+@celery_app.task(name="app.tasks.hosts_drift.check_all_hosts_drift", queue="drift")
 def check_all_hosts_drift():
     """Periodic task: hosts-file drift for every host with it enabled."""
-    import asyncio
+    from app.tasks.drift_sweep import run_sweep
 
-    from app.tasks.drift_sweep import sweep_module
-
-    return asyncio.run(sweep_module("hosts_file", check_hosts_drift_for_one_host))
+    # Fans out one check per host on the drift queue; see app.tasks.drift_sweep.
+    return run_sweep("hosts_file")
 
 
 # Register periodic hosts drift check via RedBeat

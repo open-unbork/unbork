@@ -1,6 +1,6 @@
-# LabDog Frontend — Design & Pattern Reference
+# unbork Frontend — Design & Pattern Reference
 
-This document defines the frontend conventions for LabDog. All new pages, components, and modifications must follow these patterns.
+This document defines the frontend conventions for unbork. All new pages, components, and modifications must follow these patterns.
 
 ---
 
@@ -9,8 +9,8 @@ This document defines the frontend conventions for LabDog. All new pages, compon
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 16 (App Router), built as a static export served by the backend |
-| UI | The LabDog kit in `components/ld` — the only component layer. Dialogs are built on `@base-ui/react`'s dialog; the command palette on `cmdk`. |
-| Styling | Tailwind CSS v4 over the LabDog design tokens in `app/globals.css` — dark is primary, light is a real second theme |
+| UI | The unbork kit in `components/ld` — the only component layer. Dialogs are built on `@base-ui/react`'s dialog; the command palette on `cmdk`. |
+| Styling | Tailwind CSS v4 over the unbork design tokens in `app/globals.css` — dark is primary, light is a real second theme |
 | Data Fetching | TanStack Query (`@tanstack/react-query`) |
 | API Client | `apiFetch()` from `lib/api.ts` |
 | Auth | `useAuth()` context from `lib/auth.ts` |
@@ -59,7 +59,7 @@ Everything lives in `components/shell/`:
 becomes an overlay that closes on navigation; below 640px the rail is a
 bottom tab bar and the pane is gone. The desktop rail is icons-only by
 default and expands to icons with names (the `»`/`«` button at its foot, or
-`]`); the choice is a per-browser `useLocalPref` (`labdog.rail`), and an
+`]`); the choice is a per-browser `useLocalPref` (`unbork.rail`), and an
 overlay pane starts at the rail's current width. Keyboard: `⌘K`/`Ctrl+K`
 palette, `[` toggles the pane, `]` expands or collapses the rail, `t`
 toggles the theme (never while typing in a field).
@@ -144,7 +144,7 @@ rn/m — which is most of what reading a hostname or an address needs.
 Two themes, both defined as tokens in `app/globals.css` under
 `html[data-theme="dark"]` (primary) and `html[data-theme="light"]` (a real
 second theme, not an inversion). `next-themes` writes both `class` and
-`data-theme` on `<html>`, persisted under `labdog:theme`.
+`data-theme` on `<html>`, persisted under `unbork:theme`.
 
 | Token | Tailwind | Use |
 |-------|----------|-----|
@@ -153,7 +153,7 @@ second theme, not an inversion). `next-themes` writes both `class` and
 | `--rail` | `bg-rail` | the rail |
 | `--border`, `--border-strong`, `--border-faint` | `border-line`, `border-line-strong`, `border-line-faint` | dividers |
 | `--text`, `--text-2`, `--text-3`, `--text-faint` | `text-text`, `text-text-2`, `text-text-3`, `text-text-faint` | four grades of ink |
-| `--accent`, `--accent-soft`, `--accent-line`, `--accent-fill`, `--accent-ink` | `ld-accent*` | the one blue: active states, primary buttons, host overrides |
+| `--accent`, `--accent-soft`, `--accent-line`, `--accent-fill`, `--accent-ink` | `ld-accent*` | the one blue (the mark's navy hue, lighter): active states, primary buttons, host overrides. The mark's amber is not a UI colour — it would read as `warn` |
 | `--ok` `--warn` `--danger` `--sync` `--idle` `--hold` `--add` `--del` | `bg-ok` … | status tones, all at one chroma so nothing shouts louder than its severity |
 | `--<tone>-soft` / `--<tone>-ink` | `bg-ok-soft text-ok-ink` | a tint and the ink solved against it (≥5:1). **Never paint a raw tone on its own tint.** |
 
@@ -180,7 +180,7 @@ actions, alert status and severity, assistant sessions), read with
 app/layout.tsx              — Fonts, Providers (theme, query client, auth, toaster), AppShell
 ├── components/app-shell.tsx    — Rail + pane + content column; mobile header + bottom rail; palette; shortcuts
 ├── components/shell/*          — zones registry, Rail, Pane, Palette, AccountMenu, glyphs, redirect helper
-├── components/ld/*             — the LabDog UI kit (see below)
+├── components/ld/*             — the unbork UI kit (see below)
 └── app/(dashboard)/...         — every screen (inside the shell)
     app/(auth)/...              — login/register (no shell, centred card)
 ```
@@ -189,7 +189,7 @@ app/layout.tsx              — Fonts, Providers (theme, query client, auth, toa
 
 `components/app-shell.tsx` checks the current pathname. Auth routes (`/login`, `/register`) render children bare. Everything else renders the rail, the current zone's pane and a content column. Account things — email, change password, About, log out — live behind the avatar at the foot of the rail (`components/shell/account-menu.tsx`), where they cannot be mistaken for navigation.
 
-### The LabDog kit (`components/ld`)
+### The unbork kit (`components/ld`)
 
 Dense, token-driven primitives ported from the design prototype, all
 exported from `@/components/ld`:
@@ -228,6 +228,15 @@ runs into one stream; `lib/pending.ts` builds the Pending queue's lanes.
 ---
 
 ## Component Patterns
+
+State and effects: `react-hooks/set-state-in-effect` and
+`react-hooks/purity` are lint errors. Derive values during render rather
+than copying them into state from an effect, reset state with a `key`, and
+set state in an effect only from an asynchronous callback (see
+`components/scheduled-actions/cron-input.tsx`). The one sanctioned
+exception is a single read of browser-only state after mount, which
+carries an `eslint-disable-next-line` with its reason (see
+`lib/local-pref.ts`).
 
 ### A screen
 
@@ -428,7 +437,7 @@ if (!user?.is_superuser) {
 |------|---------|
 | `app/(dashboard)/*/page.tsx` | Screens (inside the shell); a server `page.tsx` wrapping a `client-page.tsx` where the screen reads search params |
 | `app/(auth)/*/page.tsx` | Auth pages (no shell, centred card) |
-| `components/ld/*` | The LabDog kit |
+| `components/ld/*` | The unbork kit |
 | `components/shell/*` | The rail, pane, palette, account menu and zone registry |
 | `components/config/*-editor.tsx` | The eight group module editors |
 | `components/ai/*` | The assistant's pieces — transcript, tool call, approval gate, session list and aside, usage panel, markdown renderer |
@@ -449,6 +458,23 @@ if (!user?.is_superuser) {
 - Anything used by more than one screen goes in `components/`.
 
 ---
+
+## Unit tests
+
+Vitest with jsdom and Testing Library (`npm test`, `npm run test:watch`;
+config in `vitest.config.mts`).
+
+- A test sits next to the code it tests, as `<name>.test.ts` or
+  `<name>.test.tsx`, under `lib/`, `components/` or `hooks/`. Never under
+  `app/`: pages are covered by the Playwright specs in `e2e/`
+  (`*.spec.ts`), and the two suffixes keep the runners apart.
+- Tests run in node by default. A test that renders a component starts
+  with `// @vitest-environment jsdom`.
+- Import `describe`, `it`, `expect` and `vi` from `"vitest"` (no globals),
+  so `npx tsc --noEmit` type-checks tests like any other file.
+- Mock `@/lib/api` per test file with `vi.mock` and a `vi.hoisted` spy;
+  no test talks to a backend. `components/scheduled-actions/cron-input.test.tsx`
+  shows the pattern, with fake timers for a debounce.
 
 ## Toast Notifications
 
@@ -636,4 +662,4 @@ Optimistic updates available via `optimisticUpdate` option (for simple delete/to
 | System theme following | Dark is the default and light is an explicit choice (`t` or the rail toggle); `next-themes` runs with `enableSystem={false}`. |
 | Framer Motion | No animation library. CSS transitions only. |
 | Separate `/profile` page | Password change lives in the account menu at the foot of the rail. |
-| Pagination | Tables show all data. LabDog manages tens/hundreds of items, not thousands. The audit log is the exception — it loads 100 entries at a time. |
+| Pagination | Tables show all data. unbork manages tens/hundreds of items, not thousands. The audit log is the exception — it loads 100 entries at a time. |

@@ -4,7 +4,7 @@ An action run's log is the evidence an investigation of it starts from,
 but it is too big to hand over whole: ``ActionHostRun.output`` holds up to
 a mebibyte per host, and every byte in a prompt is read back on each later
 turn. So the mission gets the parts an operator would look at first — what
-LabDog did around the playbook (``[preflight]``, ``[verify]``,
+unbork did around the playbook (``[preflight]``, ``[verify]``,
 ``[rollback]``…), each ``PLAY RECAP``, and every failed task — and the
 model pages through the rest with ``get_action_run_output``.
 
@@ -34,16 +34,16 @@ _RECAP = re.compile(r"^PLAY RECAP\b")
 _RECAP_ROW = re.compile(r"^\S.*\s:\s+ok=\d+")
 _ERROR = re.compile(r"^\[ERROR\]:")
 _WARNING = re.compile(r"^\[(DEPRECATION )?WARNING\]:")
-_LABDOG = re.compile(r"^\[[a-z][a-z-]*\] ")
-_LABDOG_FAILED = re.compile(r"\b(status=failed|passed=False|success=False|failed|unreachable)\b")
+_UNBORK = re.compile(r"^\[[a-z][a-z-]*\] ")
+_UNBORK_FAILED = re.compile(r"\b(status=failed|passed=False|success=False|failed|unreachable)\b")
 _SECTION = re.compile(r"^={3,} .* ={3,}$")
 _OPENS_BRACKET = re.compile(r"(=> |^ *)[{\[]$")
 
 #: The kinds that open a failure. Only the line that opens a block counts.
-FAILURE_KINDS = frozenset({"error", "fatal", "failed", "unreachable", "labdog-failed"})
+FAILURE_KINDS = frozenset({"error", "fatal", "failed", "unreachable", "unbork-failed"})
 
 #: Lines that say what happened around and between the playbooks.
-_OUTLINE_KINDS = frozenset({"labdog", "labdog-failed", "section", "recap-head", "recap-row"})
+_OUTLINE_KINDS = frozenset({"unbork", "unbork-failed", "section", "recap-head", "recap-row"})
 
 #: Lines of a task kept before its failure, and lines of the failure kept.
 _LINES_BEFORE = 5
@@ -91,7 +91,7 @@ def parse(text: str) -> list[LogLine]:
             continue
         if block is not None:
             structural = any(
-                p.match(line) for p in (_STATUS, _TASK, _PLAY, _RECAP, _LABDOG, _SECTION)
+                p.match(line) for p in (_STATUS, _TASK, _PLAY, _RECAP, _UNBORK, _SECTION)
             )
             if structural or (block[1] == "blank" and not line.strip()):
                 block = None
@@ -122,8 +122,8 @@ def parse(text: str) -> list[LogLine]:
         elif _WARNING.match(line):
             kind = "warning"
             block = (kind, "blank")
-        elif _LABDOG.match(line):
-            kind = "labdog-failed" if _LABDOG_FAILED.search(line) else "labdog"
+        elif _UNBORK.match(line):
+            kind = "unbork-failed" if _UNBORK_FAILED.search(line) else "unbork"
         elif _SECTION.match(line):
             kind = "section"
         if kind not in ("recap-head", "recap-row") and line.strip():
@@ -133,7 +133,7 @@ def parse(text: str) -> list[LogLine]:
 
 
 def outline(lines: list[LogLine]) -> list[LogLine]:
-    """LabDog's own step lines, the section headers, and every recap."""
+    """unbork's own step lines, the section headers, and every recap."""
     return [line for line in lines if line.kind in _OUTLINE_KINDS and not line.cont]
 
 
@@ -153,7 +153,7 @@ def failures(lines: list[LogLine]) -> list[Failure]:
 
     Each keeps its task header, the few lines before the failure, and the
     failure's own block (the result, or the ``[ERROR]`` explanation). A
-    LabDog step that failed (``[verify] … status=failed``) is its own entry
+    unbork step that failed (``[verify] … status=failed``) is its own entry
     with no task.
     """
     found: list[Failure] = []
@@ -180,7 +180,7 @@ def failures(lines: list[LogLine]) -> list[Failure]:
                 break
             block.append(follow)
 
-        if line.kind == "labdog-failed":
+        if line.kind == "unbork-failed":
             found.append(Failure(task=None, lines=block))
             current = None
             continue

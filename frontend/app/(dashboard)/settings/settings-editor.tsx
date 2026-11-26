@@ -125,7 +125,7 @@ const CATEGORIES: Record<string, Category> = {
   },
   ssh: {
     label: "SSH",
-    keys: ["ssh.connect_timeout", "ssh.command_timeout", "ssh.idle_timeout_seconds"],
+    keys: ["ssh.connect_timeout", "ssh.command_timeout", "ssh.idle_timeout_seconds", "ssh.max_session_seconds"],
   },
   ansible: {
     label: "Ansible",
@@ -196,7 +196,7 @@ function isMultiline(s: AppSetting): boolean {
   return s.value_type === "text"
 }
 
-const COLLAPSE_STORAGE_KEY = "labdog:settings-collapse"
+const COLLAPSE_STORAGE_KEY = "unbork:settings-collapse"
 
 /**
  * Manual expand/collapse choices, keyed by category. A key's *absence*

@@ -56,8 +56,8 @@ docker run --rm python:3.12-slim apt-cache policy <package>
 #    means the ignore can be removed.
 
 # 3. Locally rebuild the image and confirm the scan is clean.
-docker build -t labdog:trivy-test .
-trivy image --severity HIGH,CRITICAL --ignore-unfixed labdog:trivy-test
+docker build -t unbork:trivy-test .
+trivy image --severity HIGH,CRITICAL --ignore-unfixed unbork:trivy-test
 ```
 
 If a fix has shipped, delete the line from `.trivyignore`, delete

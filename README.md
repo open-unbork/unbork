@@ -19,7 +19,7 @@ Manage firewall rules, systemd services, `/etc/hosts`, packages, users and more 
 
 ```bash
 docker run -d --name unbork -p 8000:8000 \
-  -v unbork-data:/var/lib/labdog \
+  -v unbork-data:/var/lib/unbork \
   unbork/unbork:latest
 ```
 
@@ -70,10 +70,10 @@ parser, bounded by a host allowlist, redacted, and written to the audit log.
   the model went looking for.
 - **Alert-driven actions, investigation and fixes** — point a Grafana
   contact point at unbork and let the alert rule's labels say what
-  happens. `labdog_action` runs an action you have allowed on the alert's
-  host, no AI needed. `labdog_ai` has the assistant investigate, within
+  happens. `unbork_action` runs an action you have allowed on the alert's
+  host, no AI needed. `unbork_ai` has the assistant investigate, within
   budget; it only looks unless you allow more, and can ask for approval
-  for each change. `labdog_ai_automate`, or rules naming alerts, hosts and
+  for each change. `unbork_ai_automate`, or rules naming alerts, hosts and
   groups, lets it fix the host unattended. Every unattended fix is
   snapshotted first and checked afterwards, and one that made the host
   worse is rolled back.
@@ -130,8 +130,29 @@ All technical content lives under **[the documentation site](https://open-unbork
 
 See **[BUGS.md](BUGS.md)** for known issues and **[CONTRIBUTING.md](CONTRIBUTING.md)** to file a new report or send a patch. Security-sensitive issues: **[SECURITY.md](SECURITY.md)**.
 
+## 🧩 Editions
+
+**unbork Community** is this repository. It is licensed AGPL-3.0-or-later, and it is complete and usable on its own:
+
+- Your own Ansible playbooks as actions, with a preview per server, and scheduled actions
+- The configuration modules, drift detection and remediation
+- Git integration, webhooks and configuration as code (GitOps)
+- Snapshot, apply, verify and rollback on Proxmox
+- The append-only audit log in the web UI
+- Local accounts with fixed roles (admin, operator, viewer)
+- The AI assistant with default-deny rules, which can be left out entirely
+- The REST API, alert intake and the Prometheus metrics endpoint
+
+**unbork Enterprise** is a separate package under a commercial licence, developed in a separate private repository. It installs next to Community and adds to it through a documented extension interface; it does not replace or modify Community code. Today it adds single sign-on through a company directory (OIDC and LDAP) and role-based access control scoped to hosts and groups. Further Enterprise features are planned, with no dates or commitments; their titles are listed in the [roadmap](planning/PLAN.md#enterprise-features).
+
+No Community feature is removed or limited to make room for Enterprise, and the extension interface is part of the AGPL code in this repository.
+
 ## 📜 License
 
-**AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+**AGPL-3.0-or-later.** Everything in this repository is licensed AGPL-3.0-or-later, including the extension interface, the documentation and the packaging, except third-party files bundled with it (such as fonts), which keep their own licences, stated next to them. See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
 
-Copyright © 2026 Dennis Tyresson and contributors.
+The Enterprise edition is not covered by this licence, and none of its code is in this repository.
+
+Images and packages list every third-party component they ship, with its licence, in `/usr/share/doc/unbork/THIRD-PARTY-NOTICES`, and say where to get each one's source in [SOURCE-OFFER.md](SOURCE-OFFER.md).
+
+Copyright © 2026 Dennis Tyresson and contributors. Contributions are accepted under a [contributor licence agreement](legal/cla/README.md).

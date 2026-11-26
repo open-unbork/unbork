@@ -13,7 +13,7 @@ HTTPS_URL_PREFIX = "https://"
 
 # Networks that must never be reachable via a user-supplied git URL.
 # RFC1918 private ranges (10/8, 172.16/12, 192.168/16) are intentionally
-# absent — labdog's primary use-case is managing hosts on the operator's
+# absent — unbork's primary use-case is managing hosts on the operator's
 # internal LAN and operators may run a git server there.
 _BLOCKED_URL_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),  # loopback
@@ -30,7 +30,7 @@ _SCP_HOST_RE = re.compile(r"^git@([^:]+):")
 # Allowed characters in a git branch / ref. Conservative allow-list so the
 # value is safe to pass as a `--branch <ref>` CLI argument and to interpolate
 # into `refs/heads/<branch>` webhook comparisons.
-_BRANCH_RE = re.compile(r"^[\w./-]+$")
+_BRANCH_RE = re.compile(r"^[\w./-]+\Z")
 
 
 def extract_hostname(url: str) -> str | None:
@@ -53,7 +53,7 @@ def _check_host_blocked(host: str) -> None:
     """Raise ``ValueError`` if *host* resolves to a blocked network range.
 
     String-checks only — no DNS resolution is performed (DNS rebinding is
-    out of scope; the operator is superuser-only).
+    out of scope; adding a repository needs ``integrations.manage``, i.e. an admin).
     """
     if host.lower() == "localhost":
         raise ValueError(

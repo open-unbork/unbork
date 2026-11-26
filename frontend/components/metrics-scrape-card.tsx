@@ -6,12 +6,12 @@ import { Banner, CodeBlock, Copy, Dot, Facts } from "@/components/ld"
 import type { MetricsStatus } from "@/lib/types"
 
 const SECURITY_HARDENING_URL =
-  "https://open-labdog.github.io/labdog/security-hardening#exposing-metrics"
+  "https://open-unbork.github.io/unbork/security-hardening#exposing-metrics"
 const PROMETHEUS_EXAMPLES_URL =
-  "https://github.com/open-labdog/labdog/tree/main/docs/examples/prometheus"
+  "https://github.com/open-unbork/unbork/tree/main/docs/examples/prometheus"
 
 /** Builds a copy-paste Grafana Alloy `prometheus.scrape` block from the
- *  resolved scrape URL. Alloy is LabDog's house agent — the bundled
+ *  resolved scrape URL. Alloy is unbork's house agent — the bundled
  *  alloy-install action already deploys it to managed hosts. The
  *  exposition format is standard Prometheus text, so any compatible
  *  scraper works — point it at the same URL.
@@ -21,7 +21,7 @@ const PROMETHEUS_EXAMPLES_URL =
  *  parseable absolute URL. */
 function buildAlloyConfig(status: MetricsStatus): string {
   let scheme = "https"
-  let host = "<labdog-host:port>"
+  let host = "<unbork-host:port>"
   try {
     const u = new URL(status.scrape_url)
     scheme = u.protocol.replace(":", "") || scheme
@@ -30,9 +30,9 @@ function buildAlloyConfig(status: MetricsStatus): string {
     // scrape_url wasn't absolute — keep the placeholder host.
   }
   return [
-    'prometheus.scrape "labdog" {',
+    'prometheus.scrape "unbork" {',
     `  targets         = [{ __address__ = "${host}" }]`,
-    '  job_name        = "labdog"',
+    '  job_name        = "unbork"',
     `  scheme          = "${scheme}"`,
     `  metrics_path    = "${status.path}"`,
     '  scrape_interval = "30s"',
@@ -121,9 +121,9 @@ export function MetricsScrapeCard() {
       ) : (
         <div className="flex flex-col gap-2">
           <div className="text-xs text-text-2">
-            Add to <span className="mono text-text">/etc/labdog/labdog.toml</span> and restart:
+            Add to <span className="mono text-text">/etc/unbork/unbork.toml</span> and restart:
           </div>
-          <CodeBlock title="labdog.toml" actions={<Copy text={data.toml_snippet} />} wrap={false}>
+          <CodeBlock title="unbork.toml" actions={<Copy text={data.toml_snippet} />} wrap={false}>
             {data.toml_snippet}
           </CodeBlock>
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-2">
@@ -132,7 +132,7 @@ export function MetricsScrapeCard() {
             <Copy text={data.env_snippet} />
           </div>
           <div className="text-[11px] text-text-3">
-            File-level on purpose: the endpoint is unauthenticated, so enabling it needs server access, not just a LabDog login.
+            File-level on purpose: the endpoint is unauthenticated, so enabling it needs server access, not just an unbork login.
           </div>
         </div>
       )}

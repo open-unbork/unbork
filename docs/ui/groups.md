@@ -6,7 +6,7 @@
 
 **Path:** `/groups`
 
-Groups are the core organisational unit in LabDog. Each group holds desired-state configuration for one or more modules. Hosts belong to groups, and when a host belongs to multiple groups, configurations are merged by priority (higher number wins).
+Groups are the core organisational unit in unbork. Each group holds desired-state configuration for one or more modules. Hosts belong to groups, and when a host belongs to multiple groups, configurations are merged by priority (higher number wins).
 
 ### Columns
 
@@ -51,20 +51,23 @@ The head offers **Run action…** (pick an action the group supports, preview or
 
 ### Overview
 
+Four full-width parts, top to bottom:
+
+| Part | What it shows |
+|------|---------------|
+| Headline numbers | One strip: **members** (and how many are also in a higher-priority group), **in sync**, **drifted** (which modules, with a 14-day bar of checks that found drift underneath), **failed** (the first failing host and its error), **sync success · 7d** for this group's members with a sparkline, and the **next run** of a schedule that reaches the group. **members** opens the Members tab; **in sync**, **drifted** and **failed** open the hosts list filtered to this group and that status; **next run** opens Activity › Schedules. |
+| Members | On the left, a member × module grid, worst host first, that lists only the members with a problem; the line under it counts the rest and **show all N** lists every member (up to 40). The **host** column is the host's own status; it is hatched when the host is marked drifted or failed as a whole and no module says so, which a snapshot rollback does. Each module cell is that module's state on that host (in sync, drifted, error or unknown, dashed when never collected); in-sync cells are toned down. Only modules some member has reported, or this group declares, get a column; the ones this group declares are outlined. A cell opens that host's tab for the module. On the right, **what they actually get**: each module the group declares, its item count, and how many members get it from this group alone versus from a higher-priority group or a host override, which wins any conflict. A row opens that module in the Config tab. |
+| Runs | **next**: up to three schedules that reach the group (its own and fleet-wide ones), next to fire first. **earlier**: the group's last five action runs; a row opens the run. **all activity →** opens the Activity tab. |
+| Settings | A bar with the name, category, priority and GitOps state. **edit** opens the settings form, GitOps, metrics destinations and the danger zone below it. |
+
+What **edit** opens:
+
 | Panel | What it does |
 |-------|--------------|
-| Headline numbers | **members** (and how many are also in a higher-priority group), **in sync**, **drifted** (and which modules), **failed** (and the first failing host), **sync success · 7d** for this group's members with a sparkline, and the **next run** of a schedule that reaches the group. **members** opens the Members tab; **in sync**, **drifted** and **failed** open the hosts list filtered to this group and that status; **next run** opens Activity › Schedules. |
-| Member health | A grid of member × module, worst host first. Each cell is that module's state on that host: in sync, drifted, error or unknown, dashed when it has never been collected. Columns this group declares are outlined. A cell opens that host's tab for the module. Up to 40 members show; **N more members →** opens the Members tab. |
-| What members actually get | For each module the group declares, how many members get it from this group alone and how many also get it from a higher-priority group or a host override, which wins any conflict — with the hosts and groups named. |
-| Drift · 14 days | Checks that found drift on these hosts, per day. |
-| Recent activity | The group's latest action runs; **all activity →** opens the Activity tab. |
-| Coming up | Schedules that reach the group (its own and fleet-wide ones), next to fire first; **schedules →** opens Activity › Schedules. |
-| Modules | The modules this group declares, with item counts. A row opens that module in the Config tab. |
 | Settings | Name, category, description and priority, saved inline. Moving the priority shows a tie warning and **every winner/loser flip** the move causes — which other group this one starts beating or losing to, on how many shared hosts, for which modules — before you save. Nothing reaches a host until a plan runs. |
 | GitOps | **Enable…** links a registered Git repository and file path; the group's desired state is then imported from that file and the module editors become read-only. Status, repository, file and last import are shown; **Disable GitOps** keeps the current items and stops importing. See [GitOps UI](gitops-ui.md). |
-| Danger zone | Folded; **expand** opens it. **Delete group** takes two clicks (the second confirms with the number of hosts that drop the group). Hosts keep their other groups; nothing on a host changes until a plan runs. |
-
-Settings, GitOps and the danger zone sit in a row at the foot of the tab.
+| Metrics destinations | The Mimir and Loki instance members ship to when they don't set their own. |
+| Danger zone | Folded again; **expand** opens it. **Delete group** takes two clicks (the second confirms with the number of hosts that drop the group). Hosts keep their other groups; nothing on a host changes until a plan runs. |
 
 ### Config
 
@@ -115,7 +118,7 @@ The desired firewall state for every host in the group.
 Two selects in the toolbar set the **input** and **output** default
 policies: *default (drop)* / *drop* / *accept* for input, *default (accept)*
 / *accept* / *drop* for output. *default* means the group does not set one;
-another group, or LabDog's default, decides.
+another group, or unbork's default, decides.
 
 ### Rule table
 
@@ -130,7 +133,7 @@ another group, or LabDog's default, decides.
 | port | A port or range (`22`, `8000-8080`); an **ssh** tag marks port 22 |
 | comment | Why the rule exists |
 
-LabDog always injects its own SSH rule so it can never lock itself out; it
+unbork always injects its own SSH rule so it can never lock itself out; it
 is not listed here, but it shows on every host's Firewall tab as *system*.
 The **ssh** tag on a rule for port 22 is a reminder that this control-plane
 rule is re-injected on apply whatever the group says.
@@ -166,7 +169,7 @@ not, on every host in the group.
 The **Add service** / **edit** dialog can attach a unit file:
 
 - **Override existing** — a drop-in under
-  `/etc/systemd/system/<unit>.service.d/labdog.conf`, applied only on hosts where the
+  `/etc/systemd/system/<unit>.service.d/unbork.conf`, applied only on hosts where the
   unit already exists.
 - **New service (full file)** — deployed to
   `/etc/systemd/system/<unit>.service` on every host in the group.
@@ -219,7 +222,7 @@ The dialog also takes a GPG key URL.
 `/etc/hosts` entries on every host in the group. An entry is either:
 
 - **Literal address + name** — an IP address and a hostname, or
-- **Registered host** — a LabDog host, written with its *current* address
+- **Registered host** — an unbork host, written with its *current* address
   and name at sync time, so the entry follows the host when it moves.
 
 | Column | Description |
@@ -230,7 +233,7 @@ The dialog also takes a GPG key URL.
 | priority | Decides between groups declaring the same hostname |
 | comment | Optional note |
 
-LabDog writes `/etc/hosts` only on a host at least one entry applies to;
+unbork writes `/etc/hosts` only on a host at least one entry applies to;
 any other host's file is left as it is. When it does write the file it
 adds `127.0.0.1 localhost`, `::1 localhost` and the host's own name on
 `127.0.1.1` — the full name and the short one, as the host reports them,
@@ -252,7 +255,7 @@ Scheduled tasks, deployed with `ansible.builtin.cron`.
 
 | Column | Description |
 |--------|-------------|
-| job | Unique name for the job — how LabDog finds it again to update it |
+| job | Unique name for the job — how unbork finds it again to update it |
 | user | The Linux user it runs as |
 | schedule | Five-field cron expression (`minute hour day month weekday`), with a plain-English reading |
 | command | Shell command to run |
@@ -293,7 +296,7 @@ field. A sudo rule is a sudoers line without the username, e.g.
 
 ### Groups
 
-System groups (not LabDog groups), so users can be given supplementary
+System groups (not unbork groups), so users can be given supplementary
 membership.
 
 | Column | Description |
@@ -315,7 +318,7 @@ The resolver configuration. It is a **singleton** — at most one per group
 (or host). With none declared, hosts keep whatever DNS settings they have.
 
 **Configure DNS** opens the form; once a configuration exists the form
-shows it, with **Save changes**, **Preview file** (the file LabDog would
+shows it, with **Save changes**, **Preview file** (the file unbork would
 write) and **Delete config**.
 
 | Field | Description |
@@ -358,7 +361,7 @@ Below the table, the most recent deployment runs show each host's outcome.
 
 ## Syncing changes
 
-LabDog applies a group's desired configuration to its hosts over SSH,
+unbork applies a group's desired configuration to its hosts over SSH,
 always **preview-first**, on the [Plans](operations.md#plans) screen:
 
 - **Plan sync — N hosts** on the group's page opens a plan scoped to the
@@ -370,7 +373,7 @@ always **preview-first**, on the [Plans](operations.md#plans) screen:
 ### 1. Preview
 
 Opening a plan runs a dry run on every host in scope: a per-host diff
-between the desired state (stored in LabDog's database, merged across all
+between the desired state (stored in unbork's database, merged across all
 groups the host belongs to) and the current state fetched live over SSH.
 Each host shows config to **add**, **remove** and leave **unchanged**;
 hosts already in sync are flagged as such, hosts that cannot be reached are
@@ -385,7 +388,7 @@ follow the selection, and **Review & apply…** arms only once you have
 typed the host count. Each selected host then runs as a background job
 through the unified per-host orchestrator: one Ansible playbook per host
 covering every requested module, so two syncs targeting the same host
-queue rather than race over SSH. LabDog generates the playbook from the
+queue rather than race over SSH. unbork generates the playbook from the
 previewed diff, runs it via `ansible-runner`, updates the per-host and
 per-module sync status, and writes an audit-log entry.
 

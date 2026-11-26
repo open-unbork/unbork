@@ -1,18 +1,19 @@
 """
-LabDog configuration — loaded from TOML config file.
+unbork configuration — loaded from TOML config file.
 
 Resolution order (first found wins):
-  1. LABDOG_CONFIG env var (explicit path)
-  2. labdog.toml in project root  (development)
-  3. /etc/labdog/labdog.toml    (production / packaged install)
+  1. UNBORK_CONFIG env var (explicit path)
+  2. unbork.toml in project root  (development)
+  3. /etc/unbork/unbork.toml    (production / packaged install)
 
 Environment variables can override any setting using double-underscore
-separators for nested keys.  E.g. LABDOG_SERVER__PORT=9000 overrides
+separators for nested keys.  E.g. UNBORK_SERVER__PORT=9000 overrides
 [server] port.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
@@ -22,7 +23,7 @@ from pathlib import Path
 from typing import Any, Literal, Union, get_args, get_origin
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from app.key_format import decode_master_key
 
@@ -43,12 +44,12 @@ class ServerConfig(BaseModel):
     #: without authentication and enumerate every endpoint, its
     #: parameters and its schemas. That is a convenience in development
     #: and a map for anyone who reaches the port in production, so it is
-    #: off unless asked for. ``dev/labdog.toml`` turns it on.
+    #: off unless asked for. ``dev/unbork.toml`` turns it on.
     expose_docs: bool = False
 
 
 class DatabaseConfig(BaseModel):
-    url: str = "postgresql+asyncpg://labdog:labdog@localhost:5432/labdog"
+    url: str = "postgresql+asyncpg://unbork:unbork@localhost:5432/unbork"
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
@@ -60,7 +61,7 @@ class RedisConfig(BaseModel):
 
 #: Placeholder values that must never reach a running instance. The
 #: first two are this file's own defaults; ``CHANGE_ME`` is what
-#: ``packaging/etc/labdog.toml`` ships, and it was **not** on this list —
+#: ``packaging/etc/unbork.toml`` ships, and it was **not** on this list —
 #: so a packaged install that skipped the "generate your secrets" step
 #: booted happily with a nine-character signing key that is public in
 #: this repository (SEC-31).
@@ -80,7 +81,7 @@ _MIN_SECRET_KEY_LENGTH = 32
 class SecurityConfig(BaseModel):
     secret_key: str = "change-me-in-production"
     encryption_key: str = "change-me-32-bytes-base64-encoded"
-    labdog_server_ip: str = "127.0.0.1"
+    unbork_server_ip: str = "127.0.0.1"
     allowed_origins: list[str] = ["http://localhost:3000"]
     cookie_secure: bool = False
     cookie_domain: str = ""
@@ -106,10 +107,11 @@ class MetricsConfig(BaseModel):
     Disabled by default and deliberately **file-level, not a DB-backed
     ``AppSetting``**: the endpoint is unauthenticated (like ``GET
     /api/version``) once enabled, so flipping it on must require server
-    access (editing ``labdog.toml`` / setting ``LABDOG_METRICS__ENABLED``
-    and restarting), not just a LabDog login. ``/api/settings`` gates on
-    ``current_active_user`` (not superuser), so a DB toggle would let any
-    authenticated — or XSS'd — session expose fleet state with one PATCH.
+    access (editing ``unbork.toml`` / setting ``UNBORK_METRICS__ENABLED``
+    and restarting), not just an unbork login. ``/api/settings`` is
+    readable by every role and writable by any admin session, so a DB
+    toggle would let one admin — or one XSS'd admin session — expose fleet
+    state with one PATCH.
     Protection for the enabled endpoint itself is expected to be a reverse
     proxy allow-list, not application-level auth.
     """
@@ -118,11 +120,24 @@ class MetricsConfig(BaseModel):
     cache_ttl_seconds: float = 15.0
     action_key_label: bool = True
     #: Hard timeout for the Redis broker probe that produces
-    #: ``labdog_broker_queue_depth``. Short on purpose: the broker is a
+    #: ``unbork_broker_queue_depth``. Short on purpose: the broker is a
     #: second failure domain in an unauthenticated request path, so a
     #: broker that is not answering promptly is reported as unreachable
     #: rather than waited for. See ``app.metrics.broker``.
     broker_timeout_seconds: float = 0.2
+
+
+class AssistantConfig(BaseModel):
+    """Whether the AI assistant is loaded at all (C-026).
+
+    **File-level on purpose**, like ``MetricsConfig``: leaving a subsystem
+    out must need server access, not an admin session. Off means no AI
+    routes, pages, providers, tasks or settings; the tables stay, so
+    turning it back on loses nothing. The runtime switch ``ai.enabled``
+    keeps its meaning while the assistant is loaded.
+    """
+
+    enabled: bool = True
 
 
 class AlertsConfig(BaseModel):
@@ -130,18 +145,55 @@ class AlertsConfig(BaseModel):
 
     ``webhook_token`` is the shared bearer token a Grafana contact point
     must send. **File-level rather than a DB-backed ``AppSetting``**, for
-    the same reason as ``MetricsConfig`` above: ``/api/settings`` gates on
-    ``current_active_user``, so a token stored there could be read — and
-    rewritten — by any authenticated or XSS'd session, which is not where
-    a shared secret belongs.
+    the same reason as ``MetricsConfig`` above: ``/api/settings`` is
+    readable by every role, so a token stored there could be read by any
+    signed-in or XSS'd session, which is not where a shared secret belongs.
 
     Empty by default, and an empty token means the endpoint refuses
     everything rather than accepting anything. An alert receiver that
     silently accepted unauthenticated POSTs would let anyone on the
-    network write rows LabDog might then spend money investigating.
+    network write rows unbork might then spend money investigating.
+
+    Two more locks, both off until set (C-022):
+
+    - ``allowed_sources``: addresses or CIDRs a request must come from,
+      checked against the client address resolved through
+      ``server.trusted_proxies``. Empty means any source.
+    - ``webhook_hmac_secret``: when set, the request must carry an
+      HMAC-SHA256 of its body, hex-encoded, in ``webhook_hmac_header``, as
+      a Grafana webhook contact point with HMAC signing sends it. With
+      ``webhook_hmac_timestamp_header`` set, that header is required too,
+      the signed text is ``<timestamp>:<body>``, and a timestamp more than
+      ``webhook_hmac_max_skew_seconds`` away from now is refused. The token
+      is still required.
     """
 
     webhook_token: str = ""
+    allowed_sources: list[str] = []
+    webhook_hmac_secret: str = ""
+    webhook_hmac_header: str = "X-Grafana-Alerting-Signature"
+    webhook_hmac_timestamp_header: str = ""
+    webhook_hmac_max_skew_seconds: int = 300
+
+    @field_validator("allowed_sources")
+    @classmethod
+    def _parse_sources(cls, value: list[str]) -> list[str]:
+        # A typo must stop startup, not lock the webhook silently.
+        for entry in value:
+            try:
+                ipaddress.ip_network(entry.strip(), strict=False)
+            except ValueError:
+                raise ValueError(
+                    f"alerts.allowed_sources: {entry!r} is not an IP address or CIDR"
+                ) from None
+        return [entry.strip() for entry in value]
+
+    @field_validator("webhook_hmac_max_skew_seconds")
+    @classmethod
+    def _positive_skew(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("alerts.webhook_hmac_max_skew_seconds must be positive")
+        return value
 
 
 #: ``[logging]`` keys that look like settings here but are app settings,
@@ -161,12 +213,12 @@ class LoggingConfig(BaseModel):
     @classmethod
     def _warn_ignored_retention(cls, values: Any) -> Any:
         # Runs after the env overrides are merged in, so this covers
-        # LABDOG_LOGGING__AUDIT_RETENTION_DAYS as well as labdog.toml.
+        # UNBORK_LOGGING__AUDIT_RETENTION_DAYS as well as unbork.toml.
         if isinstance(values, dict):
             for key in _RETENTION_KEYS:
                 if key in values:
                     logger.warning(
-                        "logging.%s in labdog.toml or the environment has no effect "
+                        "logging.%s in unbork.toml or the environment has no effect "
                         "and can be removed. Retention is set on the Settings page, "
                         "under System.",
                         key,
@@ -178,6 +230,7 @@ class SSHConfig(BaseModel):
     max_sessions_per_user: int = 5
     max_total_sessions: int = 50
     idle_timeout_seconds: int = 1800
+    max_session_seconds: int = 43200
     connect_timeout: int = 10
     #: Fallback for the ``ssh.command_timeout`` app setting, used before the
     #: settings cache is warm. Bounds one command on an already-open session;
@@ -211,6 +264,14 @@ class CeleryConfig(BaseModel):
     #: ``soft_time_limit`` on one, and the orchestrator's 12h soft limit is
     #: what finalises a wedged run.
     orchestrator_concurrency: int = 4
+    #: Slots on a ``worker-drift`` container (``--role worker-drift``).
+    #: Unused by the default ``all`` role, whose ``work`` worker consumes
+    #: the ``drift`` queue alongside ``default`` and ``long_running``.
+    drift_concurrency: int = 4
+    #: Slots on a ``worker-actions`` container (``--role worker-actions``):
+    #: how many hosts' action runs execute at once. Unused by the default
+    #: ``all`` role, whose ``work`` worker consumes ``actions`` too.
+    actions_concurrency: int = 4
     max_tasks_per_child: int = 100
 
 
@@ -227,14 +288,14 @@ class AnsibleConfig(BaseModel):
 
     Pack sources are not configured here — DB-backed packs are managed
     via the admin UI at ``/settings/packs``. This section only carries
-    filesystem paths LabDog uses to materialise those packs.
+    filesystem paths unbork uses to materialise those packs.
     """
 
-    packs_root_dir: str = "/var/lib/labdog/packs"
+    packs_root_dir: str = "/var/lib/unbork/packs"
     """Directory under which DB-backed packs are checked out.
 
     Each pack gets a subdirectory named after its integer id. Must be
-    writable by the labdog process; for container deploys, mount a
+    writable by the unbork process; for container deploys, mount a
     persistent volume here so checkouts survive restarts.
     """
 
@@ -252,6 +313,7 @@ class Settings(BaseModel):
     tls: TLSConfig = TLSConfig()
     rate_limit: RateLimitConfig = RateLimitConfig()
     metrics: MetricsConfig = MetricsConfig()
+    assistant: AssistantConfig = AssistantConfig()
     alerts: AlertsConfig = AlertsConfig()
     logging: LoggingConfig = LoggingConfig()
     ssh: SSHConfig = SSHConfig()
@@ -264,17 +326,17 @@ class Settings(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _apply_env_overrides(cls, values: dict) -> dict:
-        """Allow env-var overrides with LABDOG_ prefix and __ separators.
+        """Allow env-var overrides with UNBORK_ prefix and __ separators.
 
         ``__`` separates path segments, so nested models are reachable too:
-          * ``LABDOG_SERVER__PORT=9000`` → ``server.port = 9000``
-          * ``LABDOG_ANSIBLE__DEFAULT_PACK__REPO=…`` → ``ansible.default_pack.repo = …``
+          * ``UNBORK_SERVER__PORT=9000`` → ``server.port = 9000``
+          * ``UNBORK_ANSIBLE__DEFAULT_PACK__REPO=…`` → ``ansible.default_pack.repo = …``
 
         List and dict-typed fields accept either a JSON literal
         (``'["a","b"]'``) or a comma-separated string (``'a,b'``). Scalar
         fields are passed through as raw strings — pydantic handles coercion.
         """
-        prefix = "LABDOG_"
+        prefix = "UNBORK_"
         for key, raw in os.environ.items():
             if not key.startswith(prefix):
                 continue
@@ -368,7 +430,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _find_config_path() -> Path | None:
     """Return the first config file that exists, or None."""
-    explicit = os.environ.get("LABDOG_CONFIG")
+    explicit = os.environ.get("UNBORK_CONFIG")
     if explicit:
         p = Path(explicit)
         if p.is_file():
@@ -376,8 +438,8 @@ def _find_config_path() -> Path | None:
         return None
 
     candidates = [
-        _PROJECT_ROOT / "labdog.toml",
-        Path("/etc/labdog/labdog.toml"),
+        _PROJECT_ROOT / "unbork.toml",
+        Path("/etc/unbork/unbork.toml"),
     ]
     for candidate in candidates:
         if candidate.is_file():
@@ -412,13 +474,13 @@ def _is_localhost_origin(origin: str) -> bool:
     return False
 
 
-def _validate_required(s: Settings) -> None:
+def _validate_required(s: Settings, old_toml_keys: list[str] | None = None) -> None:
     """Raise on insecure or missing required settings at startup."""
     errors: list[str] = []
     if s.security.secret_key in _INSECURE_DEFAULTS:
         errors.append(
             "security.secret_key is not set. "
-            "Set LABDOG_SECURITY__SECRET_KEY or [security] secret_key in labdog.toml."
+            "Set UNBORK_SECURITY__SECRET_KEY or [security] secret_key in unbork.toml."
         )
     elif len(s.security.secret_key) < _MIN_SECRET_KEY_LENGTH:
         # Chained to the placeholder branch: a placeholder is also too
@@ -434,8 +496,8 @@ def _validate_required(s: Settings) -> None:
         errors.append(
             "security.encryption_key is not set. "
             "Generate one with: python -m app.crypto.key_management "
-            "and set LABDOG_SECURITY__ENCRYPTION_KEY"
-            " or [security] encryption_key in labdog.toml."
+            "and set UNBORK_SECURITY__ENCRYPTION_KEY"
+            " or [security] encryption_key in unbork.toml."
         )
     else:
         # Checked here so a malformed key fails at boot rather than at
@@ -452,7 +514,7 @@ def _validate_required(s: Settings) -> None:
     # victim visits, with the session cookie attached.
     if "*" in s.security.allowed_origins:
         errors.append(
-            "security.allowed_origins contains '*' and LabDog always sends "
+            "security.allowed_origins contains '*' and unbork always sends "
             "credentials, so every origin would be reflected back as allowed — "
             "any website a logged-in user visits could drive the API as them. "
             "List the frontend URL(s) explicitly."
@@ -477,12 +539,86 @@ def _validate_required(s: Settings) -> None:
             logger.warning(
                 "security.cookie_secure is False but allowed_origins includes %s. "
                 "The session cookie will be sent over plain HTTP. Set cookie_secure "
-                "to true once LabDog is behind TLS.",
+                "to true once unbork is behind TLS.",
                 ", ".join(repr(o) for o in remote),
             )
 
     if errors:
-        raise SystemExit("FATAL: LabDog cannot start:\n  - " + "\n  - ".join(errors))
+        old = old_names_in_use() + (old_toml_keys or [])
+        if old:
+            errors.append(
+                "These names from before the rename are no longer read: "
+                + ", ".join(old)
+                + ". Rename them as docs/upgrade.md says (UNBORK_*, /etc/unbork/unbork.toml)."
+            )
+        raise SystemExit("FATAL: unbork cannot start:\n  - " + "\n  - ".join(errors))
+
+
+#: The prefix and config path used before the product was renamed. unbork
+#: 2.0 reads neither (D-29); they are only named, in a warning at every
+#: start and in the startup error, so an install upgraded without renaming
+#: them is told what it is ignoring.
+_OLD_ENV_PREFIX = "LABDOG_"  # old-name-ok
+_OLD_CONFIG_PATH = Path("/etc/labdog/labdog.toml")  # old-name-ok
+#: Directories the old package used. A path setting under one of them is
+#: named like an old key. Database URLs are not paths and are left alone:
+#: the database keeps whatever name it had.
+_OLD_NAME = _OLD_ENV_PREFIX.lower().rstrip("_")
+_OLD_PATHS = tuple(f"{base}/{_OLD_NAME}" for base in ("/etc", "/var/lib", "/var/log", "/run"))
+
+
+def old_names_in_use(environ: dict[str, str] | None = None) -> list[str]:
+    """Old-name variables set in the environment, and the old config file
+    if it exists (also next to a new one). Names only, never values."""
+    env = os.environ if environ is None else environ
+    old = _OLD_ENV_PREFIX.rstrip("_")
+    # Renaming only the prefix of LABDOG_SECURITY__LABDOG_SERVER_IP leaves  # old-name-ok
+    # the old key name after it, which the settings ignore: the server IP
+    # would fall back to 127.0.0.1 and a firewall sync could lock unbork out.
+    found = sorted(
+        k for k in env if k.startswith(_OLD_ENV_PREFIX) or (k.startswith("UNBORK_") and old in k)
+    )
+    if _old_config_present():
+        found.append(str(_OLD_CONFIG_PATH))
+    return found
+
+
+def _old_config_present() -> bool:
+    """Whether the old config file is there, without needing to read it.
+
+    Removing (not purging) the old package leaves its config directory
+    owned by the old group, mode 0750, so the new service user may not
+    even look inside. The directory being there and closed to us means the
+    file is: that must count as present, and must never stop the start.
+    """
+    try:
+        return _OLD_CONFIG_PATH.is_file()
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
+    """Keys in the config file that still carry the old name, and path
+    settings that still point under the old directories.
+
+    The settings models ignore unknown keys, so ``[security]`` with the old
+    ``*_server_ip`` key would silently fall back to the default.
+    """
+    found: list[str] = []
+    for key, value in data.items():
+        dotted = f"{prefix}{key}"
+        if _OLD_ENV_PREFIX.lower().rstrip("_") in key.lower():
+            found.append(f"{dotted} (in the config file)")
+        elif isinstance(value, str) and value.startswith(_OLD_PATHS):
+            # A config copied from the old version keeps e.g. its packs
+            # directory under the old data path, which the new service may
+            # not write to (and which the upgrade guide later deletes).
+            found.append(f"{dotted} = {value!r} (an old path, in the config file)")
+        if isinstance(value, dict):
+            found += old_toml_keys(value, f"{dotted}.")
+    return found
 
 
 def load_settings() -> Settings:
@@ -490,7 +626,15 @@ def load_settings() -> Settings:
     path = _find_config_path()
     data = _load_toml(path)
     s = Settings(**data)
-    _validate_required(s)
+    old_keys = old_toml_keys(data)
+    _validate_required(s, old_keys)
+    old = old_names_in_use() + old_keys
+    if old:
+        logger.warning(
+            "These names from before the rename are not read: %s. Rename them as "
+            "docs/upgrade.md says (UNBORK_*, /etc/unbork/unbork.toml).",
+            ", ".join(old),
+        )
     return s
 
 

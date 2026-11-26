@@ -5,7 +5,7 @@ peer rather than its subclass: the two agree on what a session *is* — the
 same rows, the same SSE events, the same caps and the same tools — and
 disagree entirely on who runs the loop. ``AgentLoop`` calls a provider one
 turn at a time and decides what happens next. Here the SDK owns that, and
-LabDog supplies the tools, the permission decisions, and the bookkeeping.
+unbork supplies the tools, the permission decisions, and the bookkeeping.
 
 That inversion is what makes subscription billing possible, and it costs
 the loop's natural place to put things. Three consequences are worth
@@ -68,7 +68,7 @@ from app.ai import approvals, service
 from app.ai.agent_sdk.bridge import NO_BUILTIN_TOOLS, build_tool_server, local_tool_name
 from app.ai.agent_sdk.environment import build_sdk_env, ensure_state_dir
 from app.ai.alert_autonomy import busy_refusal
-from app.ai.gate import decide, target_host
+from app.ai.gate import decide, gate_mutation, target_host
 from app.ai.loop import LoopCaps, LoopOutcome, build_system_prompt
 from app.ai.models import AIApprovalRequest, AIProvider, AISession, AIToolCall
 from app.ai.providers.claude_cli import DEFAULT_CONFIG_DIR
@@ -83,7 +83,7 @@ logger = logging.getLogger(__name__)
 
 #: Where the CLI keeps its own session files. ``resume`` reads them, so a
 #: deployment that wants to park a session across a container restart has
-#: to persist this path — it is under LabDog's state root for that reason,
+#: to persist this path — it is under unbork's state root for that reason,
 #: and the shipped compose in ``docs/production-deploy.md`` mounts it.
 #:
 #: ``ClaudeAgentOptions.session_store`` would let this live in Postgres
@@ -93,6 +93,15 @@ logger = logging.getLogger(__name__)
 #: package installs get the persistence for free because this is a real
 #: directory on disk. Worth revisiting only if the volume proves fragile.
 SESSION_STATE_DIR = DEFAULT_CONFIG_DIR
+
+
+def _program_path() -> str | None:
+    """The Claude Code program to run, or ``None`` to let the SDK look."""
+    from app.ai.claude_code import binary_path
+
+    found = binary_path()
+    return str(found) if found is not None else None
+
 
 #: How the CLI's ``rate_limit_type`` values read in a sentence. An
 #: unrecognised value is used verbatim rather than dropped: a window this
@@ -115,7 +124,7 @@ async def _uninterruptible(coro: Any) -> Any:
     """Await ``coro`` to completion even if the caller is cancelled.
 
     For database writes a tool callback makes. The SDK cancels the
-    callback's task when LabDog interrupts it, and a cancellation that
+    callback's task when unbork interrupts it, and a cancellation that
     lands mid-flush or mid-commit leaves the shared session unusable. The
     work runs as its own task, so the cancellation reaches only the
     caller, which waits for the task and then re-raises it.
@@ -412,6 +421,9 @@ class AgentSDKRunner:
             permitted=self._permitted,
             autonomy_level=self.session.autonomy_level,
         )
+        # An installed extension may refuse or hold a change (S-002).
+        async with self._db_lock:
+            verdict = await gate_mutation(self.db, self.session, name, arguments or {}, verdict)
 
         if verdict.allowed:
             tool_use_id = getattr(context, "tool_use_id", None)
@@ -533,7 +545,7 @@ class AgentSDKRunner:
             if name == "run_ssh_command":
                 self.session.command_count += 1
                 # Commands against managed hosts belong in the same audit
-                # trail as any other change LabDog makes to them.
+                # trail as any other change unbork makes to them.
                 await log_action(
                     self.db,
                     action="ai_command",
@@ -622,21 +634,25 @@ class AgentSDKRunner:
         # MCP server with nothing in it invites the model to go looking
         # for what it should have.
         servers = (
-            {"labdog": build_tool_server(self._handlers, self._execute_tool)}
+            {"unbork": build_tool_server(self._handlers, self._execute_tool)}
             if with_tools and self._handlers
             else {}
         )
         resume = (self.session.resume_state or {}).get("sdk_session_id")
 
         return ClaudeAgentOptions(
+            # build_runner() made sure there is a program (S-009). Left
+            # unset, the SDK would look for a bundled copy the image does
+            # not have.
+            cli_path=_program_path(),
             mcp_servers=servers,
-            # Only the tools LabDog built. Omitting this hands the model
-            # Bash, Read, Write and Edit inside LabDog's container.
+            # Only the tools unbork built. Omitting this hands the model
+            # Bash, Read, Write and Edit inside unbork's container.
             tools=NO_BUILTIN_TOOLS,
             strict_mcp_config=True,
             # Do not read the host's own Claude Code configuration: a
             # CLAUDE.md or an MCP server belonging to whoever administers
-            # the box is not part of LabDog's threat model.
+            # the box is not part of unbork's threat model.
             setting_sources=[],
             # Deliberately empty. An entry here would auto-approve that
             # tool *before* can_use_tool is consulted, silently disabling
@@ -1025,7 +1041,7 @@ class AgentSDKRunner:
 
         Tolerant of shape: the SDK exposes ``session_id`` as an attribute
         on some system messages and only inside ``data`` on the generic
-        ones, and an id LabDog fails to record is a session it cannot
+        ones, and an id unbork fails to record is a session it cannot
         resume.
         """
         data = getattr(message, "data", None)
@@ -1070,7 +1086,7 @@ class AgentSDKRunner:
         booked from :func:`service.estimate_cost`, an estimate of money
         nobody spends, flagged ``cost_unknown`` for exactly that reason.
         So the one limit that can really end a ``claude_agent`` run was
-        the one LabDog never mentioned.
+        the one unbork never mentioned.
 
         What an operator saw instead depended on where the CLI gave up.
         With a result message, ``_stop_reason`` reported "the backend

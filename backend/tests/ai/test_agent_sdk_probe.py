@@ -100,3 +100,19 @@ class TestTheProbeIsHonest:
         took on the single-shot backend."""
         source = Path("app/ai/agent_sdk/probe.py").read_text()
         assert "returned nothing" in source
+
+
+def test_the_version_named_is_the_programs_own(tmp_path) -> None:
+    """Not the build the SDK expects: an operator's program may differ (S-009)."""
+    from app.ai.agent_sdk.probe import program_version
+
+    downloaded = tmp_path / "2.1.0" / "claude"
+    downloaded.parent.mkdir()
+    downloaded.write_text("")
+    (downloaded.parent / "version").write_text("2.1.0 (Claude Code)\n")
+    assert program_version(downloaded) == "2.1.0 (Claude Code)"
+
+    own = tmp_path / "bin" / "claude"
+    own.parent.mkdir()
+    own.write_text("")
+    assert program_version(own) == str(own)

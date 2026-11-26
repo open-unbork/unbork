@@ -5,12 +5,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.users import current_active_user
+from app.auth.permissions import require
 from app.crypto.encryption import decrypt_ssh_key
 from app.crypto.key_management import get_master_key
 from app.db import get_db
 from app.hosts_mgmt.collector import collect_hosts_file
-from app.hosts_mgmt.diff import compute_hosts_diff
+from app.hosts_mgmt.diff import compute_hosts_diff, diff_entry_dict
 from app.hosts_mgmt.merge import get_effective_hosts_entries
 from app.models.host import Host
 from app.models.host_module_status import HostModuleStatus
@@ -45,7 +45,7 @@ class DriftSettingsRequest(BaseModel):
 @router.post("/hosts/{host_id}/drift-check", response_model=HostsDriftResponse)
 async def check_hosts_drift(
     host_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     """Manual drift check: collect current /etc/hosts and compare to desired."""
@@ -102,33 +102,9 @@ async def check_hosts_drift(
             host_id=host_id,
             status=hms.sync_status,
             has_changes=diff.has_changes,
-            entries_to_add=[
-                {
-                    "ip_address": e.ip_address,
-                    "hostname": e.hostname,
-                    "aliases": e.aliases,
-                    "reason": e.reason,
-                }
-                for e in diff.entries_to_add
-            ],
-            entries_to_remove=[
-                {
-                    "ip_address": e.ip_address,
-                    "hostname": e.hostname,
-                    "aliases": e.aliases,
-                    "reason": e.reason,
-                }
-                for e in diff.entries_to_remove
-            ],
-            entries_to_update=[
-                {
-                    "ip_address": e.ip_address,
-                    "hostname": e.hostname,
-                    "aliases": e.aliases,
-                    "reason": e.reason,
-                }
-                for e in diff.entries_to_update
-            ],
+            entries_to_add=[diff_entry_dict(e) for e in diff.entries_to_add],
+            entries_to_remove=[diff_entry_dict(e) for e in diff.entries_to_remove],
+            entries_to_update=[diff_entry_dict(e) for e in diff.entries_to_update],
             entries_in_sync=diff.entries_in_sync,
             checked_at=checked_at.isoformat(),
         )
@@ -155,7 +131,7 @@ async def check_hosts_drift(
 async def update_hosts_drift_settings(
     host_id: int,
     body: DriftSettingsRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Toggle hosts file drift checking for a host."""

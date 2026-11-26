@@ -1,7 +1,7 @@
 """Build and run the instant CPU/memory/disk queries for a host.
 
-Metrics are matched by the ``labdog_host_id`` external label that the
-Alloy install action stamps on every series (= LabDog's DB host id), so
+Metrics are matched by the ``unbork_host_id`` external label that the
+Alloy install action stamps on every series (= unbork's DB host id), so
 queries are immune to hostname/IP changes. PromQL builders are pure for
 easy testing; ``fetch_host_metrics`` runs them concurrently.
 """
@@ -25,24 +25,24 @@ def cpu_percent_query(host_id: int) -> str:
     # (memory/disk) and stops intermittently disappearing on refresh.
     return (
         f"100 - (avg(rate(node_cpu_seconds_total"
-        f'{{labdog_host_id="{host_id}",mode="idle"}}[5m])) * 100)'
+        f'{{unbork_host_id="{host_id}",mode="idle"}}[5m])) * 100)'
     )
 
 
 def cpu_cores_query(host_id: int) -> str:
-    return f'count(count by (cpu)(node_cpu_seconds_total{{labdog_host_id="{host_id}"}}))'
+    return f'count(count by (cpu)(node_cpu_seconds_total{{unbork_host_id="{host_id}"}}))'
 
 
 def mem_total_query(host_id: int) -> str:
-    return f'node_memory_MemTotal_bytes{{labdog_host_id="{host_id}"}}'
+    return f'node_memory_MemTotal_bytes{{unbork_host_id="{host_id}"}}'
 
 
 def mem_available_query(host_id: int) -> str:
-    return f'node_memory_MemAvailable_bytes{{labdog_host_id="{host_id}"}}'
+    return f'node_memory_MemAvailable_bytes{{unbork_host_id="{host_id}"}}'
 
 
 def _root_fs_selector(host_id: int) -> str:
-    return f'labdog_host_id="{host_id}",mountpoint="/",fstype!~"{_FS_EXCLUDE}"'
+    return f'unbork_host_id="{host_id}",mountpoint="/",fstype!~"{_FS_EXCLUDE}"'
 
 
 def disk_size_query(host_id: int) -> str:
@@ -129,15 +129,15 @@ async def fetch_host_metrics(client: PrometheusClient, host_id: int) -> HostMetr
 
 
 # ---------------------------------------------------------------------------
-# Fleet-wide: one query per resource, grouped by labdog_host_id.
+# Fleet-wide: one query per resource, grouped by unbork_host_id.
 # ---------------------------------------------------------------------------
 
-_ANY_HOST = 'labdog_host_id!=""'
+_ANY_HOST = 'unbork_host_id!=""'
 
 
 def fleet_cpu_percent_query() -> str:
     return (
-        "100 - (avg by (labdog_host_id)(rate(node_cpu_seconds_total"
+        "100 - (avg by (unbork_host_id)(rate(node_cpu_seconds_total"
         f'{{{_ANY_HOST},mode="idle"}}[5m])) * 100)'
     )
 
@@ -146,8 +146,8 @@ def fleet_memory_percent_query() -> str:
     # ``max by`` on both sides so a host scraped twice (two jobs, two
     # instances) still divides one series by one series.
     return (
-        "100 * (1 - (max by (labdog_host_id)(node_memory_MemAvailable_bytes"
-        f"{{{_ANY_HOST}}}) / max by (labdog_host_id)(node_memory_MemTotal_bytes"
+        "100 * (1 - (max by (unbork_host_id)(node_memory_MemAvailable_bytes"
+        f"{{{_ANY_HOST}}}) / max by (unbork_host_id)(node_memory_MemTotal_bytes"
         f"{{{_ANY_HOST}}})))"
     )
 
@@ -155,8 +155,8 @@ def fleet_memory_percent_query() -> str:
 def fleet_disk_percent_query() -> str:
     sel = f'{_ANY_HOST},mountpoint="/",fstype!~"{_FS_EXCLUDE}"'
     return (
-        "100 * (1 - (max by (labdog_host_id)(node_filesystem_avail_bytes"
-        f"{{{sel}}}) / max by (labdog_host_id)(node_filesystem_size_bytes{{{sel}}})))"
+        "100 * (1 - (max by (unbork_host_id)(node_filesystem_avail_bytes"
+        f"{{{sel}}}) / max by (unbork_host_id)(node_filesystem_size_bytes{{{sel}}})))"
     )
 
 
@@ -166,7 +166,7 @@ def _by_host(result: list[dict]) -> tuple[dict[int, float], float | None]:
     values: dict[int, float] = {}
     newest: float | None = None
     for series in result:
-        raw_id = series.get("metric", {}).get("labdog_host_id", "")
+        raw_id = series.get("metric", {}).get("unbork_host_id", "")
         try:
             host_id = int(raw_id)
             ts, val = series["value"]
@@ -183,7 +183,7 @@ async def fetch_fleet_metrics(
 ) -> tuple[list[FleetHostMetrics], float | None]:
     """Every known host's CPU, memory and disk percentages, plus the newest
     sample time. Hosts with no series at all are left out; a series for a
-    host id LabDog doesn't know (a deleted host still reporting) is too."""
+    host id unbork doesn't know (a deleted host still reporting) is too."""
     cpu_r, mem_r, disk_r = await asyncio.gather(
         client.query(fleet_cpu_percent_query()),
         client.query(fleet_memory_percent_query()),

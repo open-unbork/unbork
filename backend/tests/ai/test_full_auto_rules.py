@@ -1,4 +1,4 @@
-"""Which alerts may run at full auto: the labdog_ai_automate label, or rules.
+"""Which alerts may run at full auto: the unbork_ai_automate label, or rules.
 
 The parser and the matching need no database; the host and group
 conditions, the name check on save and the per-host view do.
@@ -146,9 +146,9 @@ class TestMatching:
         assert not rule.matches("DiskFull", {}, "web-1", {"web"})
 
     def test_host_names_ignore_case_labels_do_not(self) -> None:
-        (rule,) = parse_rules("labdog_ai_automate=true, host:WEB-1")
-        assert rule.matches("x", {"labdog_ai_automate": "true"}, "web-1", set())
-        assert not rule.matches("x", {"labdog_ai_automate": "True"}, "web-1", set())
+        (rule,) = parse_rules("unbork_ai_automate=true, host:WEB-1")
+        assert rule.matches("x", {"unbork_ai_automate": "true"}, "web-1", set())
+        assert not rule.matches("x", {"unbork_ai_automate": "True"}, "web-1", set())
 
     def test_not_equal_holds_when_the_label_is_missing(self) -> None:
         (rule,) = parse_rules("severity!=info")
@@ -168,30 +168,30 @@ class TestMatching:
 class TestModes:
     async def test_by_default_the_label_decides(self, db) -> None:
         host = await create_host(db)
-        assert await _matched(db, await _alert(db, host.id, labdog_ai_automate="true")) == (
-            "labdog_ai_automate=true"
+        assert await _matched(db, await _alert(db, host.id, unbork_ai_automate="true")) == (
+            "unbork_ai_automate=true"
         )
-        assert await _matched(db, await _alert(db, host.id, labdog_ai_automate="false")) is None
+        assert await _matched(db, await _alert(db, host.id, unbork_ai_automate="false")) is None
         assert await _matched(db, await _alert(db, host.id)) is None
 
     async def test_turning_the_rules_on_starts_from_the_label_rule(self, db) -> None:
         await _set(db, "ai.alert_full_auto_rules_enabled", "1")
         host = await create_host(db)
-        assert await _matched(db, await _alert(db, host.id, labdog_ai_automate="true")) == (
-            "labdog_ai_automate=true"
+        assert await _matched(db, await _alert(db, host.id, unbork_ai_automate="true")) == (
+            "unbork_ai_automate=true"
         )
 
     async def test_with_the_rules_on_the_label_counts_only_if_a_rule_says_so(self, db) -> None:
         await _rules(db, "DiskFull")
         host = await create_host(db)
-        assert await _matched(db, await _alert(db, host.id, labdog_ai_automate="true")) is None
+        assert await _matched(db, await _alert(db, host.id, unbork_ai_automate="true")) is None
 
     async def test_an_empty_list_lets_nothing_through(self, db) -> None:
         await _rules(db, "")
         host = await create_host(db)
-        assert await _matched(db, await _alert(db, host.id, labdog_ai_automate="true")) is None
+        assert await _matched(db, await _alert(db, host.id, unbork_ai_automate="true")) is None
 
-    async def test_hosts_and_groups_are_labdogs(self, db) -> None:
+    async def test_hosts_and_groups_are_unborks(self, db) -> None:
         db_group = await create_group(db, name="db")
         db1 = await create_host(db, hostname="db-1", group_ids=[db_group.id])
         legacy = await create_host(db, hostname="db-legacy", group_ids=[db_group.id])
@@ -210,9 +210,9 @@ class TestModes:
         monkeypatch.setattr(settings.alerts, "webhook_token", "t" * MIN_WEBHOOK_TOKEN_CHARS)
         await _set(db, "ai.alert_full_auto_requires_snapshot", "0")
         host = await create_host(db)
-        decided = await resolve(db, await _alert(db, host.id, labdog_ai_automate="true"))
+        decided = await resolve(db, await _alert(db, host.id, unbork_ai_automate="true"))
         assert decided.level == "full_auto"
-        assert decided.note == "Full auto: matched labdog_ai_automate=true."
+        assert decided.note == "Full auto: matched unbork_ai_automate=true."
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ class TestModes:
 
 
 class TestNames:
-    async def test_saving_a_rule_for_a_host_labdog_does_not_have_is_refused(self, db) -> None:
+    async def test_saving_a_rule_for_a_host_unbork_does_not_have_is_refused(self, db) -> None:
         await create_host(db, hostname="web-1")
         with pytest.raises(ValueError, match="no host named 'web-9'; no group named 'nope'"):
             await update_setting(
@@ -248,22 +248,22 @@ class TestNames:
 
 
 class TestResolveHost:
-    async def test_labdog_host_id_wins(self, db) -> None:
+    async def test_unbork_host_id_wins(self, db) -> None:
         named = await create_host(db, hostname="web-1", ip="10.0.0.5")
         target = await create_host(db, hostname="web-2", ip="10.0.0.6")
-        labels = {"labdog_host_id": str(target.id), "instance": "web-1:9100"}
+        labels = {"unbork_host_id": str(target.id), "instance": "web-1:9100"}
         assert await resolve_host(db, labels) == target.id
         assert named.id != target.id
 
     async def test_a_deleted_hosts_id_falls_back_to_the_names(self, db) -> None:
         host = await create_host(db, hostname="web-1")
-        labels = {"labdog_host_id": "999999", "labdog_hostname": "web-1"}
+        labels = {"unbork_host_id": "999999", "unbork_hostname": "web-1"}
         assert await resolve_host(db, labels) == host.id
 
-    async def test_labdog_hostname_before_the_conventional_labels(self, db) -> None:
+    async def test_unbork_hostname_before_the_conventional_labels(self, db) -> None:
         mine = await create_host(db, hostname="web-1", ip="10.0.0.5")
         other = await create_host(db, hostname="exporter", ip="10.0.0.9")
-        labels = {"labdog_hostname": "web-1", "instance": "10.0.0.9:9100"}
+        labels = {"unbork_hostname": "web-1", "instance": "10.0.0.9:9100"}
         assert await resolve_host(db, labels) == mine.id
         assert other.id != mine.id
 
@@ -281,13 +281,13 @@ class TestHostView:
         web = await create_group(db, name="web")
         host = await create_host(db, hostname="web-1", group_ids=[web.id])
         await create_host(db, hostname="db-1")
-        await _rules(db, "NginxDown, group:web\nDiskFull, host:db-1\nlabdog_ai_automate=true")
+        await _rules(db, "NginxDown, group:web\nDiskFull, host:db-1\nunbork_ai_automate=true")
         await db.commit()
 
         data = (await regular_user_client.get(f"/api/alerts/hosts/{host.id}")).json()
         assert data["ai_enabled"] is False
         assert data["rules_enabled"] is True
-        assert data["rules"] == ["NginxDown, group:web", "labdog_ai_automate=true"]
+        assert data["rules"] == ["NginxDown, group:web", "unbork_ai_automate=true"]
         blockers = " | ".join(data["blockers"])
         assert "alerts.intake_enabled" in blockers
         assert f"shorter than {MIN_WEBHOOK_TOKEN_CHARS}" in blockers

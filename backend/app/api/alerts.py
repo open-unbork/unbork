@@ -5,8 +5,8 @@ session. The list and the manual investigate button were under
 ``/api/ai/alerts`` before 1.0.0; those paths still answer, deprecated, for
 the life of 1.x (:mod:`app.api.ai`).
 
-The list of actions alerts may run (``/api/alerts/actions``) is LabDog's
-half of the ``labdog_action`` label (:mod:`app.alerts.labels`): Grafana
+The list of actions alerts may run (``/api/alerts/actions``) is unbork's
+half of the ``unbork_action`` label (:mod:`app.alerts.labels`): Grafana
 says which action an alert asks for, and only an action on this list, on
 a host inside its scope, is started. The list starts empty.
 """
@@ -30,8 +30,9 @@ from app.ai.schemas import AlertDispatchOut, AlertEventResponse
 from app.ai.service import AIDisabledError, BudgetExceededError
 from app.alerts.models import AlertAction, AlertActionDispatch
 from app.audit.logger import log_action
-from app.auth.users import current_active_user
+from app.auth.permissions import require, require_on
 from app.db import get_db
+from app.features import assistant_enabled
 from app.models.action_run import ActionRun
 from app.models.host import Host
 from app.models.host_group import HostGroup
@@ -46,6 +47,8 @@ from app.schemas.alerts import (
 from app.settings_service import get_setting_typed
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
+#: The assistant's routes here, included only when it is loaded (C-026).
+assistant_router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 # ---------------------------------------------------------------------------
@@ -169,13 +172,13 @@ async def list_alerts(
     limit: int = 100,
     status: str | None = None,
     host_id: int | None = None,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """Recent alerts, newest first.
 
     Ordered by ``created_at`` rather than ``starts_at``: an alert that
-    fired an hour ago but only reached LabDog now is new information to
+    fired an hour ago but only reached unbork now is new information to
     the operator reading this list, and burying it an hour down would
     hide exactly the case the poller exists to catch.
     """
@@ -188,18 +191,18 @@ async def list_alerts(
     return await _with_investigation(db, list(result.scalars().all()))
 
 
-@router.post("/{alert_id}/investigate", response_model=AlertEventResponse)
+@assistant_router.post("/{alert_id}/investigate", response_model=AlertEventResponse)
 async def investigate_alert_now(
     alert_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Start an investigation for one alert by hand.
 
     The manual path deliberately skips the labels — an operator asking
-    for this has already made the judgement labdog_ai exists to automate —
+    for this has already made the judgement unbork_ai exists to automate —
     but not the kill switch, the provider check, or
-    the budget. Those are about whether LabDog *may* spend, which a
+    the budget. Those are about whether unbork *may* spend, which a
     button press does not change. Nor does it change the autonomy level,
     which comes from the same remediation policy as an automatic start.
     """
@@ -248,10 +251,10 @@ async def investigate_alert_now(
 
 @router.get("/intake", response_model=AlertIntakeStatus)
 async def alert_intake_status(
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Whether alerts can reach LabDog, what they can set off, and when the
+    """Whether alerts can reach unbork, what they can set off, and when the
     last one arrived.
 
     The intake switch and the poll interval are settings; the webhook token
@@ -282,10 +285,12 @@ async def alert_intake_status(
         webhook_path="/api/webhooks/grafana-alerts",
         token_set=bool(token),
         token_long_enough_for_full_auto=len(token) >= MIN_WEBHOOK_TOKEN_CHARS,
-        ai_enabled=bool(int(await get_setting_typed("ai.enabled", db))),
-        auto_investigate_enabled=bool(
-            int(await get_setting_typed("ai.auto_investigate_enabled", db))
-        ),
+        source_allowlist=bool(settings.alerts.allowed_sources),
+        body_signature=bool(settings.alerts.webhook_hmac_secret),
+        # Both false without the assistant (C-026), whatever is stored.
+        ai_enabled=assistant_enabled() and bool(int(await get_setting_typed("ai.enabled", db))),
+        auto_investigate_enabled=assistant_enabled()
+        and bool(int(await get_setting_typed("ai.auto_investigate_enabled", db))),
         full_auto_rules_enabled=rules_enabled,
         full_auto_rules=len(rules),
         allowed_actions=allowed or 0,
@@ -298,7 +303,7 @@ async def alert_intake_status(
 @router.get("/hosts/{host_id}", response_model=HostAlertsResponse)
 async def host_alerts(
     host_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """What alerts may do to ``host_id``: the actions they may run, and
@@ -363,10 +368,10 @@ async def host_alerts(
                 )
             )
     return HostAlertsResponse(
-        ai_enabled=bool(int(await get_setting_typed("ai.enabled", db))),
-        auto_investigate_enabled=bool(
-            int(await get_setting_typed("ai.auto_investigate_enabled", db))
-        ),
+        # Both false without the assistant (C-026), whatever is stored.
+        ai_enabled=assistant_enabled() and bool(int(await get_setting_typed("ai.enabled", db))),
+        auto_investigate_enabled=assistant_enabled()
+        and bool(int(await get_setting_typed("ai.auto_investigate_enabled", db))),
         rules_enabled=rules_enabled,
         rules=applicable,
         blockers=blockers,
@@ -463,7 +468,7 @@ _DUPLICATE = "{key} is already on the list of actions alerts may run. Edit that 
 
 @router.get("/actions", response_model=list[AlertActionOut])
 async def list_alert_actions(
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     """The actions alerts may run, by action key."""
@@ -471,13 +476,28 @@ async def list_alert_actions(
     return [await _hydrate(db, entry) for entry in entries.all()]
 
 
+async def _require_run_on_target(user: User, body: AlertActionIn) -> None:
+    """Whoever lets alerts run an action must be able to run it there.
+
+    An alert-triggered run has no user of its own; the person who set up
+    the entry is the one answerable for it, so their own rights bound
+    where it may run.
+    """
+    if body.target_kind in ("host", "group") and body.target_id is not None:
+        key = "hosts" if body.target_kind == "host" else "groups"
+        await require_on(user, "actions.run", **{key: [body.target_id]})
+    else:
+        await require_on(user, "actions.run")
+
+
 @router.post("/actions", response_model=AlertActionOut, status_code=201)
 async def create_alert_action(
     body: AlertActionIn,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("alerts.manage")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Allow alerts to run an action: ``labdog_action=<key>`` then starts it."""
+    """Allow alerts to run an action: ``unbork_action=<key>`` then starts it."""
+    await _require_run_on_target(user, body)
     await _validate_entry(db, body)
     if await db.scalar(select(AlertAction.id).where(AlertAction.action_key == body.action_key)):
         raise HTTPException(status_code=409, detail=_DUPLICATE.format(key=body.action_key))
@@ -504,7 +524,7 @@ async def create_alert_action(
 @router.get("/actions/{entry_id}", response_model=AlertActionOut)
 async def get_alert_action(
     entry_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     return await _hydrate(db, await _get_entry(db, entry_id))
@@ -514,7 +534,7 @@ async def get_alert_action(
 async def update_alert_action(
     entry_id: int,
     body: AlertActionIn,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("alerts.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Change an entry. The action key cannot change: the label names it,
@@ -525,6 +545,7 @@ async def update_alert_action(
             status_code=422,
             detail="The action cannot change; take it off the list and allow the other one.",
         )
+    await _require_run_on_target(user, body)
     await _validate_entry(db, body)
     before = _audit_payload(entry)
     for field, value in body.model_dump(exclude={"action_key"}).items():
@@ -547,7 +568,7 @@ async def update_alert_action(
 @router.delete("/actions/{entry_id}", status_code=204)
 async def delete_alert_action(
     entry_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("alerts.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Take an action off the list. Alerts naming it are refused from now

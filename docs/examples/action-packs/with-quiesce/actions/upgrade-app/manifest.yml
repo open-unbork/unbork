@@ -1,0 +1,28 @@
+key: upgrade-app
+name: Upgrade app
+description: >-
+  Upgrades the app package. Before the snapshot, the quiesce playbook
+  limits the web server to loopback, stops the background worker and
+  checkpoints PostgreSQL, so nothing is written between the snapshot and
+  a possible rollback. The unquiesce playbook reopens it afterwards.
+icon: Database
+playbook: playbook.yml
+version: "1.0"
+estimated_duration: "2-5 min"
+destructive: true
+supports_group: false
+supports_host: true
+verify_playbook: verify.yml
+verify_timeout_seconds: 120
+quiesce_playbook: quiesce.yml
+unquiesce_playbook: unquiesce.yml
+quiesce_timeout_seconds: 300
+parameters:
+  - key: package
+    label: Package to upgrade
+    type: string
+    default: myapp
+  - key: worker_service
+    label: Background worker unit
+    type: string
+    default: myapp-worker

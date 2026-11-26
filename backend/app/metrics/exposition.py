@@ -5,7 +5,7 @@ Prometheus-compatible scraper, while OpenMetrics 1.0 adds a mandatory
 ``# EOF`` terminator and different counter-naming semantics that commonly
 cause "half the metrics vanished" when a renderer gets it slightly wrong.
 True OpenMetrics support (via ``Accept`` content negotiation) is a purely
-additive follow-up — see ``TODO.md``.
+additive follow-up.
 
 Why hand-rolled instead of ``prometheus_client``: that library's value is
 its registry, and ``app.metrics.collector.collect`` can't use it —
@@ -14,7 +14,7 @@ is sync. Worse, its in-process counters would be *wrong* under multiple
 uvicorn workers (each worker has its own memory), whereas every metric here
 is derived fresh from the database, so all workers report identical values.
 Its default registry also auto-registers process/GC/platform collectors
-that describe the (near-idle) API process — actively misleading as "LabDog
+that describe the (near-idle) API process — actively misleading as "unbork
 health". So the library would only have contributed ``CONTENT_TYPE_LATEST``
 and ~10 lines of escaping logic; not worth the dependency.
 
@@ -40,9 +40,9 @@ class Sample:
 
     ``suffix`` is appended to the family name to form the full metric name
     — ``""`` for gauges/counters (whose family name is already complete,
-    e.g. ``labdog_sync_jobs_total``), or ``"_bucket"`` / ``"_sum"`` /
+    e.g. ``unbork_sync_jobs_total``), or ``"_bucket"`` / ``"_sum"`` /
     ``"_count"`` for histogram components (whose family name is the base,
-    e.g. ``labdog_sync_job_duration_seconds``).
+    e.g. ``unbork_sync_job_duration_seconds``).
     """
 
     suffix: str

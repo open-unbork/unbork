@@ -43,6 +43,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ MAX_OUTPUT_BYTES = 1_048_576  # 1 MB
 @celery_app.task(
     bind=True,
     name="app.tasks.action_host.run_action_host",
-    queue="long_running",
+    queue="actions",
 )
 def run_action_host(self, action_run_id: int, host_run_id: int) -> dict:
     """Run ansible-runner for a single host within an action run.
@@ -71,7 +72,7 @@ def run_action_host(self, action_run_id: int, host_run_id: int) -> dict:
         A dict summarising the outcome, e.g.
         ``{"action_run_id": 1, "host_run_id": 2}``.
     """
-    asyncio.run(_run_action_host_async(action_run_id, host_run_id))
+    asyncio.run(with_task_engine(_run_action_host_async(action_run_id, host_run_id)))
     return {"action_run_id": action_run_id, "host_run_id": host_run_id}
 
 
@@ -81,7 +82,7 @@ def run_action_host(self, action_run_id: int, host_run_id: int) -> dict:
 
 
 async def _stored_host_key_entry(host_id: int) -> str | None:
-    """The SSH host key LabDog has recorded for *host_id*, if any.
+    """The SSH host key unbork has recorded for *host_id*, if any.
 
     Read in its own session immediately before the inventory is built:
     preflight connects over asyncssh and records the key on first
@@ -188,6 +189,16 @@ class _RunCtx:
     claimed: bool = False
     claimed_host_id: int | None = None
     step_log: list[str] = field(default_factory=list)
+    #: Quiesce bookkeeping. ``quiesced`` flips the moment the quiesce
+    #: playbook starts, since a quiesce that dies halfway may already have
+    #: closed the application; from then on every exit path must reach the
+    #: unquiesce playbook exactly once (``unquiesce_done``). What that
+    #: playbook needs is kept here because the failure paths only get ctx.
+    quiesced: bool = False
+    unquiesce_done: bool = False
+    hook_spec: "_RunSpec | None" = None
+    hook_inventory_json: str | None = None
+    hook_extra_vars: dict | None = None
 
 
 @dataclass
@@ -224,7 +235,7 @@ class _RunSpec:
     verify_enabled: bool
     auto_rollback: bool
     #: Manifest-declared post-run module syncs. Fired against the same
-    #: host after a successful, non-dry-run completion so labdog's desired
+    #: host after a successful, non-dry-run completion so unbork's desired
     #: state is re-enforced. See ``app.sync.post_run.queue_post_run_sync``.
     post_run_sync: tuple[str, ...]
     #: Manifest-declared post-run resource registrations. After success the
@@ -235,6 +246,10 @@ class _RunSpec:
     post_run_register: dict[str, tuple[dict, ...]]
     triggered_by_user_id: int | None
     master_key: bytes
+    #: Manifest quiesce hooks; both None for an action without them.
+    quiesce_playbook_path: str | None = None
+    unquiesce_playbook_path: str | None = None
+    quiesce_timeout: int = 300
 
 
 @dataclass
@@ -576,6 +591,9 @@ async def _load_run_spec(ctx: _RunCtx) -> _RunSpec | None:
             roles_paths=action.roles_paths,
             verify_playbook_path=action.verify_playbook_path,
             verify_timeout=action.verify_timeout_seconds,
+            quiesce_playbook_path=action.quiesce_playbook_path,
+            unquiesce_playbook_path=action.unquiesce_playbook_path,
+            quiesce_timeout=action.quiesce_timeout_seconds,
             ai_verify_prompt=action.ai_verify_prompt,
             ai_verify_fail_closed=action.ai_verify_fail_closed,
             playbook_timeout=action.playbook_timeout_seconds,
@@ -706,7 +724,7 @@ async def _build_inventory(
     from app.ansible_runtime.known_hosts import write_known_hosts
     from app.grafana.service import METRICS_DESTINATIONS_PARAM, build_metrics_extra_vars
 
-    # SEC-26: pin the run to the host key LabDog recorded over asyncssh.
+    # SEC-26: pin the run to the host key unbork recorded over asyncssh.
     # Read fresh rather than from the cached scalars in the spec, because
     # preflight runs in between and is what records the key on a host
     # contacted for the first time.
@@ -723,7 +741,7 @@ async def _build_inventory(
     dry_run = spec.parameters.pop(DRY_RUN_PARAM, False)
     picked_destinations = spec.parameters.pop(METRICS_DESTINATIONS_PARAM, None)
     # Fail closed before these become extra-vars. Ansible evaluates
-    # extra-vars on the controller — the LabDog host — not on the target, so
+    # extra-vars on the controller — the unbork host — not on the target, so
     # a template expression here is code execution here. The API rejects them
     # too; this catches rows that did not come through that path. See
     # app/actions/extra_vars.py.
@@ -737,7 +755,7 @@ async def _build_inventory(
     # stamps queryable labels) + this host's Grafana destinations (URL,
     # tenant, TLS flag) when the manifest opts in via ``metrics_backend``.
     # Operator-supplied values win over injected ones; identity is
-    # LabDog-owned and always wins.
+    # unbork-owned and always wins.
     _dest_vars, _identity_vars = await build_metrics_extra_vars(
         spec.host_id,
         spec.host_hostname,
@@ -815,7 +833,11 @@ async def _phase_a_snapshot(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> boo
             exc,
         )
         _log_step(ctx, f"[snapshot] FAILED: {exc}")
-        await _finish_early(ctx, "failed", error=f"Snapshot failed: {exc}", include_output=True)
+        error = f"Snapshot failed: {exc}"
+        unquiesced, unquiesce_error = await _unquiesce_if_needed(ctx, outcome="failed")
+        if not unquiesced:
+            error = f"{error}; {unquiesce_error}"
+        await _finish_early(ctx, "failed", error=error, include_output=True)
         return False
 
 
@@ -881,7 +903,7 @@ def _phase_b_playbook(
             )
 
     hb_thread = threading.Thread(
-        target=_heartbeat, name=f"labdog-hb-{ctx.host_run_id}", daemon=True
+        target=_heartbeat, name=f"unbork-hb-{ctx.host_run_id}", daemon=True
     )
     hb_thread.start()
     try:
@@ -949,6 +971,70 @@ async def _phase_d_verify(
     return await _verify_with_builtin_checks(ctx, spec, dry_run=dry_run)
 
 
+@dataclass
+class _SidePlaybookResult:
+    passed: bool
+    status: str
+    rc: int
+    output: str
+
+    @property
+    def detail(self) -> str:
+        return f"status={self.status}, rc={self.rc}"
+
+
+def _run_side_playbook(
+    ctx: _RunCtx,
+    spec: _RunSpec,
+    playbook_path: str,
+    *,
+    suffix: str,
+    inventory_json: str,
+    extra_vars: dict | None,
+    timeout: int,
+) -> _SidePlaybookResult:
+    """Run a second pack playbook (verify, quiesce, unquiesce) like the main one.
+
+    Same host, same pack roles, its own runner data dir beside
+    ``private_data_dir``. Raises whatever ansible-runner raises.
+    """
+    from app.ansible_runtime.runner import run_ansible
+
+    data_dir = ctx.private_data_dir + suffix
+    # Register before the call: run_ansible creates the dir, so it must
+    # be cleaned up even if the run raises.
+    ctx.extra_data_dirs.append(data_dir)
+    runner = run_ansible(
+        playbook_path=playbook_path,
+        inventory_json=inventory_json,
+        private_data_dir=data_dir,
+        extra_vars=extra_vars,
+        timeout=timeout,
+        roles_paths=list(spec.roles_paths) if spec.roles_paths else None,
+    )
+    output: str = runner.stdout.read() if hasattr(runner.stdout, "read") else str(runner.stdout)
+    return _SidePlaybookResult(
+        passed=runner.status == "successful",
+        status=runner.status,
+        rc=runner.rc,
+        output=output,
+    )
+
+
+def _log_side_output(ctx: _RunCtx, heading: str, output: str) -> None:
+    """Put a side playbook's output in the step log and, trimmed, in the live view."""
+    ctx.step_log.append(f"=== {heading} ===")
+    ctx.step_log.append(output)
+    _publish(
+        ctx,
+        {
+            "event": "output",
+            "host_run_id": ctx.host_run_id,
+            "text": f"=== {heading} ===\n" + output[-4000:],
+        },
+    )
+
+
 def _verify_with_pack_playbook(
     ctx: _RunCtx,
     spec: _RunSpec,
@@ -962,47 +1048,25 @@ def _verify_with_pack_playbook(
     counts as verification failure. Output is appended to the step log so
     the UI run view shows it distinctly from the main playbook.
     """
-    from app.ansible_runtime.runner import run_ansible
-
     try:
-        verify_data_dir = ctx.private_data_dir + "-verify"
-        # Register before the call: run_ansible creates the dir, so it must
-        # be cleaned up even if the run raises.
-        ctx.extra_data_dirs.append(verify_data_dir)
-        verify_runner = run_ansible(
-            playbook_path=spec.verify_playbook_path,
+        result = _run_side_playbook(
+            ctx,
+            spec,
+            spec.verify_playbook_path,
+            suffix="-verify",
             inventory_json=inventory_json,
-            private_data_dir=verify_data_dir,
             extra_vars=extra_vars,
             timeout=spec.verify_timeout,
-            roles_paths=list(spec.roles_paths) if spec.roles_paths else None,
         )
-        verify_output: str = (
-            verify_runner.stdout.read()
-            if hasattr(verify_runner.stdout, "read")
-            else str(verify_runner.stdout)
-        )
-        passed = verify_runner.status == "successful"
         _log_step(
             ctx,
-            f"[verify] pack playbook exit={verify_runner.rc} "
-            f"status={verify_runner.status} "
-            f"passed={passed}",
+            f"[verify] pack playbook exit={result.rc} "
+            f"status={result.status} "
+            f"passed={result.passed}",
         )
-        ctx.step_log.append("=== Verify playbook output ===")
-        ctx.step_log.append(verify_output)
-        _publish(
-            ctx,
-            {
-                "event": "output",
-                "host_run_id": ctx.host_run_id,
-                "text": "=== Verify playbook output ===\n" + verify_output[-4000:],
-            },
-        )
-        if not passed:
-            return False, (
-                f"Verify playbook failed (status={verify_runner.status}, rc={verify_runner.rc})"
-            )
+        _log_side_output(ctx, "Verify playbook output", result.output)
+        if not result.passed:
+            return False, f"Verify playbook failed ({result.detail})"
         return True, None
     except Exception as exc:
         logger.exception(
@@ -1013,6 +1077,118 @@ def _verify_with_pack_playbook(
         )
         _log_step(ctx, f"[verify] ERROR: {exc}")
         return False, f"Verify playbook error: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Quiesce and unquiesce — around the snapshot window
+# ---------------------------------------------------------------------------
+
+
+def _should_quiesce(spec: _RunSpec, env: _Envelope, *, dry_run: bool) -> bool:
+    """Whether this run closes the host before its snapshot.
+
+    Only when a snapshot will be attempted: the quiesce exists to make a
+    rollback lossless, and without a snapshot there is no rollback.
+    ``env.can_snapshot`` already implies a destructive action with
+    snapshots enabled and a VM mapping (``_load_envelope``).
+    """
+    return (
+        spec.quiesce_playbook_path is not None
+        and spec.unquiesce_playbook_path is not None
+        and spec.destructive
+        and spec.snapshot_enabled
+        and not dry_run
+        and env.can_snapshot
+    )
+
+
+def _phase_q_quiesce(
+    ctx: _RunCtx, spec: _RunSpec, *, inventory_json: str, extra_vars: dict | None
+) -> str | None:
+    """Run the quiesce playbook. Returns None on success, else the error."""
+    ctx.hook_spec = spec
+    ctx.hook_inventory_json = inventory_json
+    ctx.hook_extra_vars = dict(extra_vars or {})
+    # Before the call, not after: a quiesce that fails or hangs halfway may
+    # already have closed the application.
+    ctx.quiesced = True
+    _log_step(ctx, "[quiesce] closing the host to writes before the snapshot")
+    try:
+        result = _run_side_playbook(
+            ctx,
+            spec,
+            spec.quiesce_playbook_path,
+            suffix="-quiesce",
+            inventory_json=inventory_json,
+            extra_vars=ctx.hook_extra_vars,
+            timeout=spec.quiesce_timeout,
+        )
+    except Exception as exc:
+        logger.exception(
+            "action_host: quiesce playbook errored for action_run %d host %d",
+            ctx.action_run_id,
+            spec.host_id,
+        )
+        _log_step(ctx, f"[quiesce] ERROR: {exc}")
+        return f"Quiesce failed: {exc}"
+    _log_step(ctx, f"[quiesce] exit={result.rc} status={result.status} passed={result.passed}")
+    _log_side_output(ctx, "Quiesce playbook output", result.output)
+    if not result.passed:
+        return f"Quiesce failed ({result.detail})"
+    return None
+
+
+async def _unquiesce_if_needed(ctx: _RunCtx, *, outcome: str) -> tuple[bool, str | None]:
+    """Reopen the host if this run quiesced it and has not reopened it yet.
+
+    Every exit path after the quiesce started calls this; the first call
+    runs the playbook and later ones do nothing. Never
+    raises, except to let a Celery soft timeout through, in which case the
+    driver's ``finally`` tries again within the hard-limit margin.
+
+    Returns ``(ok, error)``.
+    """
+    from celery.exceptions import SoftTimeLimitExceeded
+
+    from app.actions.manifest import RUN_OUTCOME_VAR
+
+    if not ctx.quiesced or ctx.unquiesce_done or ctx.hook_spec is None:
+        return True, None
+    ctx.unquiesce_done = True
+    spec = ctx.hook_spec
+    _log_step(ctx, f"[unquiesce] reopening the host (outcome={outcome})")
+    try:
+        result = _run_side_playbook(
+            ctx,
+            spec,
+            spec.unquiesce_playbook_path,
+            suffix="-unquiesce",
+            inventory_json=ctx.hook_inventory_json or "",
+            extra_vars={**(ctx.hook_extra_vars or {}), RUN_OUTCOME_VAR: outcome},
+            timeout=spec.quiesce_timeout,
+        )
+    except SoftTimeLimitExceeded:
+        ctx.unquiesce_done = False
+        raise
+    except Exception as exc:
+        logger.exception(
+            "action_host: unquiesce playbook errored for action_run %d host %d",
+            ctx.action_run_id,
+            spec.host_id,
+        )
+        _log_step(ctx, f"[unquiesce] ERROR: {exc}")
+        return False, (
+            f"Unquiesce failed: {exc}. The application may still be closed; "
+            "run the action's unquiesce playbook by hand."
+        )
+    _log_step(ctx, f"[unquiesce] exit={result.rc} status={result.status} passed={result.passed}")
+    _log_side_output(ctx, "Unquiesce playbook output", result.output)
+    if not result.passed:
+        return False, (
+            f"Unquiesce failed ({result.detail}). The application may still be "
+            "closed; run the action's unquiesce playbook by hand."
+        )
+    return True, None
 
 
 async def _verify_with_builtin_checks(
@@ -1085,13 +1261,11 @@ async def _verify_with_builtin_checks(
 # ---------------------------------------------------------------------------
 
 
-async def _phase_ef_rollback_or_cleanup(
-    ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool
-) -> None:
-    """Roll the snapshot back on failure, delete it on success."""
+async def _phase_e_rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool) -> bool:
+    """Roll the snapshot back on failure. Returns whether the VM was reverted."""
     if not success and env.has_snapshot and spec.auto_rollback:
-        await _rollback(ctx, spec, env)
-    elif not success and env.snapshot_name is not None and not spec.auto_rollback:
+        return await _rollback(ctx, spec, env)
+    if not success and env.snapshot_name is not None and not spec.auto_rollback:
         # Snapshot present but auto_rollback=False — leave it in place so the
         # operator can inspect/revert manually. Logged so the run output
         # reflects the choice rather than silently keeping it.
@@ -1100,11 +1274,39 @@ async def _phase_ef_rollback_or_cleanup(
             f"[rollback] skipped — auto_rollback=false "
             f"(snapshot {env.snapshot_name} retained for manual recovery)",
         )
-    elif success and env.has_snapshot:
+    return False
+
+
+async def _phase_f_cleanup(
+    ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool, rolled_back: bool = False
+) -> None:
+    """Delete the snapshot after a successful run, or after a rollback restored it.
+
+    Runs after the unquiesce, so a host left closed can keep its snapshot:
+    the driver skips this call then.
+    """
+    if not env.has_snapshot:
+        return
+    if success:
         await _delete_snapshot(ctx, spec, env, note="deleted")
+    elif rolled_back:
+        await _delete_snapshot(ctx, spec, env, note="deleted after rollback")
 
 
-async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> None:
+async def _phase_ef_rollback_or_cleanup(
+    ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, success: bool
+) -> None:
+    """Roll the snapshot back on failure, delete it on success.
+
+    The driver calls the two halves itself so the unquiesce can sit between
+    them; this stays for callers that have no quiesce.
+    """
+    rolled_back = await _phase_e_rollback(ctx, spec, env, success=success)
+    await _phase_f_cleanup(ctx, spec, env, success=success, rolled_back=rolled_back)
+
+
+async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> bool:
+    """Revert the VM to the run's snapshot. Returns whether it succeeded."""
     from sqlalchemy import select
 
     from app.db import task_session
@@ -1127,8 +1329,8 @@ async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> None:
             )
             await db.commit()
         _log_step(ctx, f"[rollback] success={rb.get('success')} {rb.get('error', '')}".strip())
-        if rb.get("success"):
-            await _delete_snapshot(ctx, spec, env, note="deleted after rollback")
+        # The snapshot is deleted by _phase_f_cleanup, after the unquiesce.
+        return bool(rb.get("success"))
     except Exception as exc:
         logger.exception(
             "action_host: rollback failed for action_run %d host %d: %s",
@@ -1137,6 +1339,7 @@ async def _rollback(ctx: _RunCtx, spec: _RunSpec, env: _Envelope) -> None:
             exc,
         )
         _log_step(ctx, f"[rollback] ERROR: {exc}")
+        return False
 
 
 async def _delete_snapshot(ctx: _RunCtx, spec: _RunSpec, env: _Envelope, *, note: str) -> None:
@@ -1350,6 +1553,38 @@ async def _on_failure(ctx: _RunCtx, exc: Exception) -> None:
     _publish_status(ctx, "failed")
 
 
+async def _unquiesce_after_abort(ctx: _RunCtx) -> None:
+    """Run a pending unquiesce on an abnormal exit, and note a failure on the row."""
+    from sqlalchemy import select
+
+    from app.db import task_session
+    from app.models.action_run import ActionHostRun
+
+    if not ctx.quiesced or ctx.unquiesce_done:
+        return
+    try:
+        ok, error = await _unquiesce_if_needed(ctx, outcome="failed")
+    except Exception:  # a second soft timeout, or anything else
+        logger.exception(
+            "action_host: unquiesce after abort raised for host_run %d", ctx.host_run_id
+        )
+        ok, error = False, "Unquiesce did not finish; the application may still be closed."
+    try:
+        async with task_session() as db:
+            hr = (
+                await db.execute(select(ActionHostRun).where(ActionHostRun.id == ctx.host_run_id))
+            ).scalar_one_or_none()
+            if hr is not None:
+                if not ok:
+                    hr.error_message = f"{hr.error_message or 'failed'}; {error}"
+                hr.output = "\n".join(ctx.step_log)
+                await db.commit()
+    except Exception:
+        logger.exception(
+            "action_host: could not record the unquiesce for host_run %d", ctx.host_run_id
+        )
+
+
 async def _release_host(ctx: _RunCtx) -> None:
     """Close the parent run, then hand the host to the next pending op.
 
@@ -1437,7 +1672,7 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         host_run_id=host_run_id,
         channel=f"actions.run.{action_run_id}",
         r=redis_lib.from_url(settings.redis.url),
-        private_data_dir=tempfile.mkdtemp(prefix="labdog-action-"),
+        private_data_dir=tempfile.mkdtemp(prefix="unbork-action-"),
     )
 
     try:
@@ -1452,7 +1687,7 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         # leaked, the ActionHostRun stayed "queued" forever, and dispatch-next
         # never fired — wedging that host's queue.
         key_dir = "/dev/shm" if Path("/dev/shm").is_dir() else None
-        fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix="labdog-action-", suffix=".key")
+        fd, ssh_key_path = tempfile.mkstemp(dir=key_dir, prefix="unbork-action-", suffix=".key")
         os.close(fd)
         ctx.ssh_key_path = ssh_key_path
 
@@ -1480,6 +1715,28 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         timeout = effective_playbook_timeout(spec.playbook_timeout)
 
         _publish_status(ctx, "running", host_id=spec.host_id)
+
+        if _should_quiesce(spec, env, dry_run=dry_run):
+            quiesce_error = _phase_q_quiesce(
+                ctx, spec, inventory_json=inventory_json, extra_vars=extra_vars
+            )
+            if quiesce_error is not None:
+                # No snapshot exists yet, so nothing else runs; reopen what
+                # the quiesce may already have closed.
+                unquiesced, unquiesce_error = await _unquiesce_if_needed(ctx, outcome="failed")
+                if not unquiesced:
+                    quiesce_error = f"{quiesce_error}; {unquiesce_error}"
+                await _finish_early(ctx, "failed", error=quiesce_error, include_output=True)
+                return
+            # The main and verify playbooks learn the host is quiesced, so
+            # their own health checks can accept a closed front door.
+            from app.actions.manifest import QUIESCED_VAR  # noqa: PLC0415
+
+            extra_vars = {**(extra_vars or {}), QUIESCED_VAR: True}
+            # Seam for the rollback policy (C-004): a stateful host whose
+            # rollback mode comes only from the ``stateful`` default may roll
+            # back automatically when ``ctx.quiesced`` is true, since nothing
+            # was written in the window.
 
         if dry_run:
             # Check mode changes nothing, so there is nothing to snapshot,
@@ -1515,7 +1772,36 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         elif not verification_passed:
             error_msg = verification_error
 
-        await _phase_ef_rollback_or_cleanup(ctx, spec, env, success=success)
+        rolled_back = await _phase_e_rollback(ctx, spec, env, success=success)
+        if success:
+            outcome = "succeeded"
+        elif rolled_back:
+            outcome = "rolled_back"
+        else:
+            outcome = "failed"
+        unquiesced, unquiesce_error = await _unquiesce_if_needed(ctx, outcome=outcome)
+        if not unquiesced:
+            if success:
+                # Keep the snapshot and do not roll back: the upgrade itself
+                # worked, and a revert would also lose the reopen's evidence.
+                success = False
+                error_msg = unquiesce_error
+                if env.has_snapshot:
+                    _log_step(
+                        ctx,
+                        f"[cleanup] snapshot {env.snapshot_name} kept — unquiesce failed",
+                    )
+            else:
+                error_msg = f"{error_msg}; {unquiesce_error}"
+                if rolled_back and env.has_snapshot:
+                    _log_step(
+                        ctx,
+                        f"[cleanup] snapshot {env.snapshot_name} kept — unquiesce failed",
+                    )
+        # A host still closed keeps the snapshot it was restored to.
+        await _phase_f_cleanup(
+            ctx, spec, env, success=success, rolled_back=rolled_back and unquiesced
+        )
         await _phase_g_persist(
             ctx,
             spec,
@@ -1534,5 +1820,8 @@ async def _run_action_host_async(action_run_id: int, host_run_id: int) -> None:
         raise
 
     finally:
+        # A raise or a soft timeout after the quiesce started: reopen the
+        # host before handing it on. Never masks the original error.
+        await _unquiesce_after_abort(ctx)
         await _release_host(ctx)
         _remove_workspaces(ctx)

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
+import { can, useAuth } from "@/lib/auth"
 import { shortAgo, untilLabel } from "@/lib/fleet"
 import { useNow } from "@/hooks/use-now"
 import { actionLabel, BAD, durationLabel, failStreak, scheduleName, tallyLabel, useFailedRuns, useSchedules, useStuckOperations } from "@/lib/overview"
@@ -55,11 +56,14 @@ export interface PendingItem {
   open: string
   /** A failed run, for Investigate with AI. */
   run?: ActionRun
-  /** A stuck operation, for Cancel. */
+  /** A stuck operation, for Cancel and Investigate with AI. */
   stuck?: StuckOperation
+  /** The one drifted host, for Investigate with AI. Unset when several
+   *  have drifted: the Drift page has a button per finding. */
+  driftHost?: { id: number; hostname: string }
 }
 
-const STORAGE_KEY = "labdog:pending-dismissed"
+const STORAGE_KEY = "unbork:pending-dismissed"
 
 function readDismissed(): Record<string, number> {
   try {
@@ -70,11 +74,14 @@ function readDismissed(): Record<string, number> {
 }
 
 export function usePendingQueue(enabled = true) {
+  const { user } = useAuth()
   const q = { refetchInterval: 30_000, retry: false, enabled }
   const approvals = useQuery<AIApprovalRequest[]>({
     queryKey: ["ai-approvals"],
     queryFn: () => apiFetch<AIApprovalRequest[]>("/api/ai/approvals?status=pending"),
     ...q,
+    // A viewer has no ai.use and would get a 403 every poll.
+    enabled: enabled && can(user, "ai.use"),
   })
   const alerts = useQuery<AlertEvent[]>({
     queryKey: ["alerts", "firing"],
@@ -244,7 +251,8 @@ export function usePendingQueue(enabled = true) {
       })
     }
 
-    const drifted = (hosts.data ?? []).filter((h) => h.sync_status === "out_of_sync").map((h) => h.hostname)
+    const driftedHosts = (hosts.data ?? []).filter((h) => h.sync_status === "out_of_sync")
+    const drifted = driftedHosts.map((h) => h.hostname)
     if (drifted.length > 0) {
       out.push({
         id: "drift",
@@ -259,6 +267,7 @@ export function usePendingQueue(enabled = true) {
         dismissible: false,
         hosts: drifted,
         open: "Review",
+        driftHost: driftedHosts.length === 1 ? { id: driftedHosts[0].id, hostname: driftedHosts[0].hostname } : undefined,
       })
     }
 
@@ -302,11 +311,13 @@ export interface SettledItem {
  * were decided or ran out, alerts that resolved. Newest first.
  */
 export function useSettled(hours = 24) {
+  const { user } = useAuth()
   const q = { refetchInterval: 60_000, retry: false }
   const approvals = useQuery<AIApprovalRequest[]>({
     queryKey: ["ai-approvals", "all"],
     queryFn: () => apiFetch<AIApprovalRequest[]>("/api/ai/approvals?status=all&limit=100"),
     ...q,
+    enabled: can(user, "ai.use"),
   })
   const alerts = useQuery<AlertEvent[]>({
     queryKey: ["alerts", "resolved"],

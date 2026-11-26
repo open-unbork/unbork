@@ -1,20 +1,20 @@
-# LabDog Development Guide
+# unbork Development Guide
 
 ## Project Overview
 
-LabDog is a centralized Linux configuration management tool with a FastAPI backend and Next.js frontend. It manages firewall rules, services, packages, users, cron jobs, DNS resolver config, and /etc/hosts via Ansible playbooks synced over SSH.
+unbork is a centralized Linux configuration management tool with a FastAPI backend and Next.js frontend. It manages firewall rules, services, packages, users, cron jobs, DNS resolver config, and /etc/hosts via Ansible playbooks synced over SSH.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.12+, FastAPI, SQLAlchemy (async), asyncpg |
-| Frontend | Next.js 16 (App Router, static export), the LabDog kit (`components/ld`), TanStack Query |
+| Frontend | Next.js 16 (App Router, static export), the unbork kit (`components/ld`), TanStack Query |
 | Database | PostgreSQL 18 |
 | Task Queue | Celery + Redis (RedBeat scheduler) |
 | Config Mgmt | Ansible (ansible-runner) |
 | SSH | asyncssh (terminal + host connections) |
-| Testing | pytest + testcontainers (backend), Playwright (frontend E2E) |
+| Testing | pytest + testcontainers (backend), Vitest (frontend unit), Playwright (frontend E2E) |
 
 ## Development Setup
 
@@ -32,19 +32,31 @@ cd frontend && npm install
 
 ## Running Tests
 
-### Backend (326 tests)
+### Backend
+`pytest tests/ --collect-only -q | tail -1` prints the current test count.
 ```bash
 cd backend
 source .venv/bin/activate
 pytest tests/ -v                                # everything, integration included
 pytest tests/ -v -m "not integration"           # skip the git round-trip tests
+pytest tests/ -q --cov --cov-report=term        # with coverage (as CI measures it)
 ```
 
-Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`LABDOG_SECURITY__SECRET_KEY`, `LABDOG_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
+Tests use testcontainers to auto-spin a PostgreSQL instance. The conftest.py `pytest_configure` hook sets test-safe security env vars (`UNBORK_SECURITY__SECRET_KEY`, `UNBORK_SECURITY__ENCRYPTION_KEY`) before app modules are imported.
 
 **Test session architecture**: Each test gets a database session wrapped in a savepoint that rolls back after the test. The `get_db` dependency is overridden to return this test session. Any `session.commit()` in application code translates to savepoint release/create (not actual commit) via `join_transaction_mode="create_savepoint"`.
 
 **Important**: The `auth_setup.py` register endpoint uses `AsyncSessionLocal()` directly (not `get_db`) for its user count check. This is intentional — it avoids asyncpg "another operation in progress" errors when sharing a session with `user_manager.create()`. Tests that need to test registration must mock `AsyncSessionLocal` in `app.api.auth_setup`.
+
+### Frontend unit
+```bash
+cd frontend
+npm test                     # Vitest, no stack needed
+npm run test:watch           # re-run on change
+```
+
+Unit tests are `*.test.ts(x)` next to the code under `lib/`,
+`components/` and `hooks/`; see `frontend/FRONTEND.md`, "Unit tests".
 
 ### Frontend E2E
 ```bash
@@ -55,7 +67,14 @@ npx playwright test --ui     # interactive mode
 
 ## Configuration
 
-Settings are loaded from `dev/labdog.toml` (dev — set via `LABDOG_CONFIG` env var by `dev.sh`), or `/etc/labdog/labdog.toml` (production). Environment variables override TOML settings using `LABDOG_` prefix with `__` separators (e.g., `LABDOG_SECURITY__SECRET_KEY`).
+Settings are loaded from `dev/unbork.toml` (dev — set via `UNBORK_CONFIG` env var by `dev.sh`), or `/etc/unbork/unbork.toml` (production). Environment variables override TOML settings using `UNBORK_` prefix with `__` separators (e.g., `UNBORK_SECURITY__SECRET_KEY`).
+
+The names from before the rename are not read anywhere (D-29 in
+`planning/DECISIONS.md`): the startup error lists any old variable or
+config file it finds, and `docs/upgrade.md` maps old names to new.
+`backend/tests/test_old_name.py` fails when the old name reappears outside
+the changelog, the upgrade guide, old migrations and `planning/`; a line
+that needs it on purpose carries the marker `old-name-ok`.
 
 **Required secrets** (validated at startup — insecure defaults are rejected):
 - `security.secret_key` — JWT signing key
@@ -69,8 +88,8 @@ Each configuration module follows: **model → schemas → merge engine → API 
 ### Firewall backends
 Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app/models/host.py` defines: `nftables`, `iptables`, `unknown`.
 
-- **iptables** isolates LabDog's rules in dedicated `LABDOG-INPUT` /
-  `LABDOG-OUTPUT` chains jumped from the base chains (so a reapply/flush never
+- **iptables** isolates unbork's rules in dedicated `UNBORK-INPUT` /
+  `UNBORK-OUTPUT` chains jumped from the base chains (so a reapply/flush never
   clobbers Docker's or other tools' base-chain rules). **nftables** instead owns
   the whole `inet filter` table (delete + recreate) — table-level isolation is
   the nftables-idiomatic equivalent, since tables are independent and every
@@ -81,14 +100,15 @@ Only `nftables` and `iptables` are supported. The `FirewallBackend` enum in `app
   only runs while `host.firewall_backend == "unknown"` — an operator-set or
   previously-detected value is authoritative (operator override + stickiness are
   enforced at that gate). Because both binaries are usually installed, the
-  greenfield choice is a first-match ladder: single-installed → LabDog-marker
-  stickiness → container-runtime constraint (Docker/kube-proxy/nerdctl force
-  iptables) → active-ruleset → default nftables.
-- **Dual-stack hosts:** every firewall sync tears down LabDog's footprint in the
+  greenfield choice is a first-match ladder: single-installed → marker
+  stickiness (`UNBORK-*` chains, `Managed by unbork` comments) →
+  container-runtime constraint (Docker/kube-proxy/nerdctl force iptables) →
+  active-ruleset → default nftables.
+- **Dual-stack hosts:** every firewall sync tears down unbork's footprint in the
   *inactive* backend (`_iptables_teardown_task` / `_nftables_teardown_task` in
   `app/ansible_runtime/generator.py`), and collection surfaces a competing-store
   warning (`_probe_competing_firewall_store`) so stale rules can't hide in the
-  store LabDog isn't reading.
+  store unbork isn't reading.
 
 ### Priority-based merge
 Groups have priorities (higher number wins). When a host belongs to multiple groups, configurations merge with higher-priority groups winning conflicts. Host-level overrides always win.
@@ -135,16 +155,16 @@ Network scanning is async via Celery tasks. Bulk-add requires SSH verification �
 
 ### Action packs (BYO playbooks)
 Action playbooks are supplied by pluggable packs, not the hardcoded
-registry. **Nothing pack-supplied ships with LabDog**: packs are
+registry. **Nothing pack-supplied ships with unbork**: packs are
 `action_packs` rows, configured from the UI at `/actions?tab=packs`
 (Operations → Actions → Packs), synced at FastAPI lifespan + Celery
 `worker_ready`, and can be git-backed (public, SSH-key, or HTTPS-PAT) or
 local-filesystem. Until a pack has synced, the registry holds only the
 built-in pseudo-actions (`_builtin.*`, `app/actions/builtins.py`).
 
-A fresh install seeds one pack, `labdog-playbooks`, pointing at
-[`open-labdog/labdog-playbooks`](https://github.com/open-labdog/labdog-playbooks)
-`main` (git repo + pack rows in `alembic 0001`). It is an ordinary pack:
+A fresh install seeds one pack, `unbork-playbooks`, pointing at
+[`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
+`main` (git repo + pack rows in `alembic 0001`, renamed in `0062`). It is an ordinary pack:
 operators edit, disable or delete it like any other, and re-add it by
 hand. A site without GitHub access points that repository at an internal
 mirror, or adds a local-directory pack. There used to be a "bundled"
@@ -175,22 +195,22 @@ See `app/packs/` for the subsystem, the user guide at
 `docs/ui/actions.md`, and starter packs at `docs/examples/action-packs/`.
 Backend tests that need real actions use the `sample_pack` fixture
 (`tests/fixtures/packs/sample`, registered as a local pack). Dev:
-`LABDOG_PLAYBOOKS_LOCAL=/path/to/labdog-playbooks ./dev/dev.sh start`
+`UNBORK_PLAYBOOKS_LOCAL=/path/to/unbork-playbooks ./dev/dev.sh start`
 registers a working copy as a local pack (and disables the seeded git
 pack) for iterating on playbooks without pushing.
 
 The Python runtime that consumes packs (playbook generation,
 ansible-runner) lives at `backend/app/ansible_runtime/` and is part of
-the labdog source tree.
+the unbork source tree.
 
 ### Celery workers and queues
 
 Three subprocesses, all children of the main process
 (`app/celery_manager.py`):
 
-- **`work`** — `-Q default,long_running`. Everything except the run
-  orchestrator: syncs, drift, discovery, and the per-host half of every
-  action run.
+- **`work`** — `-Q default,long_running,drift,actions`. Everything except
+  the run orchestrator: syncs, drift, discovery, and the per-host half of
+  every action run.
 - **`orchestrator`** — `-Q orchestrator`. Runs only
   `app.tasks.action_orchestrator.run_action`.
 - **`beat`** — the RedBeat scheduler, standalone. It used to be embedded
@@ -199,14 +219,47 @@ Three subprocesses, all children of the main process
   `/health/ready` stayed green because the worker itself was fine
   (BUG-83). As a peer it is under the same `poll()` as the workers.
 
-The split is load-bearing, not tidiness. `run_action` dispatches per-host
-children to `long_running` and then blocks in `result.join()` until they
+That is the default `all` role. `python -m app --role` (or
+`UNBORK_ROLE`) runs a subset instead — `api`, `beat`, `orchestrator`,
+`worker` (`default,long_running`), `worker-drift` (`drift`) or
+`worker-actions` (`actions`) — so a
+deployment can run each in its own container from the same image and
+scale workers with `--scale` (`app/celery_manager.py::ROLE_PROCESSES`,
+`docs/scaling-out.md`). Only `api`/`all` migrate; the rest wait for the
+schema. Drift sweeps fan out one `drift_sweep.check_host_module` task per
+host on the `drift` queue rather than walking hosts serially. An action
+run's children (`action_host`, `action_group`, `builtin_dispatchers`) go
+to `actions` (`CHILD_QUEUE`), so a bulk-sync backlog on `long_running`
+cannot hold them back. An extension's own tasks may use any of these
+queues except `orchestrator` (`app/tasks/extensions.py`).
+
+The orchestrator split is load-bearing, not tidiness. `run_action` dispatches per-host
+children to `actions` and then blocks in `result.join()` until they
 finish, so an orchestrator sharing that pool competes with the very work
 it is waiting for. Do not route anything else to `orchestrator`, and do
 not remove the `-n <name>@%h` node names — the `worker_ready` handlers use
 them to avoid doing pack sync twice. `tests/test_orchestrator_queue.py`
 asserts the separation; `tests/test_task_routing.py` asserts every task
 lands on a queue some worker consumes.
+
+### Leaving the assistant out
+
+`[assistant] enabled = false` (`UNBORK_ASSISTANT__ENABLED`), read at start
+through `app.features.assistant_enabled()`, leaves the assistant unloaded;
+an image built with `--build-arg WITH_ASSISTANT=0` also drops the Agent
+SDK and the two assistant pages, and writes `app/_built_without_assistant`
+so no config can turn it back on. Off: `app.api.ai` and the two
+`assistant_router`s (`api/alerts.py`, `api/actions.py`) are not included,
+`AI_TASK_MODULES` are not in `conf.include` and beat deletes their
+`AI_ENTRY_NAMES`, `ai.*` settings are not served, `/api/users/me` omits
+`ai.use`/`ai.approve`, `resolve_provider()` refuses (an AI verify step ends
+inconclusive), `wants_ai()` is false, the AI built-ins and notification
+events are not offered. `GET /api/version` carries `features`, which
+`frontend/lib/features.ts` reads. The package and its tables stay
+(`AlertEvent`, `AIRollback`, `redact` are used elsewhere). New AI code
+needs the same guard; tests under `tests/ai/` are marked
+`needs_assistant` and skip when it is off, and CI runs the whole suite
+that way (`backend-test-no-assistant`).
 
 ### Group-dispatch actions
 
@@ -215,7 +268,7 @@ single-host inventory + parallelism). Actions whose manifest declares
 `supports_host: false` are dispatched as a single ansible-playbook
 invocation against a flat `all` Ansible inventory of every member of
 the targeted group (no `children`/`control_plane`/`workers` shaping —
-labdog has no per-member roles). The pack's playbook owns all
+unbork has no per-member roles). The pack's playbook owns all
 cluster-wide coordination via Ansible primitives (`serial:`,
 `add_host`, `delegate_to`, `run_once`). The first concrete user is
 `k8s-upgrade`, which probes for
@@ -258,12 +311,16 @@ either claims the host (status → `running`) or defers (status →
 pending op for that host (FIFO across both queues by `created_at`)
 and re-dispatches it. The advisory lock is held only for the
 check-and-flip — the actual "host is busy" state lives in the row
-statuses. Group-targeted actions acquire locks for all members in
-sorted-host-id order to avoid deadlock against overlapping group
-ops. The built-in `_builtin.sync` opts out of the outer lock (its
-inner `run_host_sync.apply()` already participates via the sync
-orchestrator) — see the comment on `with_lock=` in
-`builtin_dispatchers.py`.
+statuses. A row an extension's run gate deferred (`app/run_gate.py`) stays
+`pending` but *held* (`gate_retry_at` in the future): it is not a queue
+candidate until then, so it never stalls the host, and
+`app/tasks/run_gate_retry.py` sends it again when it is due. A gated
+op that does not start hands its hosts on, like a finishing one.
+Group-targeted actions acquire locks for all members in sorted-host-id
+order to avoid deadlock against overlapping group ops. The built-in
+`_builtin.sync` opts out of the outer lock (its inner
+`run_host_sync.apply()` already participates via the sync orchestrator)
+— see the comment on `with_lock=` in `builtin_dispatchers.py`.
 
 The seven periodic drift sweeps participate too, but as *readers*
 rather than claimants: `app/tasks/drift_sweep.py::sweep_module` asks
@@ -274,6 +331,160 @@ Each module supplies only a `check_one(host, hms, db)` body that writes
 into the session and never commits — the driver owns the transaction,
 because throwing it away is how a mid-check claim is handled.
 
+### Access control
+
+Every account has a role: `admin`, `operator` or `viewer` (`users.role`;
+NULL means no role and grants nothing). Roles map onto a fixed permission
+catalog in `app/auth/permissions.py` (`hosts.view`, `config.edit`,
+`sync.run`, `actions.run`, `terminal.open`, `integrations.manage`,
+`settings.manage`, `users.manage`, ...), and that dict is the only place a
+role name means anything. An extension can add names of its own
+(`register_permission`), so `known_permissions()` is the full catalog,
+not the `Permission` enum alone.
+
+**Every new route declares one permission** with
+`Depends(require("sync.run"))`, which also returns the user, in place of
+`current_active_user`. Never test `user.role` or `is_superuser` in an
+endpoint: `is_superuser` survives only as a mirror of `role == "admin"`
+for fastapi-users and the superuser metric. `tests/test_permissions.py`
+fails on any route without a `require()` (apart from its explicit
+`PUBLIC` list) and checks that every route refuses a role lacking its
+permission. The SSH terminal websocket checks `terminal.open` itself in
+`app/api/ssh_terminal.py`, since a websocket is outside the dependency
+chain.
+
+Checks carry a lazily resolved scope: `{host_id}` / `{group_id}` in the
+path by default, `scope=row_scope(SyncJob, "job_id")` for rows owned by a
+host or group, `scope=param_scope("host", "host_id")` for `?host_id=`
+routes. The Community resolver ignores scope, but routes must still pass
+the right one, because Enterprise RBAC grants rights per host and group:
+
+- **List and catalog routes** use `scope=anywhere` (the user needs the
+  permission on at least one host or group) and narrow what they return
+  with `visible_filter()` / `visible_host_ids()` / `visible_group_ids()`.
+- **Targets in the request body** (starting a run, a schedule's target,
+  group membership) are checked in the handler with
+  `require_on(user, perm, hosts=[...], groups=[...])`: all or nothing.
+- **Anything that changes other hosts' outcome** (a group's priority) asks
+  `require_on(user, perm)` with no targets, a global check.
+- **Where a host is reached** (`hostname`, `ip_address`, `ssh_port`,
+  `ssh_user`, `ssh_key_id`; `CONNECTION_FIELDS` in `app/api/hosts.py`)
+  is global too: a grant on a host must not let its holder point the row,
+  and the key it uses, at another machine. Unchanged values pass.
+- Everything else stays global by default, which a scoped user is refused.
+
+Extensions replace the resolver through `set_permission_resolver()` and
+the lists through `set_visible_hosts_resolver()` /
+`set_visible_groups_resolver()`; `PLUGIN_API` versions that contract.
+`tests/test_permission_scopes.py` registers a stand-in scoped resolver and
+pins those promises. `GET /api/users/me` returns `permissions` and
+`permissions_anywhere`; host and group pages wrap themselves in
+`<PermissionScope>` (from `GET /api/users/me/permissions?host_id=`), so
+`useCan()` answers for that page.
+
+A user with `must_change_password` gets 403
+`password_change_required` from every `require()` route until they change
+it through `PATCH /api/users/me` (which needs `current_password`).
+`python -m app.auth.users_cli` is the recovery path when no admin can
+sign in.
+
+### Extensions (plugins) and directory sign-in
+
+The Enterprise edition is a separate package that plugs into this one;
+Community ships no Enterprise code. `app/plugins.py` loads every Python
+entry point in the `unbork.plugins` group from `create_app()`, after the
+core routers and before the SPA fallback. An entry point names a
+`register(app)` callable with a `requires_plugin_api = "X.Y"` attribute; it
+loads only when the major equals `PLUGIN_API` (`app/auth/permissions.py`)
+and the minor is not newer. Anything else, and any plugin that raises, is
+logged and skipped, never fatal: a Community install with a stale
+Enterprise package must still start and let an admin sign in. Bump
+`PLUGIN_API`'s minor when adding to the contract, its major when changing
+it, and note what changed in the comment above it.
+
+An extension with tables of its own declares a second entry point, in
+`unbork.migrations`, naming an `upgrade()` that runs its own Alembic
+environment with its **own version table**. `python -m app` calls it after
+core's `upgrade head`, in the roles that migrate. Never put extension
+revisions in core's `alembic_version`: once the extension is uninstalled,
+core would meet a revision it cannot locate and refuse to start.
+
+The contract (`PLUGIN_API`, whose comment lists each version) is the
+permission hooks above, three directory sign-in hooks and the hooks listed
+after them, none of which Community uses itself:
+
+- `app/auth/external.py`: `register_login_provider_source()` puts buttons
+  on the login page through the public `GET /api/auth/providers`
+  (`redirect` kind for OIDC/SAML, `password` kind for LDAP);
+  `resolve_external_user()` maps an `ExternalIdentity` to a user (existing
+  `user_identities` link, else a verified-email link when allowed, else a
+  new account with no password and no role), flushing but never
+  committing so a later refusal rolls it back; `issue_session()` sets the
+  same auth and CSRF cookies password login does. Refusals raise
+  `ExternalLoginRefused(code, message)`; a callback redirects to
+  `/login?sso_error=<code>`, which the login page explains.
+- `app/auth/login_paths.py`: `register_password_login_path()` makes an
+  extension's own password endpoint CSRF-exempt and login-rate-limited,
+  like `/api/auth/jwt/login`. Exact paths only.
+- `users.hashed_password` is nullable: NULL is a directory-only account,
+  which password login and `PATCH /api/users/me` refuse.
+- `app/audit` (1.3): `register_audit_subscriber(fn)` hands every
+  `log_action` row to `fn` as a frozen `AuditEntry` after its transaction
+  commits, in the API and in workers, and never a row whose transaction or
+  savepoint rolled back. At most once (a crash between commit and delivery
+  loses it; `AuditEntry.id` is the `audit_log` key, a catch-up cursor).
+  Subscribers are synchronous, must only enqueue, and one that raises is
+  logged and skipped. With none registered `log_action` does no extra work.
+- `app/run_gate.py` (1.4): `register_run_gate(gate)` is asked, with a
+  `RunRequest`, just before a sync (and a CA certificate deploy), an action
+  run, a schedule's fire, or a change the assistant is about to make.
+  It answers `allow`, `refuse(reason)` (the run
+  ends `failed` with "Refused: ..."; a schedule skips the fire and audits
+  it) or `defer(reason, retry_at)` (the run stays `pending`, held as
+  above; a schedule stays due; a full-auto assistant session parks for a
+  human; an approval session's call is asked when it is approved and about
+  to run). An action run is asked once, when its orchestrator picks it
+  up, not again after waiting for a busy host. A gate that raises
+  refuses. `register_run_end_listener(fn)` is
+  told, after commit, when each sync, action run and changing assistant
+  session ends. With nothing registered neither does any work.
+- `app/tasks/extensions.py` (1.5): `register_task_module(module, queue=)`
+  adds an extension's Celery task module to `conf.include` and routes
+  `<module>.*` to `queue`, which must be a consumed queue other than
+  `orchestrator` (a module under `app.` is refused);
+  `register_periodic_task(name, task, every_seconds)` (10 s minimum) has
+  beat keep a RedBeat entry `ext-<name>`. Extensions load once per Celery
+  process (`load_plugins_once`): in the worker parent and in beat from the
+  `import_modules` signal, before the task modules are imported, and in
+  each pool child. So `register()` may run in the worker parent before
+  the pool forks: start threads, sockets or connections lazily, or from
+  your own `worker_process_init` handler, never in `register()`. At beat
+  start `register_all` writes the `ext-` entries
+  and deletes every `ext-` entry no installed extension registers.
+  Extension tasks reach the database with `with_task_engine` and
+  `task_session`, as core tasks do.
+- `app/auth/permissions.py` (1.6): `register_permission(name, roles=)`
+  declares an `area.action` permission an extension's routes ask for with
+  `require()` / `require_on()`. `roles` are the fixed roles that hold it
+  under the Community resolver, admin always and by default admin only.
+  Call it in `register(app)` *before* importing the routes that use it:
+  `require()` checks the name at import. Repeating the same registration
+  is a no-op; a core name or other roles are refused.
+- `app/ai/providers/policy.py` (1.7): `set_provider_type_policy(fn)`
+  limits which AI provider types the install accepts; `fn(type)` returns
+  `None` to allow or a sentence to refuse. A refused type is refused on
+  create, update and test (`app/api/ai.py`) and for every session in
+  `resolve_provider()` (`app/ai/service.py`), and the form leaves it out
+  (`GET /api/ai/provider-types`). A stored provider of that type is never
+  deleted or changed; it shows `refused_reason`. A policy that raises
+  refuses every type.
+
+The frontend seam is `frontend/lib/extensions.ts`: lists of extra Settings
+sections and Users-page edit panels, empty in Community. The Enterprise
+build copies this frontend, adds its files and replaces that one module.
+Change its types only additively, and keep it the one place Community
+pages read extension UI from.
+
 ### About / version surface
 
 `GET /api/version` is a public (no-auth) endpoint exposing
@@ -281,9 +492,9 @@ because throwing it away is how a mid-check claim is handled.
 repo_url}`. The frontend renders it in Settings › System
 (`/settings?section=system`). The
 backend reads `version` via
-`importlib.metadata.version("labdog-backend")`; `commit_sha` and
-`build_date` come from env vars `LABDOG_COMMIT_SHA` /
-`LABDOG_BUILD_DATE` (set in Docker via build args) or, for
+`importlib.metadata.version("unbork-backend")`; `commit_sha` and
+`build_date` come from env vars `UNBORK_COMMIT_SHA` /
+`UNBORK_BUILD_DATE` (set in Docker via build args) or, for
 `.deb` / `.rpm` / `.tar.gz` installs, from a build-time-generated
 `backend/app/_build_info.py` written by the `bake-build-info`
 target in `packaging/Makefile`.
@@ -306,7 +517,7 @@ upgrade.
 ## Working with `plans/`
 
 When picking up substantive design work that needs more than a
-[`TODO.md`](TODO.md) line can hold, use `plans/` as a branch-scoped
+roadmap item can hold, use `plans/` as a branch-scoped
 scratchpad:
 
 1. Branch from `dev`.
@@ -317,11 +528,24 @@ scratchpad:
 4. **Delete `plans/` before opening the PR.** `dev` and `main` must
    never carry it.
 
-Roles of the four top-level tracking files: [`ROADMAP.md`](ROADMAP.md)
-(direction), [`TODO.md`](TODO.md) (open near-term tasks, open-only),
-[`BUGS.md`](BUGS.md) (open bug registry, open-only), `plans/` (private
-in-flight scratchpad on work branches). See
+This rule is about `plans/` only; `planning/` (next section) stays on `dev`.
+
+Where work is tracked: the [roadmap board](https://github.com/orgs/open-unbork/projects/1)
+(direction and open tasks; research and design notes go in each item),
+[`BUGS.md`](BUGS.md) (open bug registry, open-only), `planning/` (the
+staged roadmap, kept on `dev`), `plans/` (private in-flight scratchpad on
+work branches). See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full workflow.
+
+## Staged roadmap (`planning/`)
+
+`planning/` holds the long-lived execution plan (it is not the `plans/`
+scratchpad above and is meant to stay on `dev`): `PLAN.md` for the
+overview, `roadmap.yaml` as the source of truth, one file per stage under
+`stages/` and one spec per item under `items/`. `/run-stage <N>` executes
+a stage and `/review-stage <N>` reviews it; both are in `.claude/skills/`
+and are started by a person, never automatically. Decisions go in
+`planning/DECISIONS.md`, unscheduled ideas in `planning/PROPOSALS.md`.
 
 ## Key Files
 
@@ -342,11 +566,16 @@ in-flight scratchpad on work branches). See
 ## CI/CD
 
 GitHub Actions pipeline (`.github/workflows/ci.yml`):
-- **lint + test + scan**: ruff, bandit, ESLint, pytest,
-  frontend build check, docs build check, gitleaks, pip-audit, npm
-  audit — runs on PRs to `dev` and `workflow_dispatch`
-- **build-test-image**: pushes a `:test-<sha>` Docker image and feeds
-  trivy — runs on PRs to `dev` and `workflow_dispatch`
+- **lint + test + scan**: ruff, bandit, ESLint, pytest (prints the
+  backend coverage total and uploads `coverage.xml`), Vitest
+  (`frontend-test`), frontend build check, docs build check, gitleaks,
+  pip-audit, npm audit — runs on PRs to `dev` and `workflow_dispatch`
+- **build-test-image**: pushes a `:test-<sha>` Docker image (there is no
+  floating `:test`; `:dev-latest` follows `dev`) and feeds trivy — runs
+  on same-repository PRs to `dev`, pushes to `dev` and
+  `workflow_dispatch`
+- **CLA** (`.github/workflows/cla.yml`): the `CLAAssistant` check on
+  every PR; see `legal/cla/`
 - **build-image**: publishes `:latest` and `:<sha>` to Docker Hub —
   runs on push to `main` (PR-from-dev merges only; direct pushes are
   blocked by branch protection)

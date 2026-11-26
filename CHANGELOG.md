@@ -8,6 +8,288 @@ The format follows [Keep a Changelog]; unbork follows
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-11-26
+
+**LabDog is now unbork.** This is a major release because the rename
+changes names that the 1.x line promised to keep: environment variables,
+config and data paths, the package, service and user, metric names, alert
+labels and the names unbork writes on managed hosts. 2.0.0 reads none of
+the old names, and nothing renames them for you. Follow
+[Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
+before you start it. What you must act on:
+
+- Docker: the image is `unbork/unbork:2.0.0`; rename `LABDOG_*` variables
+  to `UNBORK_*` and move volume mount targets to `/var/lib/unbork`.
+- Packages and tarball: install `unbork` next to `labdog`, copy the config
+  and the data, then remove (not purge) `labdog`. The steps are written
+  for 1.1.x; upgrade older installs to 1.1.1 first.
+- Grafana and Prometheus: rename `labdog_*` metrics and alert labels in
+  dashboards and alert rules.
+- Managed hosts: after the first sync, remove the old iptables chains and
+  files by hand.
+- Everyone signs in again once. Accounts that were not administrators get
+  the `operator` role.
+- The "Claude agent" and "Claude single-shot" providers download Claude
+  Code on first use, and need outbound HTTPS to do so.
+
+### Security
+
+- **Next.js 16.4.6.** Fixes seven advisories in the 16.4.3 the frontend
+  was built with (for example GHSA-pc58-hwjq-p385). The web UI is a static
+  export, so the server-side ones did not apply, but `next build` now
+  refuses an affected version.
+
+- The alert webhook can be limited to listed source addresses
+  (`[alerts] allowed_sources`) and can require an HMAC signature over the
+  body (`[alerts] webhook_hmac_secret`, as Grafana's webhook contact point
+  signs). Both are off until set, and the Intake card shows whether each
+  is on.
+
+### Added
+
+- **Third-party notices and a source offer ship with every build.**
+  `/usr/share/doc/unbork/` holds `LICENSE`, `THIRD-PARTY-NOTICES` (every
+  Python, npm and Debian component, with version, licence and text) and
+  `SOURCE-OFFER.md`; the image carries the OCI `licenses`, `source` and
+  `revision` labels. The build fails on a dependency whose licence is
+  unknown or not compatible with the AGPL.
+- **The assistant can be left out.** `[assistant] enabled = false` on an
+  install, or `--build-arg WITH_ASSISTANT=0` for an image (which then has
+  no Agent SDK and no assistant pages). No AI routes, pages, providers,
+  tasks or settings are loaded; alerts still run their actions. See
+  [Running without the assistant](docs/ui/assistant.md#running-without-the-assistant).
+- **Extension hook to restrict AI provider types.** An extension can
+  refuse provider types; a refused type cannot be created, tested or used,
+  and the form leaves it out. Stored providers are never deleted or
+  changed. A Community install refuses nothing. Plugin API 1.7.
+- **Quiesce hooks for destructive actions.** A pack can declare
+  `quiesce_playbook` and `unquiesce_playbook`; unbork runs them around the
+  snapshot window, also when the run fails, so a rollback loses nothing
+  users wrote. The run dialog says the application is offline for the
+  whole run. Example pack: `docs/examples/action-packs/with-quiesce/`.
+- **Extension hook for permissions.** An extension can declare
+  permissions of its own for its routes. The built-in catalog and roles
+  are unchanged. Plugin API 1.6.
+- **Extension hook for background work.** An extension can register its
+  own task module and periodic jobs. A Community install behaves exactly
+  as before. Plugin API 1.5.
+- **Extension hook to refuse or hold a sync, an action run, a scheduled
+  run or an assistant change before it starts, and to hear when it ends.**
+  A Community install behaves exactly as before. Plugin API 1.4.
+- **Extension hook for the audit log.** Groundwork for Enterprise audit
+  export; a Community install behaves exactly as before. An extension can
+  subscribe to audit entries, which are handed over after they are
+  committed. Plugin API 1.3.
+- **The audit log records who started and who cancelled every action
+  run**, whether from the API, a schedule, Run now or an alert: one
+  `action_run.started` entry per run, with its `origin`, and
+  `action_run.cancelled` when it is cancelled. Parameter names are
+  recorded, never their values.
+- **Extension hooks for rights scoped to hosts and groups.** Groundwork
+  for Enterprise RBAC; a Community install behaves exactly as before.
+  List routes now ask whether a user may view hosts *anywhere* and show
+  only what they may see, runs, schedules and group membership check the
+  hosts and groups named in the request, and changing a group's priority
+  needs the right everywhere. `GET /api/users/me` adds
+  `permissions_anywhere`, and the new `GET /api/users/me/permissions`
+  answers for one host or group, which host and group pages use to enable
+  their buttons. Plugin API 1.2.
+- **Extension hooks for directory sign-in.** Groundwork for the Enterprise
+  SSO and LDAP packages; a Community install looks and behaves exactly as
+  before. Installed extensions load from the `unbork.plugins` entry point
+  group at startup (an incompatible or broken one is logged and skipped).
+  The login page shows any sign-in methods an extension offers, from the
+  new public `GET /api/auth/providers`. Accounts may now have no password
+  (directory-only accounts, which password login refuses), and the new
+  `user_identities` table links an account to its directory identity.
+  Plugin API 1.1.
+
+- **Run unbork as separate containers, one per role.** `UNBORK_ROLE` (or
+  `--role`) picks `api`, `beat`, `orchestrator`, `worker` or
+  `worker-drift`; the default `all` is the single container as before.
+  Only `api` runs migrations; the other roles wait for the schema. The
+  image's health check checks each role, and
+  `dev/docker-compose.split.yml` is a working example. See
+  `docs/scaling-out.md`.
+- **Drift checks get their own queue and run in parallel.** Each periodic
+  sweep enqueues one check per host on the new `drift` queue instead of
+  walking the hosts one by one, so a sweep no longer waits behind syncs and
+  finishes faster. New setting `celery.drift_concurrency` (slots of a
+  `worker-drift` container). In a load test at 300 hosts with a bulk sync
+  every 15 minutes, sweeps kept their 30-minute interval (up to 51 minutes
+  before) and took about half as long.
+- **Action runs get their own queue.** The per-host (or group-wide) part
+  of every action run now goes to a new `actions` queue instead of
+  `long_running`, so a backlog of bulk syncs no longer holds action runs
+  back. A split deployment serves it with the new `worker-actions` role
+  (setting `celery.actions_concurrency`); the single container consumes it
+  as before.
+- **A load-test harness** in `dev/loadtest/`: N fake SSH hosts, scenarios
+  for drift, bulk syncs and action schedules, on one or two Docker hosts.
+
+- **Re-run an action from its run page.** A finished run's head has a
+  **Re-run…** button that opens the run dialog on the same host or group,
+  filled in with the run's parameters, metrics destinations and
+  parallelism. Anything can be changed before **Run** or **Preview**. It is
+  disabled, with the reason on hover, for a fleet run, a run whose target
+  was deleted, and an action no pack supplies any more.
+- **Investigate with AI from where a problem shows up.** The sparkle
+  button now sits on the Fleet state resource hot spots, a host's Metrics
+  tab and header, failed syncs, the Pending stuck and drift lanes, and
+  each Drift finding. It starts a read-only assistant session about that
+  subject, with a prompt unbork writes from its own data, and reopens the
+  earlier one on a second press. New endpoints:
+  `POST`/`GET /api/ai/investigations`; `ai_sessions` gains `subject_kind`
+  and `subject_key` (alembic 0056).
+
+### Changed
+
+- The README says which parts are AGPL (everything in this repository)
+  and that the Enterprise edition is a separate commercial package.
+
+- **The Docker image no longer contains the Claude Code program.** It is
+  downloaded to the state volume (`/var/lib/unbork/claude-code`) the first
+  time a provider that needs it is turned on, tested or used, and checked
+  against the checksum the release pins before it is ever run. The image is
+  smaller, and a server without outbound access must provide the program
+  itself on PATH. See
+  [the upgrade note](docs/upgrade.md#the-claude-code-program-is-no-longer-in-the-image).
+- **The Claude providers take no token any more.** "Claude agent" and
+  "Claude single-shot" (the new names for the Claude Agent SDK and Claude
+  Code CLI types) use the Claude Code sign-in of the `unbork` service
+  account on the server. A token saved by an earlier version keeps working
+  until you remove it from the provider.
+- **Breaking: everything is renamed to unbork, and the old names are no
+  longer read.** Environment variables are `UNBORK_*`, the config file is
+  `/etc/unbork/unbork.toml` (key `security.unbork_server_ip`), the package,
+  service and system user are `unbork` with files under `/etc/unbork`,
+  `/usr/lib/unbork`, `/var/lib/unbork` and `/var/log/unbork`, the Python
+  distribution is `unbork-backend`. Metric names, alert labels, the host
+  variables handed to packs, iptables chains, rule comments, files written
+  to hosts and Proxmox snapshot names all use `unbork`. The session cookies
+  were renamed, so everyone signs in again once. Nothing renames or removes
+  the old names on the server or on managed hosts: follow
+  [Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
+  before starting this version. A server whose secrets are set only under the
+  old names refuses to start, and its error lists the old names it found;
+  every start warns about a path setting still under an old directory, and about a
+  variable renamed only in its prefix (`UNBORK_SECURITY__LABDOG_SERVER_IP`). Sync run output
+  shows play names beginning "unbork".
+
+- CI no longer publishes a floating `:test` image tag. Test images are
+  `:test-<short sha>`; follow `:dev-latest` to track `dev`.
+
+- Contributions now require a signed contributor licence agreement,
+  checked on every pull request. On a pull request from a fork, every
+  commit must also be linked to a GitHub account. See CONTRIBUTING.md.
+
+- `LICENSE` now names the copyright holder (Dennis Tyresson and
+  contributors). The licence is unchanged.
+
+- **New logo and colours.** The dog is replaced by the mark for the
+  coming name, unbork: a timeline with a restore point, and a U that
+  turns back to it. It is in the rail, on the sign-in page and in the
+  browser tab. Both themes are rebuilt from the mark's colours: dark
+  surfaces are navy with cream text, light surfaces are cream with navy
+  text, and the accent is a lighter shade of the same navy. The mark's
+  amber is kept out of the interface, because amber already means
+  "drifted" or "warning"; its one other use is a faint glow on the
+  sign-in page. Beside the mark, the name is drawn in the logo's own
+  lettering (Familjen Grotesk Bold). The
+  name beside the mark changes with it: the sign-in and setup pages, the
+  rail and the browser tab say unbork.
+
+- **The project moved to `open-unbork` on GitHub and `unbork` on Docker
+  Hub.** The repositories are now
+  [`open-unbork/unbork`](https://github.com/open-unbork/unbork) and
+  [`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks),
+  the docs are at <https://open-unbork.github.io/unbork/>, and images are
+  published as `unbork/unbork`. Old GitHub links redirect. Releases are
+  also copied to `openlabdog/labdog` for now, so existing installs keep
+  updating. A migration points the seeded playbooks pack at the new URL
+  when it still holds the old default; a pack the operator pointed
+  elsewhere is left alone. Release artifacts from before the move verify
+  with `gh attestation verify <file> --repo open-labdog/labdog`.
+
+- **The README, the docs and the developer guide say unbork.** The
+  remaining prose that still said LabDog is renamed, the README shows the
+  new logo, and examples use `unbork` for names you choose yourself
+  (hostnames, compose services and volumes, directories).
+
+- **The roadmap moved to a GitHub project.** `ROADMAP.md` and `TODO.md`
+  are gone; planned work, open tasks and their design notes now live on the
+  [roadmap board](https://github.com/orgs/open-unbork/projects/1).
+  `CONTRIBUTING.md`, `CLAUDE.md` and the release checklist point there, and
+  the "out of scope" list moved to `CONTRIBUTING.md`.
+
+- **Workers take one task at a time** (`worker_prefetch_multiplier=1`), so a
+  long sync no longer holds queued tasks that an idle worker could run. Only
+  one booting worker runs the startup orphan sweep.
+
+- **A tidier group Overview.** The fifteen panels in five rows, which left
+  gaps beside the shorter ones, are now four full-width parts: one strip
+  of headline numbers (the 14-day drift chart is a small bar under
+  *drifted*), one members panel, one runs list and a settings bar. The
+  member grid lists only the members with a problem until **show all**,
+  tones down in-sync cells, gains a **host** column that marks a host
+  drifted or failed as a whole when no module says so (a snapshot
+  rollback does that), and drops modules nobody reports. *What they
+  actually get* now carries the module item counts, so the separate
+  modules table is gone. *Coming up* and *recent activity* share one
+  list, next above earlier. Settings, GitOps, metrics destinations and
+  the danger zone open from **edit** on the settings bar.
+
+- **The VM mapping sits under the host card.** On a host's Overview the
+  Proxmox VM mapping is now open, the width of the host card, directly
+  under it, instead of folded at the foot of the tab.
+
+### Fixed
+
+- Every README link into the documentation site is checked in CI, so a
+  moved page or renamed heading fails the pull request.
+
+- An API path that no route serves (`GET /api/...`), such as the
+  assistant's on a server without it, now answers a JSON 404 instead of
+  the web page with status 200.
+- Firewall rule and chain policy changes are now written to the audit
+  log, like every other module's: create, update, delete, reorder, and
+  a group's input and output policy (BUG-147).
+- **Services, packages and users read "never collected".** The group
+  member grid and the host page's module states looked these three up
+  under spellings the backend doesn't write (`services`, `packages`,
+  `linux-users` instead of `service`, `package`, `linux_user`), so their
+  states never showed.
+- **A rolled-back host keeps no snapshot.** Deleting the pre-run snapshot
+  right after a rollback hit the VM lock Proxmox holds for about 30 s
+  while it cleans up the killed QEMU process, so it failed every time.
+  unbork now retries a locked delete for up to two minutes (BUG-168).
+- **Leftover snapshots are cleaned up on their own.** An hourly sweep
+  removes action-run snapshots older than `workflow.snapshot_max_age_hours`
+  that no running action uses. Before, only **Clean up orphaned
+  snapshots** did, by hand. Neither touches AI sessions' `unbork-ai-`
+  snapshots any more: the manual cleanup used to read their session number
+  as a run id (BUG-169).
+- **The AI snapshot sweep accepts a snapshot already gone.** One deleted
+  by hand was retried, with a warning, every day (BUG-170).
+- **Read-only AI pipelines through `awk` or `paste` take no snapshot.**
+  `paste`, and `awk`, `gawk` and `mawk` programs without `system()`,
+  pipes, `getline`, a redirection after `print`, gawk's `@` forms or
+  `ARGV`, now count as reads (BUG-171).
+- **Users with keys or a sudo rule no longer drift for ever when unbork
+  logs in as a non-root user.** The `authorized_keys` file and the
+  sudoers drop-in are read through `sudo -n`, and a file that exists but
+  cannot be read is reported as an error instead of an empty one
+  (BUG-172).
+- **`~/.ssh` and `authorized_keys` get the user's primary group**, not
+  `root` (BUG-173).
+- **A cron schedule with stray whitespace no longer drifts for ever.**
+  Schedules are stored five fields one space apart, and the drift check
+  ignores whitespace in ones stored before (BUG-174).
+- **The Plans page no longer shows a host whose module preview failed as
+  "no change".** It shows the module error, and the Reachability check
+  names the host (BUG-175).
+- **Playbook output no longer floods the worker log at WARNING** (BUG-176).
+
 ## [1.1.1] — 2026-11-15
 
 ### Changed
@@ -3361,7 +3643,8 @@ SSH-pushed Ansible reconciliation, and a per-host detail tab:
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[Unreleased]: https://github.com/open-unbork/unbork/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/open-unbork/unbork/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/open-unbork/unbork/compare/v1.1.1...v2.0.0
 [1.1.1]: https://github.com/open-unbork/unbork/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/open-labdog/labdog/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/open-labdog/labdog/compare/v0.10.0...v1.0.0

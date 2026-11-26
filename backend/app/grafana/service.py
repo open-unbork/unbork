@@ -249,13 +249,13 @@ async def build_metrics_extra_vars(
     operator_params: dict | None = None,
     picked: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Build the extra-vars LabDog injects into a per-host action run.
+    """Build the extra-vars unbork injects into a per-host action run.
 
     Returns ``(destination_vars, identity_vars)``:
 
-    * ``identity_vars``: ``labdog_host_id`` / ``labdog_hostname``, always
+    * ``identity_vars``: ``unbork_host_id`` / ``unbork_hostname``, always
       set so the agent stamps queryable labels. These should override any
-      operator input (identity is LabDog-owned).
+      operator input (identity is unbork-owned).
     * ``destination_vars``: for each of Mimir and Loki, the URL, tenant and
       TLS-verification flag of the instance this host ships to, mapped onto
       the action's declared var names. Empty unless ``metrics_backend`` is
@@ -266,7 +266,7 @@ async def build_metrics_extra_vars(
     with that URL (its tenant and TLS settings travel with it; an
     unregistered URL gets none); else the host's resolved destination.
     """
-    identity_vars = {"labdog_host_id": str(host_id), "labdog_hostname": hostname}
+    identity_vars = {"unbork_host_id": str(host_id), "unbork_hostname": hostname}
     out: dict[str, Any] = {}
     if not metrics_backend:
         return out, identity_vars

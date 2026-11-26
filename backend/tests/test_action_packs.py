@@ -729,9 +729,9 @@ def test_local_path_accepts_srv():
     obj = ActionPackCreate(
         name="p",
         source_type="local",
-        local_path="/srv/labdog-packs",
+        local_path="/srv/unbork-packs",
     )
-    assert obj.local_path == "/srv/labdog-packs"
+    assert obj.local_path == "/srv/unbork-packs"
 
 
 def test_local_path_accepts_opt():
@@ -740,9 +740,9 @@ def test_local_path_accepts_opt():
     obj = ActionPackCreate(
         name="p",
         source_type="local",
-        local_path="/opt/labdog/packs",
+        local_path="/opt/unbork/packs",
     )
-    assert obj.local_path == "/opt/labdog/packs"
+    assert obj.local_path == "/opt/unbork/packs"
 
 
 def test_local_path_accepts_home_subpath():
@@ -773,7 +773,7 @@ def test_local_path_rejects_etc_subpath():
     from app.packs.schemas import ActionPackCreate
 
     with pytest.raises(ValidationError, match="/etc"):
-        ActionPackCreate(name="p", source_type="local", local_path="/etc/labdog")
+        ActionPackCreate(name="p", source_type="local", local_path="/etc/unbork")
 
 
 def test_local_path_rejects_proc():
@@ -850,11 +850,11 @@ class TestPackPathsStayInsideThePack:
     """
 
     def test_a_playbook_outside_the_pack_is_refused(self, tmp_path: Path):
-        secret = tmp_path / "labdog.toml"
+        secret = tmp_path / "unbork.toml"
         secret.write_text("[security]\nsecret_key = 'not-for-you'\n")
 
         escaping = SIMPLE_MANIFEST.replace(
-            "playbook: playbook.yml", "playbook: ../../../labdog.toml"
+            "playbook: playbook.yml", "playbook: ../../../unbork.toml"
         )
         _write_pack(
             tmp_path,

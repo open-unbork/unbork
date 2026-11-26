@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import contextlib
-import ipaddress
 import json
 import logging
 import logging.config
@@ -18,16 +17,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from starlette.responses import FileResponse, RedirectResponse
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.api._repo_scan import router as repo_scan_router
 from app.api.action_packs import router as action_packs_router
 from app.api.action_resolutions import router as action_resolutions_router
+from app.api.actions import assistant_router as actions_assistant_router
 from app.api.actions import router as actions_router
 from app.api.admin_users import router as admin_users_router
 from app.api.ai import router as ai_router
+from app.api.alerts import assistant_router as alerts_assistant_router
 from app.api.alerts import router as alerts_router
 from app.api.audit import router as audit_router
+from app.api.auth_setup import me_router
 from app.api.auth_setup import router as auth_setup_router
 from app.api.ca_cert_actions import router as ca_cert_actions_router
 from app.api.ca_certs import router as ca_certs_router
@@ -69,10 +71,14 @@ from app.api.sync import router as sync_router
 from app.api.user_sync import router as user_sync_router
 from app.api.version import router as version_router
 from app.api.webhooks import router as webhooks_router
+from app.auth.login_paths import is_password_login_path
 from app.auth.schemas import UserRead, UserUpdate
 from app.auth.users import auth_backend, fastapi_users
+from app.client_ip import get_client_ip, is_trusted_proxy
 from app.config import settings
+from app.features import assistant_enabled
 from app.middleware.csrf import CSRFMiddleware
+from app.plugins import load_plugins
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -129,62 +135,10 @@ def _configure_logging() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _is_trusted_proxy(ip: str, trusted: list[str]) -> bool:
-    """Whether *ip* is one of the configured proxies.
-
-    Accepts CIDR entries as well as literal addresses (SEC-32). The
-    check used to be a plain ``in`` against the list, so ``10.0.0.0/8``
-    never matched anything — which made the setting unusable in Docker,
-    where the proxy's address is assigned at container start and is not
-    known when the config is written.
-    """
-    for entry in trusted:
-        if ip == entry:
-            return True
-        try:
-            if ipaddress.ip_address(ip) in ipaddress.ip_network(entry, strict=False):
-                return True
-        except ValueError:
-            # A malformed entry should not break IP resolution for
-            # every request; skip it and try the next.
-            continue
-    return False
-
-
-@lru_cache(maxsize=1)
-def _warn_untrusted_forwarding() -> None:
-    """Say once that forwarded addresses are being discarded.
-
-    Cached rather than guarded by a module flag so the "only once" part
-    is the mechanism rather than a convention someone has to maintain.
-    """
-    logging.getLogger(__name__).warning(
-        "X-Forwarded-For is present but server.trusted_proxies is empty, so the "
-        "real client address is being ignored. Set trusted_proxies to your "
-        "reverse proxy's address or network."
-    )
-
-
-def _get_client_ip(request: Request) -> str:
-    """Extract real client IP, respecting trusted proxies."""
-    trusted = settings.server.trusted_proxies
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if trusted and request.client:
-        if forwarded:
-            # Walk the chain from right to left, skipping trusted proxies
-            chain = [ip.strip() for ip in forwarded.split(",")]
-            for ip in reversed(chain):
-                if not _is_trusted_proxy(ip, trusted):
-                    return ip
-    elif forwarded:
-        # A reverse proxy is forwarding the real client address and
-        # LabDog is discarding it, so every request looks like it came
-        # from the proxy — which is what collapsed the login rate limit
-        # into a single shared bucket (SEC-32).
-        _warn_untrusted_forwarding()
-    if request.client:
-        return request.client.host
-    return "127.0.0.1"
+# The client-address helpers live in app.client_ip so that routers (the
+# alert webhook's source allowlist) can use them without importing main.
+_is_trusted_proxy = is_trusted_proxy
+_get_client_ip = get_client_ip
 
 
 # ---------------------------------------------------------------------------
@@ -238,8 +192,8 @@ def _build_login_limiter():
 # change exists to remove, and behind a proxy it is the same global
 # bucket by another name.
 
-#: Paths the login limiter guards.
-_LOGIN_PATHS = frozenset({"/api/auth/jwt/login", "/api/auth/register"})
+#: Paths the login limiter guards: ``app.auth.login_paths``, which an
+#: extension's own password login (LDAP) joins.
 
 #: Most a login body may be before we stop buffering it to find the
 #: account name. A real one is a couple of hundred bytes; the cap keeps
@@ -304,8 +258,8 @@ async def _buffered_receive(receive):
     must reach the app rather than being swallowed here.
 
     Stops at :data:`_MAX_LOGIN_BODY`; anything beyond that is left in the
-    stream for the route to read, and the identity simply comes out as
-    ``None``.
+    stream, and the body comes back as ``None`` so the caller can refuse
+    the request rather than let it through unthrottled (SEC-42).
     """
     messages: list[dict] = []
     total = 0
@@ -324,7 +278,7 @@ async def _buffered_receive(receive):
             return messages.pop(0)
         return await receive()
 
-    return (b"" if total > _MAX_LOGIN_BODY else body), replay
+    return (None if total > _MAX_LOGIN_BODY else body), replay
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +320,7 @@ _CSP_TAIL = (
 
 #: The fallback ``script-src`` for responses that carry no nonce.
 #:
-#: Every HTML document LabDog serves goes through ``spa_fallback``, which
+#: Every HTML document unbork serves goes through ``spa_fallback``, which
 #: stamps a nonce and sends its own header, so in practice this applies to
 #: JSON and to redirects — responses with no scripts to govern. It stays
 #: strict rather than permissive precisely so that a future code path which
@@ -477,6 +431,92 @@ class HTTPSRedirectMiddleware:
 
 
 # ---------------------------------------------------------------------------
+# Rate-limiting middleware
+# ---------------------------------------------------------------------------
+
+
+class _WSafeSlowAPI:
+    """Wrap SlowAPIMiddleware so it skips WebSocket connections
+    (SlowAPIMiddleware extends BaseHTTPMiddleware which breaks WS)."""
+
+    def __init__(self, app):
+        self._ws_app = app
+        self._http_app = SlowAPIMiddleware(app)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self._ws_app(scope, receive, send)
+        elif scope["path"] == "/metrics":
+            # Exempt the scrape endpoint from the general API rate
+            # limit. `@limiter.exempt` isn't usable here — the
+            # `Limiter` is constructed inside `create_app()`, so
+            # there's no module-level object to decorate. Without
+            # this, `_get_client_ip` (which only trusts
+            # `X-Forwarded-For` from `settings.server.trusted_proxies`,
+            # empty by default) sees every request as the reverse
+            # proxy's IP, so a Prometheus scraper would share the
+            # 100/min bucket with every logged-in operator — a
+            # monitoring gap that opens exactly when the UI is
+            # busiest. The TTL cache in app.metrics.collector is
+            # what actually bounds the DoS surface here, not this
+            # rate limit.
+            await self._ws_app(scope, receive, send)
+        else:
+            await self._http_app(scope, receive, send)
+
+
+class _LoginRateLimitMiddleware:
+    """Stricter limit on auth endpoints (login, register).
+
+    Uses pure ASGI middleware to avoid BaseHTTPMiddleware breaking WS.
+    ``login_limiter`` is what ``_build_login_limiter()`` returns.
+    """
+
+    def __init__(self, app, login_limiter):
+        self.app = app
+        self._login_limiter = login_limiter
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        request = Request(scope, receive)
+        if not (request.method == "POST" and is_password_login_path(request.url.path)):
+            await self.app(scope, receive, send)
+            return
+
+        # SEC-32: the bucket is per account, not per source
+        # address, so the body has to be read here — and then
+        # handed back intact, because ASGI bodies are read once.
+        body, receive = await _buffered_receive(receive)
+        if body is None:
+            # SEC-42: an oversized body used to come back empty,
+            # which reads as "no account named" and consumed no
+            # bucket, while the full body still reached the login
+            # handler. Padding the form removed the throttle. A
+            # real login is a few hundred bytes, so refuse it.
+            response = Response(
+                content='{"detail":"Request body too large."}',
+                status_code=413,
+                media_type="application/json",
+            )
+            await response(scope, receive, send)
+            return
+        identity = login_identity(request.headers.get("content-type", ""), body)
+        client_ip = _get_client_ip(request)
+        for key in login_rate_limit_keys(client_ip, identity):
+            if not self._login_limiter.hit(key):
+                response = Response(
+                    content='{"detail":"Too many login attempts. Try again later."}',
+                    status_code=429,
+                    media_type="application/json",
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
+# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
@@ -566,20 +606,36 @@ async def _lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     _configure_logging()
-    logger = logging.getLogger(__name__)
 
+    app = _new_fastapi_app()
+    _add_middleware(app)
+    _include_auth_routers(app)
+    _include_api_routers(app)
+    # After the core routers so a plugin cannot shadow them, and before the
+    # SPA fallback, whose catch-all would shadow the plugin's routes.
+    load_plugins(app)
+    _add_health_routes(app)
+    _add_spa_fallback(app)
+    return app
+
+
+def _new_fastapi_app() -> FastAPI:
     # SEC-34: the interactive docs enumerate every route and schema and
     # are served unauthenticated. Off by default; `server.expose_docs`
-    # turns them back on where that is wanted (dev/labdog.toml does).
+    # turns them back on where that is wanted (dev/unbork.toml does).
     _docs = settings.server.expose_docs
-    app = FastAPI(
-        title="LabDog",
+    return FastAPI(
+        title="unbork",
         version="0.1.0",
         lifespan=_lifespan,
         docs_url="/docs" if _docs else None,
         redoc_url="/redoc" if _docs else None,
         openapi_url="/openapi.json" if _docs else None,
     )
+
+
+def _add_middleware(app: FastAPI) -> None:
+    logger = logging.getLogger(__name__)
 
     # -- HTTPS redirect (must be outermost) --
     if settings.tls.force_https:
@@ -603,95 +659,41 @@ def create_app() -> FastAPI:
 
     # -- Rate limiting --
     if settings.rate_limit.enabled:
-        limiter = Limiter(
-            key_func=_get_client_ip,
-            default_limits=[settings.rate_limit.api],
-            storage_uri=settings.redis.url,
-        )
-        app.state.limiter = limiter
+        _add_rate_limiting(app)
 
-        # Wrap SlowAPIMiddleware so it skips WebSocket connections
-        # (SlowAPIMiddleware extends BaseHTTPMiddleware which breaks WS)
-        class _WSafeSlowAPI:
-            def __init__(self, app):
-                self._ws_app = app
-                self._http_app = SlowAPIMiddleware(app)
 
-            async def __call__(self, scope, receive, send):
-                if scope["type"] != "http":
-                    await self._ws_app(scope, receive, send)
-                elif scope["path"] == "/metrics":
-                    # Exempt the scrape endpoint from the general API rate
-                    # limit. `@limiter.exempt` isn't usable here — the
-                    # `Limiter` is constructed inside `create_app()`, so
-                    # there's no module-level object to decorate. Without
-                    # this, `_get_client_ip` (which only trusts
-                    # `X-Forwarded-For` from `settings.server.trusted_proxies`,
-                    # empty by default) sees every request as the reverse
-                    # proxy's IP, so a Prometheus scraper would share the
-                    # 100/min bucket with every logged-in operator — a
-                    # monitoring gap that opens exactly when the UI is
-                    # busiest. The TTL cache in app.metrics.collector is
-                    # what actually bounds the DoS surface here, not this
-                    # rate limit.
-                    await self._ws_app(scope, receive, send)
-                else:
-                    await self._http_app(scope, receive, send)
+def _add_rate_limiting(app: FastAPI) -> None:
+    logger = logging.getLogger(__name__)
 
-        app.add_middleware(_WSafeSlowAPI)
+    limiter = Limiter(
+        key_func=_get_client_ip,
+        default_limits=[settings.rate_limit.api],
+        storage_uri=settings.redis.url,
+    )
+    app.state.limiter = limiter
 
-        # Stricter limit on auth endpoints (login, register)
-        # Uses pure ASGI middleware to avoid BaseHTTPMiddleware breaking WS
-        _login_limiter = _build_login_limiter()
+    app.add_middleware(_WSafeSlowAPI)
 
-        class _LoginRateLimitMiddleware:
-            def __init__(self, app):
-                self.app = app
+    # Stricter limit on auth endpoints (login, register)
+    app.add_middleware(_LoginRateLimitMiddleware, login_limiter=_build_login_limiter())
 
-            async def __call__(self, scope, receive, send):
-                if scope["type"] != "http":
-                    await self.app(scope, receive, send)
-                    return
-                request = Request(scope, receive)
-                if not (request.method == "POST" and request.url.path in _LOGIN_PATHS):
-                    await self.app(scope, receive, send)
-                    return
-
-                # SEC-32: the bucket is per account, not per source
-                # address, so the body has to be read here — and then
-                # handed back intact, because ASGI bodies are read once.
-                body, receive = await _buffered_receive(receive)
-                identity = login_identity(request.headers.get("content-type", ""), body)
-                client_ip = _get_client_ip(request)
-                for key in login_rate_limit_keys(client_ip, identity):
-                    if not _login_limiter.hit(key):
-                        response = Response(
-                            content='{"detail":"Too many login attempts. Try again later."}',
-                            status_code=429,
-                            media_type="application/json",
-                        )
-                        await response(scope, receive, send)
-                        return
-                await self.app(scope, receive, send)
-
-        app.add_middleware(_LoginRateLimitMiddleware)
-
-        @app.exception_handler(RateLimitExceeded)
-        async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
-            return Response(
-                content='{"detail":"Rate limit exceeded. Try again later."}',
-                status_code=429,
-                media_type="application/json",
-                headers={"Retry-After": str(exc.detail)},
-            )
-
-        logger.info(
-            "Rate limiting enabled — login: %s, api: %s",
-            settings.rate_limit.login,
-            settings.rate_limit.api,
+    @app.exception_handler(RateLimitExceeded)
+    async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        return Response(
+            content='{"detail":"Rate limit exceeded. Try again later."}',
+            status_code=429,
+            media_type="application/json",
+            headers={"Retry-After": str(exc.detail)},
         )
 
-    # -- Auth routes --
+    logger.info(
+        "Rate limiting enabled — login: %s, api: %s",
+        settings.rate_limit.login,
+        settings.rate_limit.api,
+    )
+
+
+def _include_auth_routers(app: FastAPI) -> None:
     app.include_router(
         fastapi_users.get_auth_router(auth_backend),
         prefix="/api/auth/jwt",
@@ -700,12 +702,23 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_setup_router)
 
-    app.include_router(
-        fastapi_users.get_users_router(UserRead, UserUpdate),
-        prefix="/api/users",
-        tags=["users"],
-    )
+    # BUG-140: only the /me routes. The router's GET/PATCH/DELETE /{id}
+    # let a superuser deactivate or delete the last superuser, or delete
+    # themselves, past the guards in app/api/admin_users.py, which is the
+    # one path for administering other users.
+    users_router = fastapi_users.get_users_router(UserRead, UserUpdate)
+    # GET /me is served by app.api.auth_setup.me_router instead, which
+    # adds the caller's permissions; only PATCH /me is kept from here.
+    users_router.routes = [
+        route
+        for route in users_router.routes
+        if getattr(route, "path", "") == "/me" and "GET" not in getattr(route, "methods", set())
+    ]
+    app.include_router(me_router)
+    app.include_router(users_router, prefix="/api/users", tags=["users"])
 
+
+def _include_api_routers(app: FastAPI) -> None:
     app.include_router(actions_router, prefix="/api")
     app.include_router(action_packs_router, prefix="/api")
     app.include_router(action_resolutions_router, prefix="/api")
@@ -746,7 +759,13 @@ def create_app() -> FastAPI:
     app.include_router(proxmox_nodes_router, prefix="/api")
     app.include_router(proxmox_discovery_router, prefix="/api")
     app.include_router(grafana_router, prefix="/api")
-    app.include_router(ai_router, prefix="/api")
+    # Left out entirely when the assistant is (C-026): no /api/ai route
+    # exists, not even one that refuses.
+    if assistant_enabled():
+        app.include_router(ai_router, prefix="/api")
+        # Its routes on other prefixes: investigating an alert or a run.
+        app.include_router(alerts_assistant_router, prefix="/api")
+        app.include_router(actions_assistant_router, prefix="/api")
     app.include_router(alerts_router, prefix="/api")
     app.include_router(notifications_router, prefix="/api")
     app.include_router(metrics_status_router, prefix="/api")
@@ -759,7 +778,7 @@ def create_app() -> FastAPI:
     # holds while they stay under this prefix.
     app.include_router(webhooks_router, prefix="/api")
     # metrics_router owns the literal root path "/metrics" and MUST be
-    # registered before the SPA catch-all route below
+    # registered before the SPA catch-all route in `_add_spa_fallback`
     # (`@app.api_route("/{full_path:path}", ...)`) is added — FastAPI/
     # Starlette match routes in registration order, and the catch-all
     # matches every unmatched GET/HEAD with `index.html` + HTTP 200. If
@@ -770,6 +789,8 @@ def create_app() -> FastAPI:
     # registering and branching on `settings.metrics.enabled` internally.
     app.include_router(metrics_router)
 
+
+def _add_health_routes(app: FastAPI) -> None:
     @app.get("/health")
     async def health():
         """Liveness. Kept at the original path so nothing pointed here breaks.
@@ -800,69 +821,88 @@ def create_app() -> FastAPI:
         Returns 503 with a per-component dict when any component is down,
         so an operator reading the failing probe learns *which* one.
         """
-        from sqlalchemy import text as _sql_text  # noqa: PLC0415
-        from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
-
-        from app.celery_manager import active_manager  # noqa: PLC0415
-
         components: dict[str, str] = {}
-
-        # A dedicated connection rather than one from the request pool.
-        # The question is "can I reach Postgres", and borrowing from the
-        # pool answers a different one: under load the probe would queue
-        # behind real traffic and report the database down when it is
-        # merely busy — turning a slow moment into a restart.
-        #
-        # Engine construction is inside the try: a health check that raises
-        # is a health check that returns 500 with no component detail,
-        # which is the one outcome this endpoint exists to prevent.
-        probe_engine = None
-        try:
-            probe_engine = create_async_engine(settings.database.url, pool_size=1, max_overflow=0)
-            async with probe_engine.connect() as conn:
-                await conn.execute(_sql_text("SELECT 1"))
-            components["database"] = "ok"
-        except Exception as exc:
-            logger.warning("readiness: database check failed: %s", exc)
-            components["database"] = "error"
-        finally:
-            if probe_engine is not None:
-                try:
-                    await probe_engine.dispose()
-                except Exception:  # noqa: BLE001
-                    logger.warning("readiness: probe engine dispose failed", exc_info=True)
-
-        try:
-            import redis.asyncio as _redis  # noqa: PLC0415
-
-            client = _redis.from_url(settings.redis.url)
-            try:
-                await client.ping()
-                components["redis"] = "ok"
-            finally:
-                await client.aclose()
-        except Exception as exc:
-            logger.warning("readiness: redis check failed: %s", exc)
-            components["redis"] = "error"
-
-        manager = active_manager()
-        if manager is None:
-            # Either --no-celery (a development choice, not a fault) or a
-            # forked uvicorn worker that does not own the subprocesses.
-            # Saying "down" here would fail the probe on a healthy dev run;
-            # saying "ok" would claim knowledge this process does not have.
-            components["celery"] = "not_supervised_here"
-        elif manager.is_alive():
-            components["celery"] = "ok"
-        else:
-            dead = ", ".join(manager.dead_workers()) or "unknown"
-            logger.error("readiness: celery worker(s) not running: %s", dead)
-            components["celery"] = f"error: {dead} not running"
+        components["database"] = await _database_readiness()
+        components["redis"] = await _redis_readiness()
+        components["celery"] = _celery_readiness()
 
         ready = all(not v.startswith("error") for v in components.values())
         if not ready:
             response.status_code = 503
         return {"status": "ready" if ready else "not_ready", "components": components}
+
+
+async def _database_readiness() -> str:
+    from sqlalchemy import text as _sql_text  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
+
+    # A dedicated connection rather than one from the request pool.
+    # The question is "can I reach Postgres", and borrowing from the
+    # pool answers a different one: under load the probe would queue
+    # behind real traffic and report the database down when it is
+    # merely busy — turning a slow moment into a restart.
+    #
+    # Engine construction is inside the try: a health check that raises
+    # is a health check that returns 500 with no component detail,
+    # which is the one outcome this endpoint exists to prevent.
+    probe_engine = None
+    try:
+        probe_engine = create_async_engine(settings.database.url, pool_size=1, max_overflow=0)
+        async with probe_engine.connect() as conn:
+            await conn.execute(_sql_text("SELECT 1"))
+        status = "ok"
+    except Exception as exc:
+        logger.warning("readiness: database check failed: %s", exc)
+        status = "error"
+    finally:
+        if probe_engine is not None:
+            try:
+                await probe_engine.dispose()
+            except Exception:  # noqa: BLE001
+                logger.warning("readiness: probe engine dispose failed", exc_info=True)
+    return status
+
+
+async def _redis_readiness() -> str:
+    logger = logging.getLogger(__name__)
+    try:
+        import redis.asyncio as _redis  # noqa: PLC0415
+
+        client = _redis.from_url(settings.redis.url)
+        try:
+            await client.ping()
+            return "ok"
+        finally:
+            await client.aclose()
+    except Exception as exc:
+        logger.warning("readiness: redis check failed: %s", exc)
+        return "error"
+
+
+def _celery_readiness() -> str:
+    from app.celery_manager import active_manager  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
+    manager = active_manager()
+    if manager is None:
+        # Either --no-celery (a development choice, not a fault) or a
+        # forked uvicorn worker that does not own the subprocesses.
+        # Saying "down" here would fail the probe on a healthy dev run;
+        # saying "ok" would claim knowledge this process does not have.
+        return "not_supervised_here"
+    if manager.is_alive():
+        return "ok"
+    dead = ", ".join(manager.dead_workers()) or "unknown"
+    logger.error("readiness: celery worker(s) not running: %s", dead)
+    return f"error: {dead} not running"
+
+
+def _add_spa_fallback(app: FastAPI) -> None:
+    """Serve the static frontend export, when there is one, behind every
+    route registered so far."""
+    logger = logging.getLogger(__name__)
 
     # -- Static file serving (SPA) --
     static_dir = _resolve_static_dir()
@@ -873,7 +913,7 @@ def create_app() -> FastAPI:
         def _serve(path: Path, dynamic_values: tuple[str, ...] = ()):
             """Serve one file: HTML gets a nonce and its own CSP, the rest streams.
 
-            Every HTML document LabDog serves passes through here, which is
+            Every HTML document unbork serves passes through here, which is
             what makes the nonce approach viable at all — there is no
             ``StaticFiles`` mount, so there is exactly one place to stamp.
             ``tests/test_csp_nonce.py`` pins that; a mount added later for
@@ -895,7 +935,13 @@ def create_app() -> FastAPI:
 
         @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa_fallback(full_path: str):
-            """Serve static files; fall back to index.html for SPA routes."""
+            """Serve static files; fall back to index.html for SPA routes.
+
+            Not for ``/api/``: an API path no router has (a removed one,
+            such as the assistant's, or a typo) answers a JSON 404, not
+            the page shell with 200."""
+            if full_path == "api" or full_path.startswith("api/"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             file_path = static_dir / full_path
             if full_path and not file_path.resolve().is_relative_to(static_dir.resolve()):
                 return _serve(index_html)
@@ -914,8 +960,6 @@ def create_app() -> FastAPI:
             return _serve(index_html)
     else:
         logger.warning("No frontend static directory found — running in API-only mode")
-
-    return app
 
 
 _SAFE_DYNAMIC_SEGMENT = re.compile(r"[0-9]{1,19}")
@@ -1102,9 +1146,59 @@ def _rewrite_placeholder(
     if not all(_SAFE_DYNAMIC_SEGMENT.fullmatch(v) for v in dynamic_values):
         return None
     content = Path(file_path).read_text(encoding="utf-8")
+    names = _route_param_names(Path(file_path).parent)
+    if len(names) == len(dynamic_values):
+        by_name = dict(zip(names, dynamic_values, strict=True))
+        content = _substitute_named_segments(content, by_name, '\\"')
+        content = _substitute_named_segments(content, by_name, '"')
     content = _substitute_placeholders(content, dynamic_values, '\\"')
     content = _substitute_placeholders(content, dynamic_values, '"')
     return content
+
+
+#: The segment-data file Next writes next to each exported page, named after
+#: the route with each dynamic segment as ``$d$<param name>``, e.g.
+#: ``__next.!KGRhc2hib2FyZCk.hosts.$d$id.actions.runs.$d$runId.__PAGE__.txt``.
+_PAGE_SEGMENT_FILE = "__next.*.__PAGE__.txt"
+_PARAM_IN_FILENAME = re.compile(r"\$d\$(\w+)")
+
+
+@lru_cache(maxsize=256)
+def _route_param_names(page_dir: Path) -> tuple[str, ...]:
+    """The route's dynamic parameter names, in path order (BUG-126).
+
+    Read from the segment-data file name the export writes next to the page.
+    Empty when there is no such file (an older export), in which case only
+    the positional shapes are rewritten.
+    """
+    for candidate in sorted(page_dir.glob(_PAGE_SEGMENT_FILE)):
+        names = tuple(_PARAM_IN_FILENAME.findall(candidate.name))
+        if names:
+            return names
+    return ()
+
+
+def _substitute_named_segments(content: str, by_name: dict[str, str], quote: str) -> str:
+    """Replace each ``{"n":"<name>","t":"d","k":"placeholder"`` by name.
+
+    BUG-126. Current Next exports describe each dynamic segment as an
+    object carrying its parameter name. Those objects appear innermost
+    first (``runId`` before ``id``), so the positional pass below handed
+    them out in the wrong order: ``/hosts/7/actions/runs/377/`` asked the
+    API for run 7. Keyed by name, the order no longer matters. Runs before
+    :func:`_substitute_placeholders`, whose path-element pattern would
+    otherwise consume these occurrences too.
+    """
+    q = re.escape(quote)
+    pattern = re.compile(rf"({q}n{q}:{q}(\w+){q},{q}t{q}:{q}d{q},{q}k{q}:{q})placeholder({q})")
+
+    def repl(match: re.Match[str]) -> str:
+        value = by_name.get(match.group(2))
+        if value is None:
+            return match.group(0)
+        return f"{match.group(1)}{value}{match.group(3)}"
+
+    return pattern.sub(repl, content)
 
 
 def _resolve_dynamic_route(static_dir: Path, full_path: str) -> tuple[Path, tuple[str, ...]] | None:
@@ -1153,10 +1247,10 @@ def _resolve_dynamic_route(static_dir: Path, full_path: str) -> tuple[Path, tupl
 def _resolve_static_dir() -> Path | None:
     """Return the frontend static directory, or None if not available.
 
-    Skipped when LABDOG_DEV_MODE=1 (set by dev.sh) so the Next.js dev
+    Skipped when UNBORK_DEV_MODE=1 (set by dev.sh) so the Next.js dev
     server on :3000 is used instead of a stale static export.
     """
-    if os.environ.get("LABDOG_DEV_MODE"):
+    if os.environ.get("UNBORK_DEV_MODE"):
         return None
     configured = settings.server.static_dir
     if configured:
@@ -1171,7 +1265,7 @@ def _resolve_static_dir() -> Path | None:
         return dev_path
 
     # Auto-detect: production packaged install
-    prod_path = Path("/usr/lib/labdog/frontend/out")
+    prod_path = Path("/usr/lib/unbork/frontend/out")
     if prod_path.is_dir() and (prod_path / "index.html").is_file():
         return prod_path
 

@@ -11,6 +11,7 @@ import { useSchedules } from "@/lib/overview"
 import { hostSchedules, useHostAlerts, useHostFeed, useHostRuns } from "@/lib/host-overview"
 import { Dot, Facts, Panel, Status, Tag } from "@/components/ld"
 import { HostMetricsSection } from "@/components/host-metrics-section"
+import { InvestigateButton } from "@/components/investigate-button"
 import { FirewallBackendTag } from "./config/shared"
 import { FailedRunBanner, ScheduledRunsPanel } from "./overview-runs"
 import { ConfigLayersPanel, HostActivityPanel, HostAlertsPanel } from "./overview-side"
@@ -54,7 +55,7 @@ function AlertsSection({ hostId }: { hostId: number }) {
         {data.alert_actions.length > 0 && (
           <div className="flex flex-col gap-1" data-testid="host-alert-actions">
             <span className="text-text-3">
-              Alerts labelled <span className="mono">labdog_action</span> may run these actions here:
+              Alerts labelled <span className="mono">unbork_action</span> may run these actions here:
             </span>
             <ul className="m-0 flex list-none flex-col gap-1 p-0">
               {data.alert_actions.map((a) => (
@@ -108,10 +109,10 @@ async function fetchMapping(hostId: number): Promise<VMMapping | null> {
   }
 }
 
-/** Collapsed at the foot of the tab: the mapping itself is a fact line in
- *  the host card, and this is where it is discovered or inspected. */
+/** Under the host card and open: which VM this host is, which is what lets
+ *  a destructive action snapshot it first. */
 function ProxmoxVMSection({ hostId }: { hostId: number }) {
-  const [open, setExpanded] = useState(false)
+  const [open, setExpanded] = useState(true)
   const queryClient = useQueryClient()
 
   const { data: mapping, isLoading, error } = useQuery<VMMapping | null>({
@@ -198,6 +199,7 @@ function ConfigLine({ host, modules, onConfig }: { host: Host; modules: ModuleCu
         <Link href={`/plans?hosts=${host.id}${sync.length ? `&modules=${sync.join(",")}` : ""}`} className={link}>
           plan sync →
         </Link>
+        <InvestigateButton icon ghost label="Explain drift with AI" subject={{ kind: "drift", host_id: host.id }} about={`the drift on ${host.hostname}`} sends={`what unbork's last checks found on ${host.hostname} and what a sync would change`} />
       </span>
     )
   }
@@ -211,6 +213,7 @@ function ConfigLine({ host, modules, onConfig }: { host: Host; modules: ModuleCu
         <button type="button" className={`border-0 bg-transparent p-0 ${link}`} onClick={onConfig}>
           config →
         </button>
+        <InvestigateButton icon ghost label="Ask AI why modules could not be checked" subject={{ kind: "drift", host_id: host.id }} about={`why ${host.hostname}'s modules could not be checked`} sends={`the errors from unbork's last checks on ${host.hostname}`} />
       </span>
     )
   }
@@ -235,7 +238,8 @@ export type HostTabTarget = "config" | "metrics" | "actions" | "schedules"
  * A host's Overview: how its scheduled work is going first (a banner when
  * its own result in a schedule's newest run failed, then every schedule
  * that reaches it), then the host card, where drift is one line, and what
- * happened on it lately. The VM mapping and automatic fixes sit at the foot.
+ * happened on it lately. The VM mapping sits under the host card; automatic
+ * fixes sit at the foot.
  */
 export function OverviewTab({ hostId, host, groups, goTab }: { hostId: number; host: Host | undefined; groups: HostGroup[] | undefined; goTab: (t: HostTabTarget) => void }) {
   const queryClient = useQueryClient()
@@ -248,7 +252,6 @@ export function OverviewTab({ hostId, host, groups, goTab }: { hostId: number; h
   const runs = useHostRuns(hostId)
   const { data: summaries } = useQuery<GroupSummary[]>({ queryKey: ["groups-summary"], queryFn: () => apiFetch<GroupSummary[]>("/api/groups/summary") })
   const { data: hostSummaries } = useQuery<HostSummary[]>({ queryKey: ["hosts-summary"], queryFn: () => apiFetch<HostSummary[]>("/api/hosts/summary") })
-  const { data: mapping } = useQuery<VMMapping | null>({ queryKey: ["host-vm-mapping", hostId], queryFn: () => fetchMapping(hostId), retry: false })
   const feed = useHostFeed(hostId, host?.hostname ?? "", runs.data, schedules)
   const alerts = useHostAlerts(hostId)
 
@@ -281,46 +284,48 @@ export function OverviewTab({ hostId, host, groups, goTab }: { hostId: number; h
       <ScheduledRunsPanel schedules={reaching} hostId={hostId} hostname={host.hostname} loading={runs.isLoading} onAll={() => goTab("schedules")} />
 
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
-        <Panel
-          title="host"
-          meta={[host.os_pretty_name ?? "os not collected", host.kernel_version].filter(Boolean).join(" · ")}
-          actions={<button type="button" className="btn btn-sm btn-ghost" onClick={() => goTab("metrics")}>metrics →</button>}
-          pad={11}
-        >
-          <div className="flex flex-col gap-3">
-            <HostMetricsSection hostId={hostId} />
-            <Facts
-              min={150}
-              items={[
-                { k: "address", v: `${host.ip_address}:${host.ssh_port}`, mono: true },
-                { k: "firewall", v: <FirewallBackendTag backend={host.firewall_backend} /> },
-                { k: "proxmox", v: mapping ? `${mapping.pve_node_name} / vmid ${mapping.vmid}` : "not mapped", mono: !!mapping },
-                { k: "last verified", v: host.last_verified_at ? <span title={new Date(host.last_verified_at).toLocaleString()}>{shortAgo(host.last_verified_at)} ago</span> : "never" },
-              ]}
-            />
-            <div className="flex flex-col gap-0.5 text-[11.5px]" data-testid="host-config-line">
-              <span className="tt text-[8.5px]">config</span>
-              <ConfigLine host={host} modules={currentState} onConfig={() => goTab("config")} />
-            </div>
-            <button type="button" className="btn btn-sm btn-ghost self-start" aria-expanded={allFacts} onClick={() => setAllFacts(!allFacts)}>
-              {allFacts ? "fewer facts ▴" : "all facts ▾"}
-            </button>
-            {allFacts && (
+        <div className="flex min-w-0 flex-col gap-3">
+          <Panel
+            title="host"
+            meta={[host.os_pretty_name ?? "os not collected", host.kernel_version].filter(Boolean).join(" · ")}
+            actions={<button type="button" className="btn btn-sm btn-ghost" onClick={() => goTab("metrics")}>metrics →</button>}
+            pad={11}
+          >
+            <div className="flex flex-col gap-3">
+              <HostMetricsSection hostId={hostId} />
               <Facts
+                min={150}
                 items={[
-                  { k: "hostname", v: host.hostname, mono: true },
-                  { k: "management ip", v: host.labdog_source_ip ?? "not yet detected", mono: !!host.labdog_source_ip },
-                  { k: "sync status", v: <Status s={host.sync_status} /> },
-                  { k: "last sync", v: host.last_sync_at ? new Date(host.last_sync_at).toLocaleString() : "never" },
-                  { k: "last drift check", v: host.last_drift_check_at ? new Date(host.last_drift_check_at).toLocaleString() : "never" },
-                  ...(host.kernel_version ? [{ k: "kernel", v: host.kernel_version, mono: true }] : []),
-                  ...(host.default_nic ? [{ k: "default nic", v: host.default_nic, mono: true }] : []),
-                  { k: "drift monitoring", v: <button type="button" className="cursor-pointer border-0 bg-transparent p-0" onClick={toggleDrift}><Tag tone={host.drift_check_enabled ? "ok" : undefined}>{host.drift_check_enabled ? "enabled" : "disabled"}</Tag></button> },
+                  { k: "address", v: `${host.ip_address}:${host.ssh_port}`, mono: true },
+                  { k: "firewall", v: <FirewallBackendTag backend={host.firewall_backend} /> },
+                  { k: "last verified", v: host.last_verified_at ? <span title={new Date(host.last_verified_at).toLocaleString()}>{shortAgo(host.last_verified_at)} ago</span> : "never" },
                 ]}
               />
-            )}
-          </div>
-        </Panel>
+              <div className="flex flex-col gap-0.5 text-[11.5px]" data-testid="host-config-line">
+                <span className="tt text-[8.5px]">config</span>
+                <ConfigLine host={host} modules={currentState} onConfig={() => goTab("config")} />
+              </div>
+              <button type="button" className="btn btn-sm btn-ghost self-start" aria-expanded={allFacts} onClick={() => setAllFacts(!allFacts)}>
+                {allFacts ? "fewer facts ▴" : "all facts ▾"}
+              </button>
+              {allFacts && (
+                <Facts
+                  items={[
+                    { k: "hostname", v: host.hostname, mono: true },
+                    { k: "management ip", v: host.unbork_source_ip ?? "not yet detected", mono: !!host.unbork_source_ip },
+                    { k: "sync status", v: <Status s={host.sync_status} /> },
+                    { k: "last sync", v: host.last_sync_at ? new Date(host.last_sync_at).toLocaleString() : "never" },
+                    { k: "last drift check", v: host.last_drift_check_at ? new Date(host.last_drift_check_at).toLocaleString() : "never" },
+                    ...(host.kernel_version ? [{ k: "kernel", v: host.kernel_version, mono: true }] : []),
+                    ...(host.default_nic ? [{ k: "default nic", v: host.default_nic, mono: true }] : []),
+                    { k: "drift monitoring", v: <button type="button" className="cursor-pointer border-0 bg-transparent p-0" onClick={toggleDrift}><Tag tone={host.drift_check_enabled ? "ok" : undefined}>{host.drift_check_enabled ? "enabled" : "disabled"}</Tag></button> },
+                  ]}
+                />
+              )}
+            </div>
+          </Panel>
+          <ProxmoxVMSection hostId={hostId} />
+        </div>
 
         <div className="flex min-w-0 flex-col gap-3">
           <HostActivityPanel items={feed.items} loading={feed.isLoading || runs.isLoading} onAll={() => goTab("actions")} />
@@ -337,7 +342,6 @@ export function OverviewTab({ hostId, host, groups, goTab }: { hostId: number; h
         </div>
       </div>
 
-      <ProxmoxVMSection hostId={hostId} />
       <AlertsSection hostId={hostId} />
     </div>
   )

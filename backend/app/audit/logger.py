@@ -2,7 +2,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.subscribers import _deliver_committed, has_audit_subscribers
+from app.db_after_commit import run_after_commit
 from app.models.audit_log import AuditLog
+from app.models.user import User
 
 
 async def log_action(
@@ -16,6 +19,12 @@ async def log_action(
     ip_address: str | None = None,
 ) -> None:
     """Create an audit log entry. Append-only — never update or delete."""
+    # A background task logs for whoever started it, minutes later. If that
+    # account was deleted meanwhile the row would break the foreign key and
+    # roll back the caller's whole transaction -- a sync finalising that way
+    # stays "running" until the sweeper fails it.
+    if user_id is not None and await db.get(User, user_id) is None:
+        user_id = None
     entry = AuditLog(
         user_id=user_id,
         action=action,
@@ -27,4 +36,8 @@ async def log_action(
         created_at=datetime.now(UTC),
     )
     db.add(entry)
-    # Don't commit here — let the caller's transaction handle it
+    # Don't commit here — let the caller's transaction handle it.
+    # Extensions that subscribed hear about the row once it is committed
+    # (S-001); with none, nothing is registered.
+    if has_audit_subscribers():
+        run_after_commit(db, lambda: _deliver_committed(entry))

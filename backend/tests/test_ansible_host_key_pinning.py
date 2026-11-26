@@ -1,4 +1,4 @@
-"""SEC-26: the Ansible path must honour LabDog's own pinned host keys.
+"""SEC-26: the Ansible path must honour unbork's own pinned host keys.
 
 The asyncssh paths do real TOFU-with-pinning: the first connect records
 ``Host.ssh_host_key_entry`` and every later one verifies against it, so a
@@ -48,7 +48,7 @@ class TestTheArgsPinWhenThereIsAKey:
         assert "UserKnownHostsFile=/dev/shm/x.key.known_hosts" in args
 
     def test_the_controllers_own_known_hosts_cannot_vouch_for_the_host(self):
-        """LabDog verifies against the key it recorded, not against
+        """unbork verifies against the key it recorded, not against
         whatever the controller happens to trust system-wide."""
         assert "GlobalKnownHostsFile=/dev/null" in build_ssh_common_args("/tmp/kh")
 
@@ -61,7 +61,7 @@ class TestTheArgsPinWhenThereIsAKey:
 
 
 class TestTheArgsFallBackOnFirstContact:
-    """A host LabDog has never connected to has no key to pin to.
+    """A host unbork has never connected to has no key to pin to.
     Refusing would make a brand-new host unmanageable, so first contact
     keeps the previous posture — and the asyncssh paths record the key,
     so the window is one connection wide."""

@@ -15,9 +15,8 @@ import copy
 from dataclasses import dataclass
 from typing import Any
 
-import yaml
-
 from app.ansible_runtime.generator import generate_playbook as generate_firewall_playbook
+from app.ansible_runtime.playbook_yaml import dump_playbook, load_playbook
 from app.cron.generator import generate_cron_playbook
 from app.hosts_mgmt.generator import generate_hosts_file_playbook
 from app.packages.generator import generate_package_playbook
@@ -80,12 +79,12 @@ CANONICAL_ORDER: list[str] = [
 # The firewall module produces two distinct play names depending on
 # backend (nftables vs iptables); both map to ``firewall``.
 PLAY_NAME_TO_MODULE: dict[str, str] = {
-    "LabDog Package Management": "packages",
-    "LabDog DNS resolver sync": "resolver",
-    "LabDog service management": "services",
-    "LabDog /etc/hosts management": "hosts-file",
-    "LabDog Cron Job Management": "cron",
-    "LabDog Linux User Management": "linux-users",
+    "unbork Package Management": "packages",
+    "unbork DNS resolver sync": "resolver",
+    "unbork service management": "services",
+    "unbork /etc/hosts management": "hosts-file",
+    "unbork Cron Job Management": "cron",
+    "unbork Linux User Management": "linux-users",
     "Apply nftables firewall rules (safe mode)": "firewall",
     "Apply iptables firewall rules (safe mode)": "firewall",
 }
@@ -173,7 +172,7 @@ def compose_playbook(
                 play["hosts"] = hosts_alias
         composed.extend(plays)
 
-    return yaml.dump(composed, default_flow_style=False, sort_keys=False)
+    return dump_playbook(composed)
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +245,7 @@ def fragment_hosts_file(rendered_content: str, ssh_port: int = 22) -> PlaybookFr
         rendered_content=rendered_content,
         ssh_key_path=_UNUSED_KEY_PATH,
     )
-    return _finalize(yaml.safe_load(playbook_yaml), "hosts-file")
+    return _finalize(load_playbook(playbook_yaml), "hosts-file")
 
 
 def fragment_firewall(
@@ -269,7 +268,7 @@ def fragment_firewall(
         ssh_key_path=_UNUSED_KEY_PATH,
         policies=policies,
     )
-    return _finalize(yaml.safe_load(playbook_yaml), "firewall")
+    return _finalize(load_playbook(playbook_yaml), "firewall")
 
 
 def fragment_services(services: list[dict], ssh_port: int = 22) -> PlaybookFragment:
@@ -287,7 +286,7 @@ def fragment_services(services: list[dict], ssh_port: int = 22) -> PlaybookFragm
         services=services,
         ssh_key_path=_UNUSED_KEY_PATH,
     )
-    return _finalize(yaml.safe_load(playbook_yaml), "services")
+    return _finalize(load_playbook(playbook_yaml), "services")
 
 
 def fragment_resolver(resolver_type: str, rendered_content: str) -> PlaybookFragment:

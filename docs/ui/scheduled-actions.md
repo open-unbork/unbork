@@ -115,7 +115,7 @@ Every cron expression is read in one timezone, `scheduling.timezone` in
 [Settings › Fleet](settings.md#scheduling). It defaults to `UTC`; pick an
 IANA name such as `Europe/Stockholm` from the searchable list there, and `1 4 * * 0` runs at 04:01 on
 Stockholm's clock all year, summer and winter. Discovery scans with a
-cron schedule follow the same setting. Cron jobs LabDog manages on hosts
+cron schedule follow the same setting. Cron jobs unbork manages on hosts
 do not: they run on each host's own clock.
 
 Changing the setting keeps every schedule's clock time and moves it to
@@ -203,7 +203,7 @@ for a fully-commented example.
 
 ## Permissions
 
-All `/api/scheduled-actions/*` endpoints require **superuser**.
-Scheduling work that affects shared infrastructure is privileged.
-Ad-hoc runs (`POST /api/actions/runs`) are still open to any
-authenticated user.
+Reading schedules and their run history needs any role. Creating,
+editing and deleting a schedule needs `schedules.manage`, and **Run now**
+needs `actions.run`: both are operator and admin rights. See
+[roles](admin.md#users).

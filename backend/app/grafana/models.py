@@ -13,7 +13,7 @@ class GrafanaInstance(Base):
 
     A single ``url`` is stored: the ingest/remote-write URL the operator
     points the agent at (with whatever path their setup needs, e.g.
-    ``.../api/v1/push``). LabDog hands that URL to the Alloy install action
+    ``.../api/v1/push``). unbork hands that URL to the Alloy install action
     verbatim, and for querying it strips the URL down to the host and
     appends the kind's query path (see ``app.grafana.schemas.derive_query_url``)
     — so the operator never has to know two URLs.
@@ -46,7 +46,7 @@ class GrafanaInstance(Base):
     verify_ssl: Mapped[bool] = mapped_column(Boolean, default=True)
     # Plaintext PEM CA certificate (NOT encrypted — CA certs are public).
     ca_cert_pem: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
-    # At most one default **per kind** — the Mimir LabDog queries for host
+    # At most one default **per kind** — the Mimir unbork queries for host
     # metrics, and the Mimir/Loki it injects into the Alloy action when none
     # is explicitly chosen. Enforced in the API layer.
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -1,7 +1,13 @@
-# LabDog Documentation
+# unbork Documentation
 
-Guides and reference material for running LabDog. For a project
-summary see the [top-level README](https://github.com/open-labdog/labdog/blob/main/README.md).
+Guides and reference material for running unbork. For a project
+summary see the [top-level README](https://github.com/open-unbork/unbork/blob/main/README.md).
+
+Everything in the unbork repository, these docs included, is licensed
+AGPL-3.0-or-later, apart from bundled third-party files such as fonts. unbork Enterprise is a separate commercial package that
+is not part of that repository or this documentation; see
+[Editions](https://github.com/open-unbork/unbork/blob/main/README.md#-editions)
+in the README.
 
 ## Contents
 
@@ -34,7 +40,7 @@ summary see the [top-level README](https://github.com/open-labdog/labdog/blob/ma
 
 | Section | What it covers |
 |---|---|
-| [ui/](./ui/README.md) | Overview of every page in the LabDog web interface |
+| [ui/](./ui/README.md) | Overview of every page in the unbork web interface |
 | [ui/dashboard.md](./ui/dashboard.md) | Overview — the landing page: status bar, Pending queue, activity, drift trend, stale hosts |
 | [ui/operations.md](./ui/operations.md) | Operations — Plans (preview → apply), Drift findings, Actions library, Runs stream, Audit |
 | [ui/hosts.md](./ui/hosts.md) | Host management, discovery scanning, SSH terminal |
@@ -44,7 +50,7 @@ summary see the [top-level README](https://github.com/open-labdog/labdog/blob/ma
 | [ui/actions.md](./ui/actions.md) | Actions and Action Packs — ad-hoc playbook runs, bring-your-own playbooks, and AI verification of destructive runs |
 | [ui/assistant.md](./ui/assistant.md) | The AI assistant — connecting a provider, autonomy levels, approving a change, snapshots, spend limits |
 | [ui/alerts.md](./ui/alerts.md) | Alert intake from Grafana and Alertmanager, the labels that choose what an alert does, the actions alerts may run, deduplication, and the AI policy |
-| [ui/notifications.md](./ui/notifications.md) | Email notifications — the mail server, LabDog's address for links, per-user subscriptions, coalescing and retries, the delivery log |
+| [ui/notifications.md](./ui/notifications.md) | Email notifications — the mail server, unbork's address for links, per-user subscriptions, coalescing and retries, the delivery log |
 | [ui/admin.md](./ui/admin.md) | SSH Keys, Audit Log, User management |
 | [ui/settings.md](./ui/settings.md) | All settings configurable in the UI (log level, drift interval, timeouts, discovery tuning, AI kill switch and budgets) |
 
@@ -57,7 +63,7 @@ summary see the [top-level README](https://github.com/open-labdog/labdog/blob/ma
 | [examples/gitops/web-servers.yaml](./examples/gitops/web-servers.yaml) | Realistic web-tier example covering all seven modules. |
 | [examples/gitops/database.yaml](./examples/gitops/database.yaml) | Realistic PostgreSQL-tier example with a declared apt repository, per-user cron backups, and different resolver backend. |
 | [examples/gitops/modules/](./examples/gitops/modules/) | One focused YAML per module (firewall, services, packages, hosts-entries, cron-jobs, resolver, users) with every field annotated and edge cases demonstrated. |
-| [examples/precedence/](./examples/precedence/README.md) | How LabDog merges group-level and host-level configurations when a host belongs to multiple groups. Worked examples for every module. |
+| [examples/precedence/](./examples/precedence/README.md) | How unbork merges group-level and host-level configurations when a host belongs to multiple groups. Worked examples for every module. |
 | [examples/action-packs/](./examples/action-packs/README.md) | Three working examples of the action-pack format — minimal, destructive-with-parameter, and a pack that ships its own role. Drop into a git repo or local directory and add via the UI. |
 
 ### Operations
@@ -68,32 +74,33 @@ summary see the [top-level README](https://github.com/open-labdog/labdog/blob/ma
 | [encryption-key-rotation.md](./encryption-key-rotation.md) | When and how to rotate `security.encryption_key`: pre-rotation checklist, step-by-step procedure, rollback, and failure modes. |
 | [upgrade.md](./upgrade.md) | Upgrade and rollback procedure for new releases. |
 | [production-deploy.md](./production-deploy.md) | Docker Compose production reference (TLS, volumes, secrets). |
+| [scaling-out.md](./scaling-out.md) | Running the API, scheduler and workers as separate containers. |
 | [security-hardening.md](./security-hardening.md) | Reverse-proxy TLS, cookie/CSP/rate-limit configuration, restricting `/metrics`, DB security, superuser policy. |
-| [metrics-export.md](./metrics-export.md) | Exposing LabDog's own fleet state and health for Prometheus to scrape — enabling the opt-in `/metrics` endpoint, full metric reference, counter semantics, cardinality, and the shipped Grafana dashboard + alert rules. |
+| [metrics-export.md](./metrics-export.md) | Exposing unbork's own fleet state and health for Prometheus to scrape — enabling the opt-in `/metrics` endpoint, full metric reference, counter semantics, cardinality, and the shipped Grafana dashboard + alert rules. |
 | [trivy-rationale.md](./trivy-rationale.md) | Per-CVE rationale for entries in `.trivyignore`. |
 
 ### Where to start
 
-- **New to LabDog?** → [ui/README.md](./ui/README.md) for a tour of the interface
+- **New to unbork?** → [ui/README.md](./ui/README.md) for a tour of the interface
 - **Configuring operational settings?** → [ui/settings.md](./ui/settings.md)
 - **Setting up GitOps for the first time?** → [examples/gitops/README.md](./examples/gitops/README.md)
 - **Looking for a specific YAML field?** → the matching file in [examples/gitops/modules/](./examples/gitops/modules/)
 - **Trying to reason about multi-group hosts?** → [examples/precedence/README.md](./examples/precedence/README.md)
 - **Want to add or override action playbooks?** → [ui/actions.md](./ui/actions.md) and [examples/action-packs/README.md](./examples/action-packs/README.md)
 - **Connecting an LLM?** → [ui/assistant.md](./ui/assistant.md) — it is off by default, and the page covers autonomy levels and spend limits before it covers how to turn it on
-- **Running LabDog in production?** → [backup-restore.md](./backup-restore.md) before users start entering credentials
+- **Running unbork in production?** → [backup-restore.md](./backup-restore.md) before users start entering credentials
 
 ### Authoritative sources
 
 The YAML examples in this tree parse cleanly against the live Pydantic
 schema; the schema itself lives in
-[`backend/app/gitops/schema.py`](https://github.com/open-labdog/labdog/blob/main/backend/app/gitops/schema.py)
+[`backend/app/gitops/schema.py`](https://github.com/open-unbork/unbork/blob/main/backend/app/gitops/schema.py)
 and is the source of truth. Per-module handlers are in
-[`backend/app/gitops/importers/`](https://github.com/open-labdog/labdog/tree/main/backend/app/gitops/importers/).
+[`backend/app/gitops/importers/`](https://github.com/open-unbork/unbork/tree/main/backend/app/gitops/importers/).
 
 ## How Configuration Is Applied
 
-LabDog organizes configuration through **host groups**. You define rules at the group level, assign hosts to one or more groups, and LabDog merges everything into a single effective configuration per host.
+unbork organizes configuration through **host groups**. You define rules at the group level, assign hosts to one or more groups, and unbork merges everything into a single effective configuration per host.
 
 ### Groups, Hosts, and Priority
 
@@ -130,20 +137,20 @@ Host overrides are applied after the group merge, so they always win regardless 
 
 ### How Sync Applies to the Remote Host
 
-When you sync, LabDog computes the full effective configuration and pushes it to the host via Ansible. The apply strategy differs by module:
+When you sync, unbork computes the full effective configuration and pushes it to the host via Ansible. The apply strategy differs by module:
 
 | Module | Strategy | What happens on sync | Manual edits on host? |
 |--------|----------|---------------------|-----------------------|
 | **Firewall (nftables)** | Full replacement | Writes complete `/etc/nftables.conf` (includes `flush ruleset`), validates, reloads | Overwritten |
 | **Firewall (iptables)** | Full replacement | Writes complete iptables rules via `iptables-restore`, validates, persists | Overwritten |
 | **/etc/hosts** | Full replacement, once an entry applies | Writes complete `/etc/hosts` via atomic copy, validates localhost entry exists. A host no entry applies to keeps its file untouched | Overwritten |
-| **Services** | Per-service tasks | Deploys unit files (full or override) if configured, sets `state` (started/stopped) and `enabled` (true/false), cleans up orphaned LabDog-managed files | Preserved (unmanaged services are left alone) |
+| **Services** | Per-service tasks | Deploys unit files (full or override) if configured, sets `state` (started/stopped) and `enabled` (true/false), cleans up orphaned unbork-managed files | Preserved (unmanaged services are left alone) |
 | **Packages** | Per-package tasks | Installs/removes individual packages via `apt`/`dnf`/`yum` (auto-detected) | Preserved (unmanaged packages are left alone) |
 | **Linux users** | Per-user tasks | Creates/removes users, sets authorized_keys (`exclusive=true`), writes `/etc/sudoers.d/{user}` | Preserved (unmanaged users are left alone) |
 | **Cron jobs** | Per-job tasks | Creates/removes individual cron entries via `crontab` (identified by job name) | Preserved (unmanaged cron jobs are left alone) |
 | **DNS resolver** | Full replacement | Writes complete resolver config (`/etc/resolv.conf`, `systemd-resolved`, or NetworkManager), restarts service | Overwritten |
 
-**Key takeaway**: Modules that manage a single config file (firewall/nftables, firewall/iptables, /etc/hosts, DNS resolver) use **full replacement** — LabDog owns the entire file and manual edits will be lost on next sync. Modules that manage individual items (services, packages, users, cron jobs) are **selectively managed** — only the items you define in LabDog are touched; everything else on the host is left alone.
+**Key takeaway**: Modules that manage a single config file (firewall/nftables, firewall/iptables, /etc/hosts, DNS resolver) use **full replacement** — unbork owns the entire file and manual edits will be lost on next sync. Modules that manage individual items (services, packages, users, cron jobs) are **selectively managed** — only the items you define in unbork are touched; everything else on the host is left alone.
 
 **Coalesced execution**: From v0.2.0 onward, every sync — bulk or
 per-tab — runs through one orchestrator task per host that emits a
@@ -160,16 +167,16 @@ the Plans screen, delegate to the same orchestrator.
 
 ### Automatic Safety Rules
 
-- **SSH lockout prevention**: An SSH ACCEPT rule for the LabDog server IP is always injected at the top of the firewall ruleset (priority 999999). This rule cannot be deleted and ensures you never lock yourself out.
+- **SSH lockout prevention**: An SSH ACCEPT rule for the unbork server IP is always injected at the top of the firewall ruleset (priority 999999). This rule cannot be deleted and ensures you never lock yourself out.
 - **System /etc/hosts entries**: `127.0.0.1 localhost` and `::1 localhost` are always injected into the rendered hosts file, regardless of what you configure. So is `127.0.1.1 <full name> <short name>` with the name the host reports, unless one of your entries already maps one of those names or uses `127.0.1.1`.
 - **Protected service deny-list**: Critical services (`sshd`, `systemd-*`) are blocked from management to prevent accidental lockout.
-- **DNS resolver header**: A `# Managed by LabDog` comment is injected into rendered resolver config files.
+- **DNS resolver header**: A `# Managed by unbork` comment is injected into rendered resolver config files.
 
 ## Architecture
 
 | Component | Technology | Port |
 |-----------|-----------|------|
-| Frontend | Next.js 16 + the LabDog kit + TanStack Query | 3000 |
+| Frontend | Next.js 16 + the unbork kit + TanStack Query | 3000 |
 | Backend API | FastAPI + SQLAlchemy (async) | 8000 |
 | Database | PostgreSQL 18 | 5432 |
 | Task Queue | Celery + Redis (RedBeat scheduler) | -- |
@@ -179,7 +186,7 @@ the Plans screen, delegate to the same orchestrator.
 
 ### From Package (Recommended)
 
-Pre-built packages are available on the [Releases](https://github.com/open-labdog/labdog/releases) page for each tagged version.
+Pre-built packages are available on the [Releases](https://github.com/open-unbork/unbork/releases) page for each tagged version.
 
 **Supported distros** — the bundled venv requires `python3.12` to be
 installed at `/usr/bin/python3.12`. That's available out of the box on:
@@ -199,16 +206,16 @@ the [Docker image](#quick-start-docker) on those hosts.
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-labdog/labdog/releases/download/v${VERSION}/labdog_${VERSION}-1_amd64.deb
-sudo apt install ./labdog_${VERSION}-1_amd64.deb
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork_${VERSION}-1_amd64.deb
+sudo apt install ./unbork_${VERSION}-1_amd64.deb
 ```
 
 **RHEL / Fedora / Rocky (.rpm)**
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-labdog/labdog/releases/download/v${VERSION}/labdog-${VERSION}-1.x86_64.rpm
-sudo dnf install ./labdog-${VERSION}-1.x86_64.rpm
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-1.x86_64.rpm
+sudo dnf install ./unbork-${VERSION}-1.x86_64.rpm
 ```
 
 After package install, skip to [Post-install configuration](#post-install-configuration).
@@ -217,25 +224,45 @@ After package install, skip to [Post-install configuration](#post-install-config
 
 ```bash
 VERSION=0.2.0
-curl -LO https://github.com/open-labdog/labdog/releases/download/v${VERSION}/labdog-${VERSION}-linux-amd64.tar.gz
-tar -xzf labdog-${VERSION}-linux-amd64.tar.gz
-cd labdog-${VERSION}-linux-amd64
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-linux-amd64.tar.gz
+tar -xzf unbork-${VERSION}-linux-amd64.tar.gz
+cd unbork-${VERSION}-linux-amd64
 sudo ./install.sh
 ```
 
 ### Verifying Downloads
 
 ```bash
-curl -LO https://github.com/open-labdog/labdog/releases/download/v${VERSION}/SHA256SUMS
+curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
+```
+
+### Licence and third-party notices
+
+Every image and package carries, in `/usr/share/doc/unbork/` (packages
+also in `/usr/lib/unbork/`, which a minimal system that drops
+`/usr/share/doc` keeps; the tarball at its root too):
+
+- `LICENSE`: unbork's own licence, AGPL-3.0-or-later.
+- `THIRD-PARTY-NOTICES`: every third-party component it ships, Python,
+  npm and (in the image) Debian, with version, licence and licence text.
+- `SOURCE-OFFER.md`: where to get the source of unbork and of each of
+  those components.
+
+The image also carries the OCI labels `org.opencontainers.image.licenses`,
+`.source` and `.revision` (the commit it was built from):
+
+```bash
+docker run --rm --entrypoint cat unbork/unbork /usr/share/doc/unbork/THIRD-PARTY-NOTICES | less
+docker inspect --format '{{ json .Config.Labels }}' unbork/unbork
 ```
 
 ### Post-install Configuration
 
-All three install methods place the default config at `/etc/labdog/labdog.toml`. Edit it before starting the service:
+All three install methods place the default config at `/etc/unbork/unbork.toml`. Edit it before starting the service:
 
 ```bash
-sudo nano /etc/labdog/labdog.toml
+sudo nano /etc/unbork/unbork.toml
 ```
 
 **Required fields:**
@@ -244,17 +271,17 @@ sudo nano /etc/labdog/labdog.toml
 |---------|-------------|-----------------|
 | `[security] secret_key` | JWT signing key | `openssl rand -base64 32` |
 | `[security] encryption_key` | AES-256-GCM key for SSH key encryption (32 bytes; standard or url-safe base64) | `openssl rand -base64 32` |
-| `[security] labdog_server_ip` | This server's IP (used in SSH lockout prevention rule) | `ip route get 1 \| awk '{print $7; exit}'` |
+| `[security] unbork_server_ip` | This server's IP (used in SSH lockout prevention rule) | `ip route get 1 \| awk '{print $7; exit}'` |
 | `[database] url` | PostgreSQL async connection string | — |
 
 ```toml
 [security]
 secret_key    = "<output of: openssl rand -base64 32>"
 encryption_key = "<output of: openssl rand -base64 32>"
-labdog_server_ip = "192.168.1.10"   # this server's IP
+unbork_server_ip = "192.168.1.10"   # this server's IP
 
 [database]
-url = "postgresql+asyncpg://labdog:password@localhost:5432/labdog"
+url = "postgresql+asyncpg://unbork:password@localhost:5432/unbork"
 ```
 
 **Prerequisites** (not bundled):
@@ -265,13 +292,13 @@ url = "postgresql+asyncpg://labdog:password@localhost:5432/labdog"
 **Start the service:**
 
 ```bash
-sudo systemctl enable --now labdog.service
-sudo systemctl status labdog.service
+sudo systemctl enable --now unbork.service
+sudo systemctl status unbork.service
 # Logs:
-sudo journalctl -u labdog -f
+sudo journalctl -u unbork -f
 ```
 
-LabDog listens on `http://127.0.0.1:8000` by default. Put it behind a reverse proxy (nginx, Caddy) for HTTPS.
+unbork listens on `http://127.0.0.1:8000` by default. Put it behind a reverse proxy (nginx, Caddy) for HTTPS.
 
 ### Uninstalling
 
@@ -279,24 +306,24 @@ LabDog listens on `http://127.0.0.1:8000` by default. Put it behind a reverse pr
 
 ```bash
 # Remove (keeps config, data, and logs)
-sudo apt remove labdog
+sudo apt remove unbork
 
 # Remove everything including config, data, logs, and system user
-sudo apt purge labdog
+sudo apt purge unbork
 ```
 
 **RHEL / Fedora / Rocky**
 
 ```bash
-sudo dnf remove labdog
-# Config, data, and logs under /etc/labdog, /var/lib/labdog,
-# /var/log/labdog are preserved. Remove manually if no longer needed.
+sudo dnf remove unbork
+# Config, data, and logs under /etc/unbork, /var/lib/unbork,
+# /var/log/unbork are preserved. Remove manually if no longer needed.
 ```
 
 **Tarball install**
 
 ```bash
-cd labdog-<version>-linux-amd64
+cd unbork-<version>-linux-amd64
 sudo ./uninstall.sh          # keeps config/data/logs
 sudo ./uninstall.sh --purge  # removes everything
 ```
@@ -311,7 +338,7 @@ sudo ./uninstall.sh --purge  # removes everything
 
 1. Clone and configure:
    ```bash
-   git clone <repo-url> labdog && cd labdog
+   git clone https://github.com/open-unbork/unbork.git && cd unbork
    cp .env.example dev/.env
    ```
 
@@ -340,23 +367,23 @@ sudo ./uninstall.sh --purge  # removes everything
 
 ## Environment Variables
 
-LabDog reads settings as environment variables using the pattern
-`LABDOG_<SECTION>__<KEY>` (double underscore between section and key) —
-e.g. `LABDOG_SERVER__PORT=9000`. They can also be set in
-`dev/labdog.toml`; env vars override the file. See
+unbork reads settings as environment variables using the pattern
+`UNBORK_<SECTION>__<KEY>` (double underscore between section and key) —
+e.g. `UNBORK_SERVER__PORT=9000`. They can also be set in
+`dev/unbork.toml`; env vars override the file. See
 [`.env.example`](../.env.example) for the full reference. The most
 common ones:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LABDOG_SECURITY__SECRET_KEY` | Yes (production) | `change-me-in-production` (insecure default rejected at startup) | JWT signing key |
-| `LABDOG_SECURITY__ENCRYPTION_KEY` | Yes (production) | insecure default rejected at startup | AES-256-GCM master key for encrypting stored SSH keys, Proxmox API tokens, and git HTTPS PATs (must decode to 32 bytes; standard or url-safe base64) |
-| `LABDOG_DATABASE__URL` | Auto (Docker) | `postgresql+asyncpg://labdog:labdog@localhost:5432/labdog` | Async PostgreSQL connection string |
-| `LABDOG_REDIS__URL` | Auto (Docker) | `redis://localhost:6379/0` | Redis URL for the Celery broker and result backend |
-| `LABDOG_SECURITY__LABDOG_SERVER_IP` | No | `127.0.0.1` | IP of the LabDog server (used in the auto-injected SSH lockout rule) |
-| `POSTGRES_PASSWORD` | Docker | `labdog` | PostgreSQL password — consumed by the `postgres` container and interpolated into `LABDOG_DATABASE__URL` in the compose file |
+| `UNBORK_SECURITY__SECRET_KEY` | Yes (production) | `change-me-in-production` (insecure default rejected at startup) | JWT signing key |
+| `UNBORK_SECURITY__ENCRYPTION_KEY` | Yes (production) | insecure default rejected at startup | AES-256-GCM master key for encrypting stored SSH keys, Proxmox API tokens, and git HTTPS PATs (must decode to 32 bytes; standard or url-safe base64) |
+| `UNBORK_DATABASE__URL` | Auto (Docker) | `postgresql+asyncpg://unbork:unbork@localhost:5432/unbork` | Async PostgreSQL connection string |
+| `UNBORK_REDIS__URL` | Auto (Docker) | `redis://localhost:6379/0` | Redis URL for the Celery broker and result backend |
+| `UNBORK_SECURITY__UNBORK_SERVER_IP` | No | `127.0.0.1` | IP of the unbork server (used in the auto-injected SSH lockout rule) |
+| `POSTGRES_PASSWORD` | Docker | `unbork` | PostgreSQL password — consumed by the `postgres` container and interpolated into `UNBORK_DATABASE__URL` in the compose file |
 | `NEXT_PUBLIC_API_URL` | Frontend build | `http://localhost:8000` | Backend API URL baked into the frontend at build time |
-| `LABDOG_METRICS__ENABLED` | No | `false` | Enable the public, unauthenticated Prometheus `/metrics` endpoint — see [metrics-export.md](./metrics-export.md) |
+| `UNBORK_METRICS__ENABLED` | No | `false` | Enable the public, unauthenticated Prometheus `/metrics` endpoint — see [metrics-export.md](./metrics-export.md) |
 
 > Operational settings (drift interval, log level, SSH/Ansible
 > timeouts, audit retention, discovery tuning) are managed on the
@@ -581,7 +608,7 @@ See [ui/assistant.md](./ui/assistant.md) for autonomy levels, approvals, snapsho
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/webhooks/grafana-alerts` | Grafana contact-point receiver (bearer or basic auth against `[alerts] webhook_token`; an unset token refuses every request) |
-| `GET` | `/api/alerts` | Alerts received, with what each one's `labdog_action` came to and the investigation it did or did not get |
+| `GET` | `/api/alerts` | Alerts received, with what each one's `unbork_action` came to and the investigation it did or did not get |
 | `POST` | `/api/alerts/{id}/investigate` | Start an investigation by hand, whatever the alert's labels |
 | `GET` | `/api/alerts/actions` · `POST` | The actions alerts may run / allow one (action, where, parameters, snapshot / verify / rollback, cooldown, enabled) |
 | `GET` · `PUT` · `DELETE` | `/api/alerts/actions/{id}` | Read, change or remove one; the action itself cannot change |
@@ -591,20 +618,20 @@ See [ui/assistant.md](./ui/assistant.md) for autonomy levels, approvals, snapsho
 
 See [ui/alerts.md](./ui/alerts.md) for the labels, the intake paths, deduplication, and the auto-investigation policy.
 
-### Grafana metrics (inbound — LabDog reads host metrics)
+### Grafana metrics (inbound — unbork reads host metrics)
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET/POST` | `/api/grafana/instances` | List/register Grafana Mimir/Loki backends (bearer or basic auth; secret encrypted at rest) |
 | `GET/PUT/DELETE` | `/api/grafana/instances/{id}` | Manage a registered instance |
 | `POST` | `/api/grafana/instances/{id}/test` · `/api/grafana/instances/test` | Connection test (saved instance / pre-save draft) |
-| `GET` | `/api/grafana/hosts/{id}/metrics` | Instant CPU/memory/disk for a host (queried from the default Mimir instance by the `labdog_host_id` label) |
+| `GET` | `/api/grafana/hosts/{id}/metrics` | Instant CPU/memory/disk for a host (queried from the default Mimir instance by the `unbork_host_id` label) |
 
-See [ui/host-metrics.md](./ui/host-metrics.md) for the end-to-end loop with the Alloy install action from `labdog-playbooks`.
+See [ui/host-metrics.md](./ui/host-metrics.md) for the end-to-end loop with the Alloy install action from `unbork-playbooks`.
 
-### Metrics export (outbound — Prometheus scrapes LabDog)
+### Metrics export (outbound — Prometheus scrapes unbork)
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/metrics` | Prometheus text exposition of fleet state and LabDog self-health. **Public and unauthenticated**, and **disabled by default** — set `[metrics] enabled = true`. Returns 404 when disabled. |
+| `GET` | `/metrics` | Prometheus text exposition of fleet state and unbork self-health. **Public and unauthenticated**, and **disabled by default** — set `[metrics] enabled = true`. Returns 404 when disabled. |
 | `GET` | `/api/metrics/status` | Authenticated: whether the exporter is enabled, its scrape URL, and copy-paste config snippets (drives the UI card) |
 
 See [metrics-export.md](./metrics-export.md) for the metric reference and [examples/prometheus/](./examples/prometheus/README.md) for scrape config, alert rules and a Grafana dashboard.
@@ -612,7 +639,7 @@ See [metrics-export.md](./metrics-export.md) for the metric reference and [examp
 ## Project Structure
 
 ```
-labdog/
+unbork/
 ├── backend/
 │   ├── app/
 │   │   ├── actions/         # Pack loader, registry, manifest schema, git sync
@@ -655,7 +682,7 @@ labdog/
 │   ├── lib/                 # API client, utilities
 │   ├── Dockerfile
 │   └── package.json
-├── labdog-lint/           # CLI tool for YAML rule validation
+├── unbork-lint/           # CLI tool for YAML rule validation
 ├── packaging/               # Linux package build system (deb/rpm/tarball)
 ├── docs/                    # This directory — docs index + examples
 ├── dev/                     # Local development tools
@@ -663,7 +690,7 @@ labdog/
 │   ├── build.sh             # Local Docker build script
 │   ├── deploy.sh            # Local Docker deploy script
 │   ├── docker-compose.yml   # Local dev stack (postgres + redis)
-│   ├── labdog.toml          # Dev configuration
+│   ├── unbork.toml          # Dev configuration
 │   └── .env                 # Local secrets (gitignored — copy from .env.example)
 ├── dev.sh                   # Thin wrapper → dev/dev.sh
 ├── .env.example             # Environment variable template
@@ -672,7 +699,7 @@ labdog/
 
 ## Extension Modules
 
-LabDog uses a modular extension architecture. Each module follows the same pattern: model → schemas → merge engine → API → Ansible generator → drift detector → Celery tasks → frontend UI.
+unbork uses a modular extension architecture. Each module follows the same pattern: model → schemas → merge engine → API → Ansible generator → drift detector → Celery tasks → frontend UI.
 
 | Module | Status | Description |
 |--------|--------|-------------|
@@ -687,18 +714,18 @@ LabDog uses a modular extension architecture. Each module follows the same patte
 | Host Discovery | Shipped | Network scanning + SSH-verified bulk host import |
 | Proxmox Integration | Shipped | VM/container discovery from Proxmox VE hypervisors |
 | Grafana metrics | Shipped | Instant CPU/memory/disk on the host page from a Mimir/Prometheus backend; ties into the Alloy install action |
-| Metrics export | Shipped | Opt-in, unauthenticated `/metrics` endpoint in Prometheus exposition format covering fleet state and LabDog self-health; ships a Grafana dashboard and alert rules |
+| Metrics export | Shipped | Opt-in, unauthenticated `/metrics` endpoint in Prometheus exposition format covering fleet state and unbork self-health; ships a Grafana dashboard and alert rules |
 | GitOps | Shipped | Git-based configuration import with webhook sync |
 
 ## Known Limitations
 
 - **Drift detection edge cases**: Firewall parsers exist for nftables and iptables, but drift comparison may miss some complex rule configurations.
 - **No HTTPS in dev**: Cookie `secure=False` by default. Set `cookie_secure=True` for production with HTTPS.
-- **Single Ansible control node**: All sync operations run from the LabDog server. No distributed execution.
+- **Single Ansible control node**: All sync operations run from the unbork server. No distributed execution.
 
 ## CI/CD
 
-LabDog runs CI on GitHub Actions (`.github/workflows/ci.yml`). Stages:
+unbork runs CI on GitHub Actions (`.github/workflows/ci.yml`). Stages:
 lint → test → build → scan.
 
 - **Lint**: ruff (backend) + ESLint/tsc (frontend) + gitleaks
@@ -711,8 +738,8 @@ lint → test → build → scan.
   (i.e. when a `dev` → `main` PR merges). Builds the `.tar.gz`,
   `.deb`, `.rpm`, and `SHA256SUMS` set via `packaging/build.sh`,
   auto-tags the merge commit `vX.Y.Z` from the repo-root
-  [`VERSION`](https://github.com/open-labdog/labdog/blob/main/VERSION) file, pushes the tag, and publishes a
+  [`VERSION`](https://github.com/open-unbork/unbork/blob/main/VERSION) file, pushes the tag, and publishes a
   GitHub Release with the artifacts attached. Idempotent on tag
   presence — re-running a previous merge's workflow skips with a
   notice instead of double-releasing. See
-  [CONTRIBUTING.md → Release process](https://github.com/open-labdog/labdog/blob/main/CONTRIBUTING.md#release-process).
+  [CONTRIBUTING.md → Release process](https://github.com/open-unbork/unbork/blob/main/CONTRIBUTING.md#release-process).

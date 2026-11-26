@@ -411,8 +411,8 @@ def test_fleet_queries_group_by_host_id():
         gm.fleet_memory_percent_query(),
         gm.fleet_disk_percent_query(),
     ):
-        assert "by (labdog_host_id)" in q
-        assert 'labdog_host_id!=""' in q
+        assert "by (unbork_host_id)" in q
+        assert 'unbork_host_id!=""' in q
     assert 'mountpoint="/"' in gm.fleet_disk_percent_query()
     assert "tmpfs" in gm.fleet_disk_percent_query()
 
@@ -431,7 +431,7 @@ class _VectorClient:
 async def test_fetch_fleet_metrics_joins_by_host_and_drops_unknown_ids():
     def vec(pairs):
         return [
-            {"metric": {"labdog_host_id": str(h)}, "value": [1000.0 + h, str(v)]} for h, v in pairs
+            {"metric": {"unbork_host_id": str(h)}, "value": [1000.0 + h, str(v)]} for h, v in pairs
         ]
 
     client = _VectorClient(
@@ -439,7 +439,7 @@ async def test_fetch_fleet_metrics_joins_by_host_and_drops_unknown_ids():
             "node_cpu_seconds_total": vec([(1, 12.34), (2, 101)]),
             "MemAvailable": vec([(1, 61), (9, 50)]),
             "node_filesystem_avail_bytes": vec([(2, 91.26)])
-            + [{"metric": {"labdog_host_id": "x"}, "value": [1, "5"]}],
+            + [{"metric": {"unbork_host_id": "x"}, "value": [1, "5"]}],
         }
     )
     rows, sampled = await gm.fetch_fleet_metrics(client, {1: "nextcloud", 2: "media"})  # type: ignore[arg-type]

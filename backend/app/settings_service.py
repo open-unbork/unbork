@@ -56,7 +56,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "max": 900,
         "description": "Maximum seconds a single remote command may take.",
         "help": (
-            "Bounds each command LabDog runs over an existing SSH session — the state "
+            "Bounds each command unbork runs over an existing SSH session — the state "
             "collectors and reachability probes, not Ansible playbooks, which have their "
             "own timeout. A host that accepts the connection but then hangs on one command "
             "fails that host after this long instead of blocking every host behind it."
@@ -89,6 +89,16 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "min": 60,
         "max": 86400,
         "description": "SSH terminal idle timeout before auto-disconnect (seconds)",
+    },
+    "ssh.max_session_seconds": {
+        "type": "int",
+        "default": 43200,
+        "min": 300,
+        "max": 604800,
+        "description": (
+            "Longest an SSH terminal session may stay open, active or not, before "
+            "it is closed (seconds)"
+        ),
     },
     "logging.audit_retention_days": {
         "type": "int",
@@ -150,7 +160,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "Minutes to wait for a locked VM before a pre-run snapshot fails",
         "help": (
             "A destructive action snapshots the VM first. If Proxmox reports the VM as locked, "
-            "usually by a running backup, LabDog retries every 30 seconds for up to this long "
+            "usually by a running backup, unbork retries every 30 seconds for up to this long "
             "and logs each wait in the run output. If the lock is still there, that host fails "
             "before anything runs on it. 0 fails on the first lock, as before. The wait counts "
             "against the run's time budget, which grows by the same amount."
@@ -167,7 +177,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "Timezone that schedule cron expressions are read in.",
         "help": (
             "An IANA name such as Europe/Stockholm. Covers scheduled actions and discovery "
-            "scans; cron jobs LabDog manages on hosts run on each host's own clock. Changing it "
+            "scans; cron jobs unbork manages on hosts run on each host's own clock. Changing it "
             "keeps every schedule's clock time and moves it to the new zone, so 0 3 * * * runs "
             "at 03:00 there — check existing schedules afterwards. Across a daylight-saving "
             "change, a time the clock skips runs once at the jump and a time it repeats runs "
@@ -189,10 +199,10 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "Accept alerts from Grafana and Alertmanager.",
         "help": (
             "Recording alerts costs nothing and starts nothing on its own. What happens next is "
-            "up to the alert's Grafana labels: labdog_action runs an action from the Alerts › "
-            "Handling list, and labdog_ai or labdog_ai_automate asks for an AI investigation, "
+            "up to the alert's Grafana labels: unbork_action runs an action from the Alerts › "
+            "Handling list, and unbork_ai or unbork_ai_automate asks for an AI investigation, "
             "which is a separate switch, ai.auto_investigate_enabled. The webhook also needs "
-            "[alerts] webhook_token in labdog.toml."
+            "[alerts] webhook_token in unbork.toml."
         ),
     },
     "alerts.poll_minutes": {
@@ -213,11 +223,11 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "min": 1,
         "max": 1440,
         "description": (
-            "Minutes after a run an alert started finishes before LabDog judges whether it worked."
+            "Minutes after a run an alert started finishes before unbork judges whether it worked."
         ),
         "help": (
             "If the alert has resolved by then, the action fixed it. If it is still firing, the "
-            "action did not, and an alert labelled labdog_ai or labdog_ai_automate goes to the AI. "
+            "action did not, and an alert labelled unbork_ai or unbork_ai_automate goes to the AI. "
             "Grafana must send resolved notifications for this to tell the two apart."
         ),
     },
@@ -248,7 +258,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "choices": ["USD", "EUR", "GBP", "SEK", "NOK", "DKK", "CHF", "CAD", "AUD"],
         "description": "Currency used to display AI costs and budgets.",
         "help": (
-            "Formatting only — LabDog never converts between currencies, so this relabels the "
+            "Formatting only — unbork never converts between currencies, so this relabels the "
             "figures rather than recalculating them. Enter provider rates in the same currency "
             "you choose here."
         ),
@@ -358,12 +368,12 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "min": 0,
         "max": 1,
         "description": (
-            "Start an AI investigation when an alert labelled labdog_ai or labdog_ai_automate "
+            "Start an AI investigation when an alert labelled unbork_ai or unbork_ai_automate "
             "arrives."
         ),
         "help": (
-            "Grafana's labels decide which alerts ask for the AI: labdog_ai=true to investigate, "
-            "labdog_ai_automate=true to let it fix (see ai.alert_full_auto_rules_enabled). This "
+            "Grafana's labels decide which alerts ask for the AI: unbork_ai=true to investigate, "
+            "unbork_ai_automate=true to let it fix (see ai.alert_full_auto_rules_enabled). This "
             "spends money without anyone asking, so it is off by default and bounded by the AI "
             "budgets. What an investigation may change is ai.alert_autonomy_level."
         ),
@@ -389,9 +399,9 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "What an alert investigation may change on the host.",
         "help": (
             "read_only: it only looks. approval: each change it wants to make waits in the "
-            "approvals queue — LabDog sends no notification yet, so a request nobody opens the "
+            "approvals queue — unbork sends no notification yet, so a request nobody opens the "
             "page to see expires after ai.approval_expiry_hours. Alerts labelled "
-            "labdog_ai_automate=true in Grafana, or matching ai.alert_full_auto_rules when the "
+            "unbork_ai_automate=true in Grafana, or matching ai.alert_full_auto_rules when the "
             "rules are on, may go further."
         ),
     },
@@ -404,11 +414,11 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
             "Decide which alerts may change the host without asking by rules, not the label."
         ),
         "help": (
-            "Off: an alert may run at full auto when Grafana labels it labdog_ai_automate=true — "
+            "Off: an alert may run at full auto when Grafana labels it unbork_ai_automate=true — "
             "put the label on the alert rule, with a template if only some hosts should qualify. "
-            "On: ai.alert_full_auto_rules decides, matching alert names, labels, and LabDog "
+            "On: ai.alert_full_auto_rules decides, matching alert names, labels, and unbork "
             "hosts and groups. Either way an alert runs at full auto — changes made with nobody "
-            "approving them — only while every safeguard holds: it is firing and names a LabDog "
+            "approving them — only while every safeguard holds: it is firing and names an unbork "
             "host, the webhook token is at least 32 characters, a snapshot can be taken first, "
             "no other automatic fix is running on the host, and the cooldown and daily cap allow "
             "it. Otherwise it runs at ai.alert_autonomy_level, and its row on the Alerts page "
@@ -429,8 +439,8 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "help": (
             "A rule is conditions separated by commas, all of which must hold; an alert qualifies "
             "when any rule does. NginxDown is the alert's name; key=value and key!=value are its "
-            "labels; host:web-1 or host:web-1|web-2 is the LabDog host it resolved to; group:web a "
-            "LabDog group that host is in; !host: and !group: exclude. Example: "
+            "labels; host:web-1 or host:web-1|web-2 is the unbork host it resolved to; group:web a "
+            "unbork group that host is in; !host: and !group: exclude. Example: "
             "'NginxDown, group:web, !host:web-legacy'. Lines starting with # are comments. The "
             "default keeps the label rule; an empty list lets no alert run at full auto."
         ),
@@ -440,7 +450,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default": 1,
         "min": 0,
         "max": 1,
-        "description": "Allow full auto only on hosts LabDog can snapshot first.",
+        "description": "Allow full auto only on hosts unbork can snapshot first.",
         "help": (
             "Needs ai.snapshot_before_mutating on and a Proxmox VM mapping for the host. Turn off "
             "to allow full auto on bare metal and unmapped hosts, whose changes then have no "
@@ -499,11 +509,11 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default": 10,
         "min": 2,
         "max": 120,
-        "description": "Minutes after an automatic fix before LabDog checks whether it worked.",
+        "description": "Minutes after an automatic fix before unbork checks whether it worked.",
         "help": (
             "Counted from the end of the session. Long enough for the alert to resolve: Grafana "
             "sends the resolved notification after its next evaluation and group interval. The "
-            "check asks whether the alert resolved, whether LabDog can still reach the host over "
+            "check asks whether the alert resolved, whether unbork can still reach the host over "
             "SSH, and whether a new critical alert has fired on it."
         ),
     },
@@ -514,7 +524,7 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "max": 1,
         "description": "Roll a host back automatically when an automatic fix made it worse.",
         "help": (
-            "Worse means LabDog can no longer reach the host over SSH, or a new critical alert "
+            "Worse means unbork can no longer reach the host over SSH, or a new critical alert "
             "fired on it after the fix. The host is restored to the snapshot taken before the "
             "session's first change, which restarts it and discards everything written since. A "
             "fix that only failed to clear the alert is not rolled back."
@@ -526,10 +536,10 @@ SETTING_DEFINITIONS: dict[str, dict[str, Any]] = {
         "type": "string",
         "default": "",
         "validator": validate_public_url,
-        "description": "LabDog's address, for links in notifications.",
+        "description": "unbork's address, for links in notifications.",
         "help": (
-            "Such as https://labdog.example.com. Every notification links back to the page "
-            "it is about, and none is sent while this is empty: LabDog will not guess its "
+            "Such as https://unbork.example.com. Every notification links back to the page "
+            "it is about, and none is sent while this is empty: unbork will not guess its "
             "own address from a request's Host header, which the client chooses."
         ),
     },
@@ -551,6 +561,20 @@ _cache: dict[str, tuple[str, float]] = {}
 _CACHE_TTL = 60  # seconds
 
 
+def is_served(key: str) -> bool:
+    """Whether the settings API offers this key.
+
+    The ``ai.*`` keys are left out when the assistant is (C-026): the page
+    does not list them and a change is refused as unknown. Code that reads
+    one still gets its stored value or default.
+    """
+    if key.startswith("ai."):
+        from app.features import assistant_enabled
+
+        return assistant_enabled()
+    return key in SETTING_DEFINITIONS
+
+
 def _cast_value(key: str, raw: str) -> int | float | str:
     defn = SETTING_DEFINITIONS.get(key)
     if not defn:
@@ -566,7 +590,7 @@ def _cast_value(key: str, raw: str) -> int | float | str:
 def _validate(key: str, value: str) -> str:
     """Validate and return the normalized value string. Raises ValueError on invalid."""
     defn = SETTING_DEFINITIONS.get(key)
-    if not defn:
+    if not defn or not is_served(key):
         raise ValueError(f"Unknown setting: {key}")
 
     vtype = defn["type"]
@@ -659,6 +683,8 @@ async def get_all_settings(db: AsyncSession) -> list[dict]:
 
     settings = []
     for key, defn in SETTING_DEFINITIONS.items():
+        if not is_served(key):
+            continue
         db_row = db_settings.get(key)
         value = db_row.value if db_row else str(defn["default"])
         settings.append(

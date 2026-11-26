@@ -687,7 +687,7 @@ class TestScanConfigsAPI:
 
 class TestRegularUserScanAccess:
     """Regular (non-superuser) users have the same access to scan endpoints
-    as superusers under labdog's two-role model (the only difference between
+    as superusers under unbork's two-role model (the only difference between
     the roles is the ability to manage other users). See
     docs/security-hardening.md ``Superuser scope``."""
 

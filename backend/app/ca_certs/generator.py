@@ -3,20 +3,21 @@
 Strategy
 --------
 Each cert is written to the OS-appropriate trust-anchor directory under
-a deterministic ``labdog-<fingerprint16>.crt`` filename. After all
+a deterministic ``unbork-<fingerprint16>.crt`` filename. After all
 copies/removals are done, a single per-OS-family update task rebuilds
 the trust store.
 
 Reconciliation (no DB tracking of "previously deployed")
 --------------------------------------------------------
 The generator emits a "reconcile" task that lists existing
-``labdog-*.crt`` files on the host and removes any whose filename is
+``unbork-*.crt`` files on the host and removes any whose filename is
 not in the current desired set. This means deleting a cert from the
 group config and re-running the action removes it from hosts, without
-LabDog needing to remember what was previously deployed.
+unbork needing to remember what was previously deployed.
 """
 
 from app.ansible_runtime.inventory import generate_inventory
+from app.ansible_runtime.playbook_yaml import Template
 
 # Per-OS-family configuration: drop-in directory + update command.
 _OS_CONFIG: list[tuple[str, str, str, str]] = [
@@ -33,7 +34,7 @@ def _short_fingerprint(fp: str) -> str:
 
 
 def cert_filename(fingerprint_sha256: str) -> str:
-    return f"labdog-{_short_fingerprint(fingerprint_sha256)}.crt"
+    return f"unbork-{_short_fingerprint(fingerprint_sha256)}.crt"
 
 
 def generate_ca_cert_playbook(
@@ -54,7 +55,7 @@ def generate_ca_cert_playbook(
         ``name`` (for task labels).
     known_hosts_path:
         File holding this host's pinned SSH host key (SEC-26). ``None``
-        keeps the ``accept-new`` fallback for a host LabDog has not
+        keeps the ``accept-new`` fallback for a host unbork has not
         recorded a key for yet.
 
     Returns
@@ -117,34 +118,34 @@ def generate_ca_cert_playbook(
                 }
             )
 
-        # Reconcile: discover any labdog-*.crt files and remove
+        # Reconcile: discover any unbork-*.crt files and remove
         # those not in the desired set.
         keep_full_paths = sorted(f"{drop_in_dir}/{fname}" for fname in keep_filenames)
         keep_paths_jinja = "[" + ", ".join(f"'{p}'" for p in keep_full_paths) + "]"
 
         tasks.append(
             {
-                "name": f"[{label}] Discover existing LabDog-managed certs",
+                "name": f"[{label}] Discover existing unbork-managed certs",
                 "ansible.builtin.find": {
                     "paths": drop_in_dir,
-                    "patterns": "labdog-*.crt",
+                    "patterns": "unbork-*.crt",
                     "file_type": "file",
                 },
-                "register": f"labdog_existing_{label.lower()}",
+                "register": f"unbork_existing_{label.lower()}",
                 "when": os_when,
             }
         )
 
         tasks.append(
             {
-                "name": f"[{label}] Remove orphaned LabDog-managed certs",
+                "name": f"[{label}] Remove orphaned unbork-managed certs",
                 "ansible.builtin.file": {
-                    "path": "{{ item.path }}",
+                    "path": Template("{{ item.path }}"),
                     "state": "absent",
                 },
-                "loop": (
+                "loop": Template(
                     "{{ "
-                    f"labdog_existing_{label.lower()}.files | default([]) "
+                    f"unbork_existing_{label.lower()}.files | default([]) "
                     f"| rejectattr('path', 'in', {keep_paths_jinja}) "
                     "| list "
                     "}}"
@@ -166,7 +167,7 @@ def generate_ca_cert_playbook(
 
     playbook = [
         {
-            "name": "LabDog CA Certificate Deployment",
+            "name": "unbork CA Certificate Deployment",
             "hosts": "all",
             "become": True,
             "gather_facts": True,

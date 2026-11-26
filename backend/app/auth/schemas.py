@@ -1,11 +1,38 @@
+from datetime import datetime
+
 from fastapi_users import schemas
-from pydantic import field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.auth.password_policy import check_password
 
 
 class UserRead(schemas.BaseUser[int]):
-    pass
+    role: str | None = None
+    display_name: str | None = None
+    last_login_at: datetime | None = None
+    must_change_password: bool = False
+
+
+class MeRead(UserRead):
+    """``GET /api/users/me``: the account plus what it may do.
+
+    ``permissions`` is the global set from ``app.auth.permissions``.
+    ``permissions_anywhere`` adds what the user holds on at least one host
+    or group (the same set in Community, where nothing is scoped); the
+    frontend shows a zone from it, and asks
+    ``GET /api/users/me/permissions`` for one host's or group's set.
+    """
+
+    permissions: list[str] = []
+    permissions_anywhere: list[str] = []
+
+
+class ScopedPermissions(BaseModel):
+    """``GET /api/users/me/permissions``: what the caller may do on one target."""
+
+    scope: str
+    id: int | None = None
+    permissions: list[str] = []
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -32,4 +59,14 @@ class UserUpdate(schemas.BaseUserUpdate):
     ``UserManager.validate_password``. Duplicating the rule here would
     mean two places to keep in step, and the manager is the one that
     cannot be bypassed.
+
+    ``current_password`` is required when a user changes their own
+    password through ``PATCH /api/users/me``; ``UserManager.update``
+    checks it and strips it before anything is written. Without it a
+    session somebody copied could set a new password and lock the owner
+    out, which is the one outcome revoking sessions on a password change
+    exists to prevent.
     """
+
+    current_password: str | None = None
+    display_name: str | None = Field(default=None, max_length=255)

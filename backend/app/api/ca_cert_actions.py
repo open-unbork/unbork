@@ -19,14 +19,15 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.users import current_active_user
+from app.api._group_sync import group_member_ids_or_400
+from app.auth.permissions import require, row_scope
 from app.ca_certs.actions import (
     CA_CERT_MODULE_TYPE,
     enqueue_ca_cert_action_for_host,
     host_has_running_ca_cert_action,
 )
 from app.db import get_db
-from app.models.host import Host, HostGroupMembership
+from app.models.host import Host
 from app.models.host_group import HostGroup
 from app.models.sync_job import SyncJob
 from app.models.user import User
@@ -77,7 +78,7 @@ def _serialize_run(job: SyncJob, hostname: str | None) -> CACertActionRunRespons
 )
 async def deploy_ca_certs_to_host(
     host_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     host = (await db.execute(select(Host).where(Host.id == host_id))).scalar_one_or_none()
@@ -103,7 +104,7 @@ async def deploy_ca_certs_to_host(
 @router.post("/groups/{group_id}/deploy", status_code=201)
 async def deploy_ca_certs_to_group(
     group_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     group = (
@@ -112,12 +113,7 @@ async def deploy_ca_certs_to_group(
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    memberships = await db.execute(
-        select(HostGroupMembership.c.host_id).where(HostGroupMembership.c.group_id == group_id)
-    )
-    host_ids = [r[0] for r in memberships.all()]
-    if not host_ids:
-        raise HTTPException(status_code=400, detail="No hosts in this group")
+    host_ids = await group_member_ids_or_400(db, group_id)
 
     triggered = 0
     skipped = 0
@@ -149,7 +145,7 @@ async def deploy_ca_certs_to_group(
 async def list_host_ca_cert_runs(
     host_id: int,
     limit: int = 20,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     host = await db.scalar(select(Host).where(Host.id == host_id))
@@ -175,7 +171,7 @@ async def list_host_ca_cert_runs(
 async def list_group_ca_cert_runs(
     group_id: int,
     limit: int = 50,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view")),
     db: AsyncSession = Depends(get_db),
 ):
     group = await db.scalar(select(HostGroup).where(HostGroup.id == group_id))
@@ -198,7 +194,7 @@ async def list_group_ca_cert_runs(
 @router.get("/runs/{run_id}", response_model=CACertActionRunResponse)
 async def get_ca_cert_run(
     run_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view", scope=row_scope(SyncJob, "run_id"))),
     db: AsyncSession = Depends(get_db),
 ):
     row = (

@@ -13,7 +13,7 @@ unresponsive host stopped every host after it from being checked at all,
 silently, on every tick.
 
 The deadline is bound at the connection rather than at each call site.
-Every SSH connection LabDog opens comes from ``app.ssh_utils``, so
+Every SSH connection unbork opens comes from ``app.ssh_utils``, so
 binding it there covers the call sites that exist and the ones written
 later, and no one can opt out by forgetting. These tests assert that
 property — that the *connection* carries it — rather than counting call

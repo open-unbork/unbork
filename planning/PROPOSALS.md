@@ -1,0 +1,318 @@
+# Proposals
+
+Work that is on neither roadmap. Nothing here is scheduled until Dennis
+accepts it; an accepted proposal becomes a normal item marked
+`source: proposed`. Status is one of open, accepted, rejected, deferred.
+Proposals about the Enterprise repository (PR-08 to PR-10) are in its
+`planning/PROPOSALS.md`. Ranked across both files: PR-01, PR-02, PR-03,
+PR-08, PR-09, PR-07, PR-06, PR-04, PR-10, PR-05. PR-12 to PR-17 came
+later and are unranked.
+
+| ID | Title | Raised by | When | From | Status |
+|---|---|---|---|---|---|
+| PR-01 | Audit rows for firewall rule changes | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-047 |
+| PR-02 | Finish the rename under the hood, with fallbacks | Claude | 2026-11-14 | planning | accepted (D-02), now C-048 to C-051 |
+| PR-03 | Test the upgrade from 1.1.0 in packaging-smoke | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-052 |
+| PR-04 | Bind stored secrets to their row | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-060 |
+| PR-05 | Bring CLAUDE.md up to date | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-051 |
+| PR-06 | A unit-test harness for the frontend | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-061 |
+| PR-07 | Measure coverage in CI and record a load-test baseline | Claude | 2026-11-14 | planning | accepted 2026-11-14, now C-062, C-063 |
+| PR-12 | Protected hosts: refuse actions and hold the assistant to reads | Claude | 2026-11-14 | C-016 spec | accepted 2026-11-16 (D-28), folded into C-016 |
+| PR-13 | k8s-upgrade: default the etcd backup off the node's own disk | Claude | 2026-11-14 | C-027 spec | accepted 2026-11-16, to be scheduled |
+| PR-14 | Jump host support for managed hosts, as its own item | Claude | 2026-11-14 | C-057 spec | deferred 2026-11-16, until a user needs it |
+| PR-15 | kennel: its own UI, a "last restore test" badge, a built-in restore-test action, OpenTofu blueprints | Claude | 2026-11-14 | C-028 specs | deferred 2026-11-16, with kennel |
+| PR-16 | Split the GitOps export out of C-033 and schedule it | Claude | 2026-11-14 | C-033 spec | accepted 2026-11-16, split out of C-033, to be scheduled |
+| PR-17 | Build the assistant usage quota half of C-038 now | Claude | 2026-11-14 | C-038 spec | deferred 2026-11-16, to C-038's stage |
+| PR-18 | Match `@types/node` to the Node 24 the frontend runs on, then move to Vitest 5 | Claude | 2026-11-15 | C-061 | accepted 2026-11-16, any stage |
+| PR-19 | Close the CLA allowlist's name loophole | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16 (D-49 option b), done in S-011 |
+| PR-20 | Backend tests fail when `frontend/out` exists | Claude | 2026-11-15 | stage 0 review | accepted 2026-11-16, to be scheduled |
+| PR-21 | Bulk syncs cannot keep up with 300 hosts every 15 minutes | Claude | 2026-11-15 | C-063 baseline | accepted 2026-11-16 for its next step only (rerun, then decide) |
+
+## PR-01 Audit rows for firewall rule changes
+- **Why:** BUG-147 in `BUGS.md` (Medium): `backend/app/api/rules.py` has
+  no `log_action` call, so creating, editing, deleting or reordering a
+  firewall rule leaves no audit row. Every other module audits through
+  `RuleAudit` in `backend/app/api/_scoped_rules.py`. C-008 closes the
+  same kind of hole for action runs, and S-001 forwards the audit stream,
+  so a missing module there is a missing module downstream.
+- **Edition and effort:** Community, S.
+- **Where:** stage 0, next to C-008.
+
+## PR-02 Finish the rename under the hood, with fallbacks
+- **Why:** see D-02. `LABDOG_` prefix (`backend/app/config.py:276`),
+  `labdog-backend` distribution (`backend/pyproject.toml`),
+  `/var/lib/labdog` (`Dockerfile:73`), `title: 'LabDog'`
+  (`website/docusaurus.config.ts:11`), README heading. The board's
+  release item asks to check "the upgrade path for an existing LabDog
+  install (data, config path, service names)" but lists no rename work.
+- **Edition and effort:** Community, L (would be split: config and env,
+  paths and packaging, docs and README).
+- **Where:** stage 1, before C-001. Only if D-02 is answered A or B.
+
+## PR-03 Test the upgrade from 1.1.0 in packaging-smoke
+- **Why:** `packaging/tests/run-smoke.sh` install-tests a clean machine
+  only; nothing installs the released 1.1.0 package and upgrades it. The
+  first release under a new name is where an upgrade is most likely to
+  break, and C-001 would otherwise verify it by hand once.
+- **Edition and effort:** Community, M.
+- **Where:** stage 1, as part of C-001.
+
+## PR-04 Bind stored secrets to their row
+- **Why:** SEC-50 in `BUGS.md` (Low): `context_id` is never passed in
+  `backend/app/crypto/encryption.py:21,35`, so a ciphertext copied to
+  another row decrypts. S-004 reworks the same call sites; doing both in
+  one pass avoids touching 52 files twice.
+- **Edition and effort:** Community, M (needs a re-encrypting migration).
+- **Where:** stage 5, with S-004.
+
+## PR-05 Bring CLAUDE.md up to date
+- **Why:** it is headed "LabDog Development Guide", says "Backend (326
+  tests)" where the suite has more than 4,700, and autonomous sessions read
+  it first.
+- **Edition and effort:** Community, S.
+- **Where:** stage 0, or with PR-02.
+
+## PR-06 A unit-test harness for the frontend
+- **Why:** `frontend/package.json` has no unit-test script; the only
+  frontend tests are Playwright specs that need the full stack. The
+  board's refactor item (C-043) notes that each refactor needed a
+  throwaway harness for that reason, and stage reviews cannot reproduce a
+  frontend bug with a failing test without one.
+- **Edition and effort:** Community, M.
+- **Where:** stage 0.
+
+## PR-07 Measure coverage in CI and record a load-test baseline
+- **Why:** `pytest-cov` is a dev dependency but `backend-test` in
+  `.github/workflows/ci.yml` runs plain `pytest`, so coverage is unknown
+  between sessions. `dev/loadtest/` exists but its last numbers are in PR
+  #270 and it is not run on any schedule. Stage reviews are asked to
+  compare performance and coverage with the previous stage and have
+  nothing recorded to compare with.
+- **Edition and effort:** Community, S for coverage, M for a recorded
+  load-test run on lin-manager-2.
+- **Where:** stage 0.
+
+## PR-12 to PR-17 Found while writing the specs
+- **PR-12:** the board's protected-host item also wants action runs
+  refused unless the manifest opts in, and the assistant's SSH tool held
+  to read-only commands. C-016 stops at config writes. Community, M.
+- **PR-13:** `etcd_backup_dir` in the public pack's `k8s-upgrade`
+  manifest defaults to the node's own disk, so a lost node loses its
+  backup. Pack-only, S. Independent of C-027.
+- **PR-14:** unbork cannot reach a host through a jump host. C-057 adds
+  it for the kennel sandbox; it is useful without kennel. Community, M.
+- **PR-15:** four things on the board's kennel notes have no item.
+- **PR-16:** `backend/app/gitops/serializer.py` already serialises every
+  module; a loader and a route are missing. Much smaller than C-033's L.
+- **PR-17:** the quota half of C-038 is fully designed on the board; the
+  per-session allowance is not.
+
+## PR-18 Match @types/node to Node 24, then Vitest 5
+- **Why:** CI and the image run the frontend build on Node 24, but
+  `frontend/package.json` pins `@types/node` to `^20`. Vitest 5 declares
+  `@types/node ^22 || >=24` as an optional peer, so C-061 had to take
+  Vitest 4. Bumping `@types/node` to `^24` may surface type errors to fix.
+- **Edition and effort:** Community, S.
+- **Where:** any stage; no item depends on it.
+
+## PR-19 Close the CLA allowlist's name loophole
+- **Finding (stage 0 review, medium):** CLA Assistant Lite checks a
+  commit's GitHub login, but falls back to the git author *name* when
+  neither the author nor the committer email is linked to an account.
+  Anyone can then pass the check by committing as `Claude` or
+  `therealscienta`. `Claude` is in the allowlist because most commits on
+  `dev` are authored and committed as `Claude <noreply@anthropic.com>`.
+- **Options:** (a) have the maintainer's coding sessions commit with a
+  committer linked to Dennis's account, then drop `Claude` from the
+  allowlist; (b) add a second job, no checkout, that fails a PR from a
+  fork when any of its commits has neither a linked author nor a linked
+  committer (`GET /pulls/{n}/commits`, `author == null && committer ==
+  null`).
+- **Recommendation:** (b) now, since it needs nobody to change how they
+  commit; (a) later if wanted. Community and playbooks, S. Decision D-49.
+
+## PR-20 Backend tests fail when `frontend/out` exists
+- **Finding (stage 0 review, low):** with a built `frontend/out/`,
+  `app.main` mounts the SPA catch-all `GET/HEAD /{full_path:path}`, which
+  has no `require()`, and four tests in `tests/test_permissions.py` fail.
+  CI is unaffected (backend-test never builds the frontend), but a
+  developer who ran `npm run build` sees a red suite.
+- **Fix:** list the catch-all in the test's `PUBLIC` set, or have the
+  test app skip the static mount. Community, S.
+
+## PR-21 Bulk syncs cannot keep up with 300 hosts every 15 minutes
+- **Finding (C-063 baseline):** in `S2 300 default` a bulk sync takes
+  about 18 s and only 4 run at once (about 800 an hour), against 1,200
+  an hour requested. The backlog never cleared: median 209 pending,
+  median wait 18 min, and 120 to 136 hosts skipped per tick. The host's
+  4 cores were also 92% busy, shared with the fake hosts, so part of this
+  is the test machine.
+- **Next step:** repeat the run in two-host mode (fake hosts elsewhere)
+  and with more sync slots, to tell CPU from slot count, then decide
+  whether the default slot count or the per-sync cost should change.
+  Community, M.
+
+## PR-22 Ask the run gate outside the host's advisory lock
+- **Finding (stage 1 review, medium):** `gate_sync_job` runs inside
+  `_claim_or_defer`'s transaction, which holds `pg_advisory_xact_lock`
+  for the host. A gate that calls out (a change-management API) holds the
+  lock for that call: group actions over many hosts and every
+  `release_host_queue` on those hosts wait on it, and the drift sweep
+  skips them for the tick.
+- **Fix:** ask the gate first, then lock and re-check the host, or commit
+  and release the lock around the gate call. Also consider a timeout per
+  gate call in `check_run`. Community, S. Status: accepted 2026-11-16 (D-52).
+
+## PR-23 Make a long run-gate hold cheap
+- **Finding (stage 1 review, medium):** each held sync or action run goes
+  back through a full Celery task every time it is due (by default every
+  minute). A freeze holding 300 hosts for 8 hours is about 144k task runs
+  and connections, and held action runs queue on `orchestrator` behind
+  long orchestrations. `retry_held` also loads each due row one by one.
+- **Fix:** ask the gate in `retry_held` before sending, and push
+  `gate_retry_at` forward on a repeated deferral, so a still-held row
+  costs no task; load due rows in one query; tell gate authors to return
+  a real `retry_at`. Community, S. Status: accepted 2026-11-16 (D-52).
+
+## PR-24 A deferred schedule asks the gate every tick
+- **Finding (stage 1 review, low):** `_gate_schedule` ignores
+  `verdict.retry_at`, so a held schedule asks again every 60 s, inside the
+  serial walk over schedules. With many due schedules and a slow gate a
+  tick can outlast its interval.
+- **Fix:** keep the hold on the schedule (or cache it per tick) and skip
+  the gate until it passes. Community, S. Status: accepted 2026-11-16 (D-52).
+
+## PR-25 An action run is gated once, before it waits for a host
+- **Finding (stage 1 review, medium):** `gate_action_run` asks when the
+  orchestrator picks the run up. A run that then waits behind a busy host
+  is not asked again, so a run allowed at 21:55 can start at 22:30 inside
+  a freeze that began at 22:00. Syncs are asked when the host is free.
+  Documented in `CLAUDE.md` for now.
+- **Fix:** also ask in the per-host claim (`action_host`, `action_group`)
+  when the run had to wait. Needs care with partial group runs (what a
+  refusal means for members already done). Community, M. Status: accepted 2026-11-16 (D-52).
+
+## PR-26 Bound the firewall rule reorder
+- **Finding (stage 1 review, low):** `reorder_rules` loads one rule per
+  id, and `RuleReorder.rule_ids` has no upper bound; the new audit row
+  carries the whole list. 500 ids is 500 SELECTs and one ~50 KB row.
+- **Fix:** one `id.in_(rule_ids)` query and a `max_length` on the list
+  (an API change, so it needs a number). Community, S. Status: accepted 2026-11-16 (D-52).
+
+## PR-27 Small tidy-ups from the stage 1 review
+- **Finding (stage 1 review, low):** cross-module imports of underscore
+  helpers (`host_lock._dispatch_pending_*`,
+  `action_orchestrator._resolve_target_host_ids`,
+  `audit.subscribers._deliver_committed`); the same registry boilerplate
+  in `app/run_gate.py` and `app/audit/subscribers.py`; the
+  `_is_trusted_proxy` / `_get_client_ip` aliases kept in `app/main.py`
+  for one test; four copies of the contract-version test.
+- **Fix:** make the shared helpers public, share one small hook-registry
+  helper, point the test at `app.client_ip`, keep one exact
+  `PLUGIN_API` test. Community, S. Status: accepted 2026-11-16 (D-52).
+
+## PR-28 Audit host create, edit and delete
+- **Finding (stage 1 live check):** `POST /api/hosts` (and the host edit
+  and delete routes) write no audit row; only `trust_host_key` does.
+  Groups, users and SSH keys are audited. An audit subscriber therefore
+  never hears about a new host, which is the stage 1 goal ("every change
+  ... leaves an audit row") left short on the most basic object.
+- **Fix:** `log_action` create/update/delete on `host`, with the
+  connection fields in before/after and no secrets. Community, S.
+  Status: accepted 2026-11-16 (D-52).
+
+## PR-29 Log a successful plugin load in the Celery processes
+- **Finding (stage 1 live check):** core's "plugin ... loaded" line shows
+  only in the API log. In the worker parent and beat, extensions load from
+  Celery's `import_modules` signal, before logging is configured, so the
+  INFO line is dropped (failures, at ERROR, do show).
+- **Fix:** log the loaded plugins again at `worker_ready` / `beat_init`
+  from `loaded_plugins`, or configure logging before the signal. Community,
+  S. Status: accepted 2026-11-16 (D-52).
+
+## PR-30 Clear pending_reason when a run starts
+- **Finding (stage 1 live check):** a sync or action run that waited
+  (host busy, or held by a gate) keeps its `pending_reason` after it ran
+  and finished, so a finished row still says "test hold".
+- **Fix:** clear it on claim, or show it only while `pending`. Community,
+  S. Status: accepted 2026-11-16 (D-52).
+
+## PR-31 Run the Claude Code install off the event loop
+- **Finding (stage 2 review):** `build_runner` → `ensure_installed` is
+  synchronous and runs inside async sessions and AI verify steps. Since
+  the review it never waits on another download and fails fast after a
+  recent failure, but the one session that does download blocks its event
+  loop (a group verify's other members) for the download.
+- **Fix:** `await asyncio.to_thread(...)`, or install before the loop
+  starts. Community, S. Status: open.
+
+## PR-32 Keep AI snapshot pruning when the assistant is off
+- **Finding (stage 2 review):** with `[assistant] enabled = false` beat
+  deletes `prune-ai-snapshots`, so Proxmox snapshots the assistant took
+  before it was turned off are never pruned.
+- **Fix:** move the pruning task to a base task module (the tables stay
+  anyway). Community, S. Status: open.
+
+## PR-33 Small tidy-ups from the stage 2 review
+- `AI_ENTRY_NAMES` in `beat_registry.py` copies four entry names by hand
+  and its test is true by construction; export each module's name and
+  build the list from them.
+- One helper for the program path (`runner._program_path`,
+  `claude_cli.program_path`, two inline `binary_path()` checks).
+- Names: `SUBSCRIPTION_BACKED_TYPES` / `uses_subscription()` now also mean
+  "needs the Claude Code program"; `_ensure_program` raises
+  `AIDisabledError` for a missing program.
+- `claude_code.status()` runs once per provider row of a list; compute it
+  once per request. `send_task` publishes synchronously in async handlers;
+  move it to the threadpool.
+- `AIProviderRuntime.state` repeats `claude_code.State` as its own
+  `Literal`; reuse it.
+- Dockerfile: copy and run `claude_code_pin.py` in a later layer so an
+  edit to it does not reinstall every Python dependency.
+- A shared docs base URL constant in the frontend.
+Community, S. Status: open.
+
+## PR-34 A package rebuild without --clean ships stale backend code
+Found in stage 3 (C-052). `packaging/build.sh` without `--clean` reused
+`packaging/staging/`, and the `.deb` it built carried the previous
+`backend/app/config.py` although the working tree had changed: the venv
+step, which also copies the backend source, is skipped once its output
+exists. CI always builds in a fresh checkout, so releases are not
+affected; a developer testing a change locally is. Copy the backend
+source in a target of its own that always runs, or have `build.sh`
+clear `staging/usr/lib/unbork/backend` every time. Community, S.
+Status: open.
+
+## Other work Dennis asked to add
+
+Added 2026-11-14. These are normal items with `source: user`; they get
+scores, a stage and specs in Phases 4 and 5.
+
+- **C-044 Keep the VM's memory in the rollback snapshot.** Dennis's goal:
+  a rollback restores the running machine, memory included.
+  `ProxmoxClient.create_snapshot` (`backend/app/proxmox/client.py:229`)
+  sends only `snapname` and `description`, so today's snapshots hold
+  disks only and a rollback leaves the VM as if it had lost power.
+  Proxmox takes a `vmstate` flag on that same call. Community, M, class B.
+  Fits stage 2, after S-003.
+- **C-045 PBS restore points through kennel.** Parked with C-028 by decision D-19. Original wording: take a backup
+  before a destructive run and restore from it on failure, for hosts or
+  storage where a snapshot is not possible, and keep restore points
+  beyond the run. Not specified until kennel is decided.
+- **Coupling with kennel (Dennis, 2026-11-14).** C-044, C-045 and S-003
+  are to be designed together with the possible intermediate VM service
+  called kennel (C-028, the board's "Companion VM layer"), which would
+  own Proxmox communication and VM state for automatic backup restore
+  tests and Kubernetes surge nodes during upgrades. Kennel is future
+  work; how far it can be taken is being explored separately. Until that
+  comes back: S-003's interface must be one kennel could sit behind, and
+  C-045 is not specified, because restoring from backups may belong in
+  kennel instead of unbork.
+- **Future kennel use cases (Dennis, 2026-11-14: note them, decide
+  later).** Parked ideas, not items: Kubernetes autoscaling on Proxmox (a
+  Cluster Autoscaler external gRPC provider), CI runners, preview
+  environments, multi-VM disaster-recovery drills, forensic copies,
+  Proxmox node maintenance, and pack tests on real VMs. Listed under
+  "Future use cases" in https://claude.ai/artifact/MJo5wKpzFdKspSeMNDrL3S
+- A third item from the same message is Enterprise and is recorded in
+  that repository.

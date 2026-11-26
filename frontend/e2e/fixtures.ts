@@ -6,7 +6,7 @@
  * make a mutating API call against this backend.
  *
  * Every POST/PUT/PATCH/DELETE outside a handful of auth paths goes through
- * `CSRFMiddleware`, which requires the `labdog_csrf` cookie *and* an
+ * `CSRFMiddleware`, which requires the `unbork_csrf` cookie *and* an
  * `X-CSRF-Token` header carrying the same value (double-submit). The
  * browser gets the header from `lib/api.ts`, which reads the cookie itself;
  * Playwright's `request` fixture carries the cookie from `storageState` but
@@ -29,7 +29,7 @@ function readCsrfToken(): string {
   try {
     const state = JSON.parse(fs.readFileSync(AUTH_FILE, "utf-8"))
     const cookie = (state.cookies ?? []).find(
-      (c: { name: string }) => c.name === "labdog_csrf"
+      (c: { name: string }) => c.name === "unbork_csrf"
     )
     return cookie?.value ?? ""
   } catch {

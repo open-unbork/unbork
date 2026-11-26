@@ -239,11 +239,11 @@ class TestAnthropic:
         provider = AnthropicProvider("claude-opus-5")
         system, wire = provider._to_wire(
             [
-                NormalizedMessage(role="system", content="You are LabDog."),
+                NormalizedMessage(role="system", content="You are unbork."),
                 NormalizedMessage(role="user", content="hi"),
             ]
         )
-        assert system == "You are LabDog."
+        assert system == "You are unbork."
         assert wire == [{"role": "user", "content": "hi"}]
 
     async def test_tool_results_merge_into_one_user_turn(self):

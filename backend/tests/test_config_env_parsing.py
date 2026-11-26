@@ -18,15 +18,15 @@ def _env(**overrides: str) -> dict[str, str]:
     """Start from a minimal env that satisfies the secret-key validator."""
     base = {
         # 32+ chars: _validate_required rejects anything shorter (SEC-31).
-        "LABDOG_SECURITY__SECRET_KEY": "test-secret-key-not-for-production",
-        "LABDOG_SECURITY__ENCRYPTION_KEY": "vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=",
+        "UNBORK_SECURITY__SECRET_KEY": "test-secret-key-not-for-production",
+        "UNBORK_SECURITY__ENCRYPTION_KEY": "vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=",
     }
     base.update(overrides)
     return base
 
 
 def test_scalar_fields_pass_through():
-    with patch.dict(os.environ, _env(LABDOG_SERVER__PORT="9001"), clear=True):
+    with patch.dict(os.environ, _env(UNBORK_SERVER__PORT="9001"), clear=True):
         s = Settings()
     assert s.server.port == 9001
 
@@ -36,7 +36,7 @@ def test_existing_allowed_origins_list_accepts_csv():
     raw-string behaviour when set via env var."""
     with patch.dict(
         os.environ,
-        _env(LABDOG_SECURITY__ALLOWED_ORIGINS="http://a,http://b"),
+        _env(UNBORK_SECURITY__ALLOWED_ORIGINS="http://a,http://b"),
         clear=True,
     ):
         s = Settings()
@@ -46,7 +46,7 @@ def test_existing_allowed_origins_list_accepts_csv():
 def test_allowed_origins_accepts_json_array():
     with patch.dict(
         os.environ,
-        _env(LABDOG_SECURITY__ALLOWED_ORIGINS='["http://a","http://b"]'),
+        _env(UNBORK_SECURITY__ALLOWED_ORIGINS='["http://a","http://b"]'),
         clear=True,
     ):
         s = Settings()
@@ -54,7 +54,7 @@ def test_allowed_origins_accepts_json_array():
 
 
 def test_allowed_origins_empty_env_yields_empty_list():
-    with patch.dict(os.environ, _env(LABDOG_SECURITY__ALLOWED_ORIGINS=""), clear=True):
+    with patch.dict(os.environ, _env(UNBORK_SECURITY__ALLOWED_ORIGINS=""), clear=True):
         s = Settings()
     assert s.security.allowed_origins == []
 
@@ -62,7 +62,7 @@ def test_allowed_origins_empty_env_yields_empty_list():
 def test_allowed_origins_csv_strips_whitespace_and_drops_empties():
     with patch.dict(
         os.environ,
-        _env(LABDOG_SECURITY__ALLOWED_ORIGINS=" http://a , , http://b "),
+        _env(UNBORK_SECURITY__ALLOWED_ORIGINS=" http://a , , http://b "),
         clear=True,
     ):
         s = Settings()
@@ -72,7 +72,7 @@ def test_allowed_origins_csv_strips_whitespace_and_drops_empties():
 def test_ansible_packs_root_dir_settable_from_env():
     with patch.dict(
         os.environ,
-        _env(LABDOG_ANSIBLE__PACKS_ROOT_DIR="/custom/packs"),
+        _env(UNBORK_ANSIBLE__PACKS_ROOT_DIR="/custom/packs"),
         clear=True,
     ):
         s = Settings()
@@ -83,7 +83,7 @@ def test_unknown_env_path_passes_through_without_error():
     """Typos in env var names must not crash config load."""
     with patch.dict(
         os.environ,
-        _env(LABDOG_NONSENSE__NESTED__KEY="value"),
+        _env(UNBORK_NONSENSE__NESTED__KEY="value"),
         clear=True,
     ):
         s = Settings()
@@ -173,7 +173,7 @@ def test_cookie_secure_true_mixed_origins_reports_only_bad_ones():
 # Startup validation used to reject exactly two literal placeholder
 # strings. Everything else passed: a six-character HS256 signing key, a
 # malformed encryption key (which then failed hours later at the first
-# host sync), and ``allowed_origins=["*"]`` — which, because LabDog
+# host sync), and ``allowed_origins=["*"]`` — which, because unbork
 # always sends credentials, makes Starlette reflect whatever Origin the
 # request carried, i.e. credentialed cross-origin access from any site a
 # logged-in user visits.
@@ -202,7 +202,7 @@ class TestTheSigningKeyMustBeWorthSigningWith:
         _validate_required(s)
 
     def test_the_shipped_packaging_placeholder_is_refused(self):
-        """packaging/etc/labdog.toml ships ``CHANGE_ME`` and it was not on
+        """packaging/etc/unbork.toml ships ``CHANGE_ME`` and it was not on
         the placeholder list, so an install that skipped the "generate
         your secrets" step booted with a nine-character signing key that
         is public in this repository."""
@@ -277,11 +277,11 @@ class TestTheInsecureCookieWarning:
     HTTP on a trusted LAN and refusing to start would be wrong for them."""
 
     def test_a_routable_origin_without_cookie_secure_warns(self, caplog):
-        s = _make_settings(cookie_secure=False, allowed_origins=["http://labdog.lan:8000"])
+        s = _make_settings(cookie_secure=False, allowed_origins=["http://unbork.lan:8000"])
         with caplog.at_level("WARNING"):
             _validate_required(s)
         assert "cookie_secure" in caplog.text
-        assert "labdog.lan" in caplog.text
+        assert "unbork.lan" in caplog.text
 
     def test_localhost_without_cookie_secure_does_not_warn(self, caplog):
         s = _make_settings(cookie_secure=False, allowed_origins=["http://localhost:3000"])
@@ -290,19 +290,19 @@ class TestTheInsecureCookieWarning:
         assert "cookie_secure" not in caplog.text
 
     def test_the_warning_does_not_stop_startup(self):
-        s = _make_settings(cookie_secure=False, allowed_origins=["http://labdog.lan:8000"])
+        s = _make_settings(cookie_secure=False, allowed_origins=["http://unbork.lan:8000"])
         _validate_required(s)  # must not raise
 
 
 class TestRetentionKeysOutsideTheSettingsPage:
     """The retention windows are app settings, stored in the database.
-    labdog.toml and the environment used to accept them as well, and
+    unbork.toml and the environment used to accept them as well, and
     nothing read those values, so they now warn instead of being dropped
     without a word."""
 
     def test_an_env_retention_key_warns(self, caplog):
         with (
-            patch.dict(os.environ, _env(LABDOG_LOGGING__AUDIT_RETENTION_DAYS="365"), clear=True),
+            patch.dict(os.environ, _env(UNBORK_LOGGING__AUDIT_RETENTION_DAYS="365"), clear=True),
             caplog.at_level("WARNING"),
         ):
             Settings()

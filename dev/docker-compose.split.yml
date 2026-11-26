@@ -1,0 +1,89 @@
+# unbork split by runtime role: same image, one container per role.
+# See docs/scaling-out.md. The default single-container install
+# (dev/docker-compose.yml, role "all") is unchanged.
+#
+#   docker compose -f dev/docker-compose.split.yml up -d --scale worker=2
+#
+# Only "api" migrates; the other roles wait until the schema is at head.
+# Exactly one "beat". Scale "worker" (syncs), "worker-drift" (drift
+# checks) and "worker-actions" (action runs' host runs) independently.
+
+x-unbork: &unbork
+  image: ${UNBORK_IMAGE:-unbork:latest}
+  environment: &unbork-env
+    UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:${POSTGRES_PASSWORD:-unbork_test_pw}@postgres:5432/unbork
+    UNBORK_REDIS__URL: redis://redis:6379/0
+    UNBORK_SECURITY__SECRET_KEY: "${UNBORK_SECURITY__SECRET_KEY}"
+    UNBORK_SECURITY__ENCRYPTION_KEY: "${UNBORK_SECURITY__ENCRYPTION_KEY}"
+    UNBORK_SECURITY__UNBORK_SERVER_IP: ${UNBORK_SECURITY__UNBORK_SERVER_IP:-127.0.0.1}
+    UNBORK_CELERY__CONCURRENCY: ${UNBORK_CELERY__CONCURRENCY:-4}
+    UNBORK_CELERY__DRIFT_CONCURRENCY: ${UNBORK_CELERY__DRIFT_CONCURRENCY:-4}
+    UNBORK_CELERY__ACTIONS_CONCURRENCY: ${UNBORK_CELERY__ACTIONS_CONCURRENCY:-4}
+    UNBORK_CELERY__ORCHESTRATOR_CONCURRENCY: ${UNBORK_CELERY__ORCHESTRATOR_CONCURRENCY:-4}
+  # One pack checkout for every container. A pack added or synced in the UI
+  # is synced by the api container only, and workers reload the action
+  # registry from this disk, so separate disks would leave workers on old
+  # playbooks (or "not found in registry") until they restarted.
+  volumes:
+    - packs:/var/lib/unbork/packs
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    # Budget about six connections per worker slot: see docs/scaling-out.md.
+    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
+    environment:
+      POSTGRES_USER: unbork
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unbork_test_pw}
+      POSTGRES_DB: unbork
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unbork"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: api }
+    ports:
+      - "8000:8000"
+
+  beat:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: beat }
+
+  orchestrator:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: orchestrator }
+
+  worker:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker }
+
+  worker-drift:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker-drift }
+
+  worker-actions:
+    <<: *unbork
+    environment: { <<: *unbork-env, UNBORK_ROLE: worker-actions }
+
+volumes:
+  postgres_data:
+  packs:

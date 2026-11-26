@@ -1,14 +1,15 @@
 import logging
 
 from celery import Celery
-from celery.signals import beat_init, worker_process_init, worker_ready
+from celery.signals import beat_init, import_modules, worker_process_init, worker_ready
 
 from app.config import settings
+from app.features import assistant_enabled
 
 logger = logging.getLogger(__name__)
 
 celery_app = Celery(
-    "labdog",
+    "unbork",
     broker=settings.redis.url,
     backend=settings.redis.url,
 )
@@ -40,45 +41,63 @@ celery_app.conf.update(
     # registered task lands on a queue the worker actually consumes.
     task_default_queue="default",
     task_routes={
+        # Drift sweeps and their per-host checks have their own queue, so a
+        # sync backlog in long_running cannot delay them (and they cannot
+        # hold long_running slots). The ``all`` role's ``work`` worker
+        # consumes it too. See app.tasks.drift_sweep.
+        "app.tasks.drift_sweep.*": {"queue": "drift"},
+        "app.tasks.drift.*": {"queue": "drift"},
+        "app.tasks.*_drift.*": {"queue": "drift"},
         "app.tasks.sync.*": {"queue": "long_running"},
         "app.tasks.host_sync_orchestrator.*": {"queue": "long_running"},
-        "app.tasks.drift.*": {"queue": "long_running"},
         "app.tasks.service_sync.*": {"queue": "long_running"},
-        "app.tasks.service_drift.*": {"queue": "long_running"},
         "app.tasks.hosts_sync.*": {"queue": "long_running"},
-        "app.tasks.hosts_drift.*": {"queue": "long_running"},
-        "app.tasks.user_drift.*": {"queue": "long_running"},
         "app.tasks.user_sync.*": {"queue": "long_running"},
-        "app.tasks.cron_drift.*": {"queue": "long_running"},
         "app.tasks.cron_sync.*": {"queue": "long_running"},
         "app.tasks.package_sync.*": {"queue": "long_running"},
-        "app.tasks.package_drift.*": {"queue": "long_running"},
         "app.tasks.ca_cert_action.*": {"queue": "long_running"},
         "app.tasks.resolver_sync.*": {"queue": "long_running"},
-        "app.tasks.resolver_drift.*": {"queue": "long_running"},
         # Its own queue, served by its own worker. run_action blocks
         # waiting for children it publishes to long_running; sharing that
         # pool is a self-deadlock at concurrency=4. See
         # app/celery_manager.py.
         "app.tasks.action_orchestrator.*": {"queue": "orchestrator"},
-        "app.tasks.action_host.*": {"queue": "long_running"},
-        "app.tasks.builtin_dispatchers.*": {"queue": "long_running"},
+        # The per-host and group-wide halves of an action run, and the
+        # built-in actions' per-host wrappers. Their own queue, so a bulk
+        # sync backlog in long_running cannot hold an action run back.
+        # The orchestrator publishes to it explicitly (CHILD_QUEUE).
+        "app.tasks.action_host.*": {"queue": "actions"},
+        "app.tasks.action_group.*": {"queue": "actions"},
+        "app.tasks.builtin_dispatchers.*": {"queue": "actions"},
         "app.tasks.scheduled_action_schedule.*": {"queue": "long_running"},
         "app.tasks.facts.*": {"queue": "long_running"},
-        "app.tasks.ai_task.*": {"queue": "long_running"},
-        # The sweep is quick and stays on default; the check and a rollback
-        # wait on SSH and on Proxmox restarting a VM.
-        "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
-        "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
         "discovery.*": {"queue": "long_running"},
         "gitops.*": {"queue": "long_running"},
         "scans.check_scheduled": {"queue": "default"},
         "scans.run_config": {"queue": "long_running"},
     },
     worker_max_tasks_per_child=100,
+    # One task reserved per free slot. The default (4) lets a worker that
+    # is busy hoard host runs another worker container could start right
+    # away; with tasks that run for minutes, prefetch buys nothing.
+    worker_prefetch_multiplier=1,
     task_time_limit=1800,
     task_soft_time_limit=1500,
 )
+
+
+#: The assistant's routes, added only when it is loaded (C-026).
+AI_TASK_ROUTES = {
+    "app.tasks.ai_task.*": {"queue": "long_running"},
+    "app.tasks.ai_runtime.*": {"queue": "long_running"},
+    # The sweep is quick and stays on default; the check and a rollback
+    # wait on SSH and on Proxmox restarting a VM.
+    "app.tasks.ai_remediation.check_remediation": {"queue": "long_running"},
+    "app.tasks.ai_remediation.run_rollback": {"queue": "long_running"},
+}
+
+if assistant_enabled():
+    celery_app.conf.task_routes.update(AI_TASK_ROUTES)
 
 
 @worker_process_init.connect
@@ -114,6 +133,50 @@ def _register_all_models(**_kwargs):
         logger.exception("model registration on worker start failed")
 
 
+@worker_process_init.connect
+def _load_extensions(**_kwargs):
+    """Load extensions (Enterprise) in each pool child, for their hooks.
+
+    Usually a no-op: the parent loaded them before forking
+    (:func:`_load_extensions_before_task_modules`) and the child inherits
+    that. This covers a pool that started without the parent loading.
+
+    ``create_app()`` loads them in the API process. A worker never builds
+    the app, yet tasks ask permission questions too: the scheduler checks
+    that a schedule's owner may still run it, and the assistant's tools act
+    as their user. Without this they would get Community's role-only
+    answer while the API applied RBAC. The routes a plugin adds land on a
+    throwaway app here; only the hooks matter.
+    """
+    try:
+        from app.plugins import load_plugins_once
+
+        load_plugins_once()
+    except Exception:
+        logger.exception("loading extensions on worker start failed")
+
+
+@import_modules.connect
+def _load_extensions_before_task_modules(**_kwargs):
+    """Load extensions in the worker parent and in beat (S-015).
+
+    Celery sends ``import_modules`` from ``loader.init_worker()`` in both,
+    just before it imports ``conf.include``. Loading here lets an extension
+    add its own task module to that list (``app.tasks.extensions``), so the
+    parent, which decides whether a received task name is known, knows its
+    tasks, and beat registers its periodic entries at ``beat_init``.
+
+    Celery re-raises what a handler of this signal raises, which would stop
+    the process; a broken extension must not, so everything is caught.
+    """
+    try:
+        from app.plugins import load_plugins_once
+
+        load_plugins_once()
+    except Exception:
+        logger.exception("loading extensions before the task modules failed")
+
+
 def _is_orchestrator_worker(sender) -> bool:
     """True on the dedicated orchestrator worker.
 
@@ -125,6 +188,24 @@ def _is_orchestrator_worker(sender) -> bool:
     """
     hostname = getattr(sender, "hostname", "") or ""
     return hostname.split("@", 1)[0] == "orchestrator"
+
+
+def _sibling_syncs_packs() -> bool:
+    """True when another worker in this container syncs the pack checkouts.
+
+    ``UNBORK_ROLE`` is set by the CeleryManager that spawned this worker.
+    In the default ``all`` role (or with no role, e.g. a worker started by
+    hand) the ``work`` sibling shares this disk and syncs. An
+    ``orchestrator`` container of its own has no such sibling and must
+    sync its own checkout, or it would run actions from a stale or
+    missing one. The checkout lock is a Postgres advisory lock
+    (``app.packs.locks``), so several containers syncing is safe, just
+    serialised.
+    """
+    import os  # noqa: PLC0415
+
+    roles = {r.strip() for r in os.environ.get("UNBORK_ROLE", "all").split(",")}
+    return bool(roles & {"all", "worker", "worker-drift", "worker-actions"})
 
 
 @worker_ready.connect
@@ -147,7 +228,7 @@ def _sync_packs_on_worker_start(sender=None, **_kwargs):
     turns under the registry lock (BUG-96); a third sync would only wait
     in line for nothing.
     """
-    orchestrator = _is_orchestrator_worker(sender)
+    orchestrator = _is_orchestrator_worker(sender) and _sibling_syncs_packs()
     try:
         import asyncio  # noqa: PLC0415
 
@@ -188,7 +269,8 @@ def _register_beat_schedules_on_beat_start(sender=None, **_kwargs):
     from app.tasks.beat_registry import register_all  # noqa: PLC0415
 
     results = register_all(celery_app)
-    failed = sorted(k for k, v in results.items() if v != "ok")
+    # "removed" and "absent" are the assistant-off deletions doing their job.
+    failed = sorted(k for k, v in results.items() if v not in ("ok", "removed", "absent"))
     if failed:
         logger.error("beat schedule registration failed for: %s", ", ".join(failed))
     else:
@@ -206,11 +288,21 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
     reaped now instead of waiting for the next 5-minute beat.
 
     Enqueued from one worker only — both boot at the same moment, and two
-    copies of each sweep would race each other over the same rows.
+    copies of each sweep would race each other over the same rows. In a
+    split deployment several worker containers boot together, so a short
+    Redis ``SET NX`` picks one of them; if Redis is unreachable the
+    enqueue fails anyway and the periodic sweeps cover it.
     """
     if _is_orchestrator_worker(sender):
         return
     try:
+        import redis as redis_lib  # noqa: PLC0415
+
+        if not redis_lib.from_url(settings.redis.url).set(
+            "unbork:startup-orphan-sweep", "1", nx=True, ex=60
+        ):
+            return
+
         celery_app.send_task("app.tasks.sync_sweeper.sweep_stale_syncs")
         celery_app.send_task("app.tasks.action_sweeper.sweep_stale_action_runs")
     except Exception:
@@ -218,7 +310,7 @@ def _sweep_orphans_on_worker_start(sender=None, **_kwargs):
 
 
 # Auto-discover tasks
-celery_app.conf.include = [
+BASE_TASK_MODULES = [
     "app.tasks.discovery",
     "app.tasks.gitops",
     "app.tasks.sync",
@@ -237,10 +329,15 @@ celery_app.conf.include = [
     "app.tasks.ca_cert_action",
     "app.tasks.resolver_sync",
     "app.tasks.resolver_drift",
+    "app.tasks.drift_sweep",
     "app.tasks.action_orchestrator",
     "app.tasks.action_host",
+    # BUG-127: the orchestrator dispatches run_action_group by name
+    # (send_task), and nothing else a worker imports pulls this module in.
+    "app.tasks.action_group",
     "app.tasks.builtin_dispatchers",
     "app.tasks.scheduled_action_schedule",
+    "app.tasks.run_gate_retry",
     "app.tasks.scan_schedule",
     "app.tasks.scan_run",
     "app.tasks.facts",
@@ -249,12 +346,28 @@ celery_app.conf.include = [
     "app.tasks.audit_retention",
     "app.tasks.run_retention",
     "app.tasks.drift_retention",
+    "app.tasks.snapshot_reaper",
+    "app.tasks.alert_handling",
+    "app.tasks.alert_poll",
+    "app.tasks.notifications",
+]
+
+#: Loaded only with the assistant (C-026). With it off no ``app.tasks.ai_*``
+#: task is registered, and beat deletes their schedules
+#: (``beat_registry.remove_assistant_entries``).
+AI_TASK_MODULES = [
     "app.tasks.ai_task",
+    "app.tasks.ai_runtime",
     "app.tasks.ai_approvals",
     "app.tasks.ai_snapshots",
     "app.tasks.ai_sessions",
     "app.tasks.ai_alerts",
-    "app.tasks.alert_handling",
     "app.tasks.ai_remediation",
-    "app.tasks.notifications",
 ]
+
+
+def task_modules(with_assistant: bool) -> list[str]:
+    return BASE_TASK_MODULES + (AI_TASK_MODULES if with_assistant else [])
+
+
+celery_app.conf.include = task_modules(assistant_enabled())

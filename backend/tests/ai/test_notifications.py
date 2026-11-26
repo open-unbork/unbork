@@ -2,7 +2,7 @@
 
 Nothing here talks to a mail server. Delivery is tested through
 ``drain``'s injectable ``send``, and the transport through a stand-in for
-``smtplib.SMTP`` — what matters is what LabDog asks the server to do and
+``smtplib.SMTP`` — what matters is what unbork asks the server to do and
 what it records when the server says no.
 """
 
@@ -38,7 +38,7 @@ from app.notifications.urls import validate_public_url
 from app.settings_service import invalidate_cache
 from tests.conftest import create_host
 
-URL = "https://labdog.example.com"
+URL = "https://unbork.example.com"
 
 
 async def _set(db, key: str, value: str) -> None:
@@ -68,7 +68,7 @@ async def smtp_on(db):
         host="mail.home.arpa",
         port=587,
         tls_mode="starttls",
-        from_address="labdog@home.arpa",
+        from_address="unbork@home.arpa",
     )
     db.add(row)
     await db.flush()
@@ -82,6 +82,7 @@ async def _user(db, *, events: tuple[str, ...] = (), active: bool = True) -> Use
         hashed_password="x",
         is_active=active,
         is_superuser=False,
+        role="operator",
         is_verified=True,
     )
     db.add(user)
@@ -133,12 +134,12 @@ def _session_cm(db):
 
 class TestPublicURL:
     def test_it_is_normalised(self) -> None:
-        assert validate_public_url(" https://labdog.example.com/ ") == URL
+        assert validate_public_url(" https://unbork.example.com/ ") == URL
 
     def test_empty_means_unset(self) -> None:
         assert validate_public_url("") == ""
 
-    @pytest.mark.parametrize("bad", ["labdog.example.com", "ftp://x", "https://x/?a=1", "https://"])
+    @pytest.mark.parametrize("bad", ["unbork.example.com", "ftp://x", "https://x/?a=1", "https://"])
     def test_anything_else_is_refused(self, bad: str) -> None:
         with pytest.raises(ValueError):
             validate_public_url(bad)
@@ -148,17 +149,17 @@ class TestAddresses:
     def test_a_home_network_domain_is_accepted(self) -> None:
         """RFC 8375's home.arpa is the domain a homelab relay is likeliest to
         use, and pydantic's EmailStr refuses it as special-use."""
-        body = EmailSettingsUpdate(enabled=True, host="mail", from_address="labdog@home.arpa")
-        assert body.from_address == "labdog@home.arpa"
+        body = EmailSettingsUpdate(enabled=True, host="mail", from_address="unbork@home.arpa")
+        assert body.from_address == "unbork@home.arpa"
 
-    @pytest.mark.parametrize("bad", ["LabDog <labdog@x.org>", "labdog", "@x.org", "a b@x.org"])
+    @pytest.mark.parametrize("bad", ["unbork <unbork@x.org>", "unbork", "@x.org", "a b@x.org"])
     def test_anything_but_a_bare_address_is_refused(self, bad: str) -> None:
         with pytest.raises(ValueError):
             EmailSettingsUpdate(from_address=bad)
 
     def test_switching_on_without_a_server_is_refused(self) -> None:
         with pytest.raises(ValueError, match="server and a From address"):
-            EmailSettingsUpdate(enabled=True, host="", from_address="labdog@home.arpa")
+            EmailSettingsUpdate(enabled=True, host="", from_address="unbork@home.arpa")
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +176,7 @@ class TestNotify:
         assert await notify(db, "alert_fired", subject="s", body="b", link_path="/alerts") == 2
         rows = await _queued(db)
         assert {r.user_id for r in rows} == {a.id, b.id}
-        assert rows[0].subject == "[LabDog] s"
+        assert rows[0].subject == "[unbork] s"
         assert rows[0].status == "pending"
 
     async def test_nothing_is_queued_while_email_is_off(self, db) -> None:
@@ -227,7 +228,7 @@ class TestAlertFired:
 
         await notify_alert_fired(db, event)
         [row] = await _queued(db, "alert_fired")
-        assert row.subject == "[LabDog] Firing: NginxDown (critical) on web1.home.arpa"
+        assert row.subject == "[unbork] Firing: NginxDown (critical) on web1.home.arpa"
         assert "nginx is not answering" in row.body
         assert "instance: web1:9100" in row.body
         assert row.link_path == "/alerts"
@@ -293,7 +294,7 @@ class TestApprovals:
 
         [row] = await _queued(db, "approval_requested")
         assert row.subject == (
-            "[LabDog] Approval needed on web1.home.arpa: systemctl restart nginx"
+            "[unbork] Approval needed on web1.home.arpa: systemctl restart nginx"
         )
         assert "nginx is down" in row.body
         assert "Nothing in this email can approve it" in row.body
@@ -380,13 +381,13 @@ class TestRemediation:
     async def test_a_change_is_reported_with_its_snapshot(self, db, smtp_on, ai_provider) -> None:
         await _user(db, events=("alert_remediation",))
         host = await create_host(db, hostname="web1.home.arpa")
-        session = await self._session(db, ai_provider, host, snapshot="labdog-ai-7-0001")
+        session = await self._session(db, ai_provider, host, snapshot="unbork-ai-7-0001")
 
         assert await notify_remediation(db, session) == 1
         [row] = await _queued(db, "alert_remediation")
-        assert row.subject == "[LabDog] Automatic fix on web1.home.arpa: NginxDown"
+        assert row.subject == "[unbork] Automatic fix on web1.home.arpa: NginxDown"
         assert "systemctl restart nginx" in row.body
-        assert "labdog-ai-7-0001" in row.body
+        assert "unbork-ai-7-0001" in row.body
         assert "restarting it brought it back" in row.body
 
     async def test_nothing_is_sent_when_nothing_changed(self, db, smtp_on, ai_provider) -> None:
@@ -435,7 +436,7 @@ class TestRemediationReportsTheExitStatus:
         from types import SimpleNamespace
 
         class _Conn:
-            async def run(self, command, check=False):  # noqa: ARG002
+            async def run(self, command, check=False, input=None):  # noqa: ARG002, A002
                 return SimpleNamespace(stdout="", stderr="sed: -e expression #1", exit_status=4)
 
         @asynccontextmanager
@@ -563,7 +564,7 @@ class TestDrain:
         assert stats == {"sent": 6, "failed": 0, "retrying": 0, "emails": 2}
         [batch] = server.batches
         mine = next(e for e in batch if e.to == a.email)
-        assert mine.subject == "[LabDog] 3 notifications: 3 × alert fired"
+        assert mine.subject == "[unbork] 3 notifications: 3 × alert fired"
         assert "body 0" in mine.body and "body 2" in mine.body
         assert f"{URL}/alerts" in mine.body
         assert all(r.status == "sent" and r.sent_at for r in await _queued(db))
@@ -573,7 +574,7 @@ class TestDrain:
         await notify(db, "alert_fired", subject="Firing: X", body="b", link_path="/alerts")
         server = FakeServer()
         await drain(db, send=server)
-        assert server.batches[0][0].subject == "[LabDog] Firing: X"
+        assert server.batches[0][0].subject == "[unbork] Firing: X"
 
     async def test_a_refusal_is_recorded_and_retried_later(self, db, smtp_on) -> None:
         await _user(db, events=("alert_fired",))
@@ -641,7 +642,7 @@ class TestDrain:
             Notification(
                 event_type="alert_fired",
                 recipient="a@x",
-                subject=f"[LabDog] Firing: A{n}",
+                subject=f"[unbork] Firing: A{n}",
                 body=f"body-{n}",
                 link_path="/alerts",
             )
@@ -702,9 +703,9 @@ def _config(**over) -> smtp.SMTPConfig:
         host="mail",
         port=587,
         tls_mode="starttls",
-        username="labdog",
+        username="unbork",
         password="pw",
-        from_address="labdog@home.arpa",
+        from_address="unbork@home.arpa",
     )
     values.update(over)
     return smtp.SMTPConfig(**values)
@@ -715,8 +716,8 @@ class TestTransport:
         results = smtp.send(_config(), [smtp.OutgoingEmail("a@x", "hi", "body")])
         [server] = fake_smtp.instances
         assert results == [None]
-        assert server.calls == ["starttls", "login labdog", "quit"]
-        assert server.sent[0]["From"] == "labdog@home.arpa"
+        assert server.calls == ["starttls", "login unbork", "quit"]
+        assert server.sent[0]["From"] == "unbork@home.arpa"
 
     def test_a_refused_login_says_what_the_server_said(self, fake_smtp) -> None:
         with pytest.raises(
@@ -767,9 +768,9 @@ class TestAPI:
                 "host": "mail.home.arpa",
                 "port": 465,
                 "tls_mode": "tls",
-                "username": "labdog",
+                "username": "unbork",
                 "password": "s3cret-pass",
-                "from_address": "labdog@home.arpa",
+                "from_address": "unbork@home.arpa",
             },
         )
         assert response.status_code == 200, response.text
@@ -782,7 +783,7 @@ class TestAPI:
         assert decrypt_ssh_key(row.encrypted_password, get_master_key()) == "s3cret-pass"
 
     async def test_saving_without_a_password_keeps_it(self, db, superuser_client) -> None:
-        base = {"enabled": True, "host": "mail", "from_address": "labdog@home.arpa"}
+        base = {"enabled": True, "host": "mail", "from_address": "unbork@home.arpa"}
         await superuser_client.put("/api/notifications/email", json={**base, "password": "pw"})
         response = await superuser_client.put("/api/notifications/email", json=base)
         assert response.json()["password_set"] is True
@@ -792,7 +793,7 @@ class TestAPI:
         assert response.json()["password_set"] is False
 
     async def test_the_test_button_reports_the_servers_words(self, db, superuser_client) -> None:
-        draft = {"host": "mail", "from_address": "labdog@home.arpa"}
+        draft = {"host": "mail", "from_address": "unbork@home.arpa"}
         with patch(
             "app.notifications.email.send",
             side_effect=smtp.SMTPSendError("535 5.7.8 Username and Password not accepted"),

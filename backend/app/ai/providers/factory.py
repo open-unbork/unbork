@@ -37,7 +37,7 @@ _LOCAL_HOSTNAMES = {
 def decrypt_api_key(provider: AIProvider) -> str | None:
     """Decrypt the stored API key.
 
-    No AAD, matching every other encrypted column in LabDog. This is
+    No AAD, matching every other encrypted column in unbork. This is
     deliberate rather than an oversight: ``scripts/rotate_encryption_key.py``
     re-encrypts blobs without a context id, so a column that bound its
     ciphertext to a row id would survive normal use and then fail to
@@ -91,8 +91,10 @@ def runs_on_agent_sdk(provider: AIProvider) -> bool:
     return provider.provider_type in SDK_BACKED_TYPES
 
 
-#: Backends whose stored credential is a Claude subscription token from
-#: ``claude setup-token`` rather than an API key. Both drive Claude Code.
+#: Backends that run the Claude Code program and authenticate a Claude plan
+#: rather than an API key. Since S-014 they take no credential: they use the
+#: service account's own sign-in, and a token is only present on a provider
+#: saved by an earlier version.
 #:
 #: The distinction is not cosmetic: such a token lasts one year, so it has
 #: an expiry an API key does not, and it authenticates a *plan* whose usage
@@ -133,7 +135,7 @@ def supports_tools(provider: AIProvider) -> bool:
     session rather than running one whose output cannot be trusted.
     """
     if runs_on_agent_sdk(provider):
-        # The SDK runs LabDog's tools as an in-process MCP server. This is
+        # The SDK runs unbork's tools as an in-process MCP server. This is
         # the capability the single-shot CLI backend never had.
         return True
     cls = _PROVIDER_CLASSES.get(provider.provider_type)
@@ -154,8 +156,8 @@ def build_provider(provider: AIProvider) -> LLMProvider:
         # accurate for a developer and useless to the operator who saw it
         # in the providers table when the Test button reached here.
         raise LLMProviderError(
-            f"Provider {provider.name!r} runs through Claude Code, which handles the "
-            "conversation itself, so LabDog cannot drive it one turn at a time. This "
+            f"Provider {provider.name!r} runs through the Claude Code program, which handles the "
+            "conversation itself, so unbork cannot drive it one turn at a time. This "
             "is an internal routing error rather than a problem with your settings — "
             "please report it."
         )
@@ -186,11 +188,10 @@ def build_provider(provider: AIProvider) -> LLMProvider:
         )
 
     if provider.provider_type == "claude_cli":
-        # The encrypted secret column carries a subscription OAuth token here
-        # (from `claude setup-token`) rather than an API key, so it reuses the
-        # same AES-256-GCM storage, redaction, and key rotation as every other
-        # LabDog credential. Blank means "use whatever the host is already
-        # authenticated with".
+        # Legacy (S-014): a provider saved by an earlier version may still
+        # hold a subscription OAuth token in the encrypted secret column. It
+        # is used until the operator removes it; the API accepts no new one.
+        # Blank, the normal case, uses the service account's own sign-in.
         return ClaudeCLIProvider(model=provider.model or None, oauth_token=api_key)
 
     raise LLMProviderError(f"Unknown provider type {provider.provider_type!r}")

@@ -8,18 +8,17 @@ channel — so the frontend has one streaming idiom to learn, not two.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import service
 from app.ai.loop import LoopCaps
 from app.ai.models import (
+    PROVIDER_TYPES,
     TERMINAL_SESSION_STATUSES,
     AIApprovalRequest,
     AIMessage,
@@ -35,12 +34,14 @@ from app.ai.providers.factory import (
     build_provider,
     runs_on_agent_sdk,
 )
+from app.ai.providers.policy import provider_type_refusal
 from app.ai.schemas import (
     AIApprovalDecision,
     AIApprovalResponse,
     AIProviderCreate,
     AIProviderResponse,
     AIProviderTestResponse,
+    AIProviderTypeInfo,
     AIProviderUpdate,
     AIRollbackRequest,
     AIRollbackResponse,
@@ -56,13 +57,16 @@ from app.ai.schemas import (
     AIUsageDayResponse,
     AIUsageSummary,
     AlertEventResponse,
+    InvestigateRequest,
+    InvestigateResponse,
+    InvestigationRef,
     SessionView,
     provider_to_response,
     session_to_response,
 )
 from app.ai.service import AIDisabledError, BudgetExceededError
 from app.audit.logger import log_action
-from app.auth.users import current_active_user
+from app.auth.permissions import require, require_on
 from app.crypto import encrypt_ssh_key, get_master_key
 from app.db import get_db
 from app.models.user import User
@@ -88,40 +92,67 @@ async def _unset_other_defaults(db: AsyncSession, keep_id: int | None) -> None:
     await db.execute(stmt)
 
 
-#: What `claude setup-token` emits. Checked at save time because the field
-#: sits next to several other credential fields in the UI and accepts any
-#: string: pasting the wrong secret stores something guaranteed to 401, and
-#: without this the first sign of it is a failed session.
-#:
-#: Kept to a prefix test rather than a full format match — if Anthropic
-#: lengthens or re-shapes the token this still passes, and it only has to
-#: catch the case of a credential that plainly is not one of these.
-SUBSCRIPTION_TOKEN_PREFIX = "sk-ant-oat"  # nosec B105 - prefix, not a secret
+def _refuse_credential(provider_type: str, api_key: str | None) -> None:
+    """The two program-backed types take no credential (S-014, D-04).
 
-
-def _check_subscription_token(provider_type: str, api_key: str | None) -> None:
-    """Reject a subscription token that is obviously not one.
-
-    A blank value is fine and means "use whatever the host is logged in as".
+    They use the Claude Code sign-in of the service account on the server.
+    An empty string is still accepted: it clears a token an earlier version
+    stored.
     """
-    if provider_type not in SUBSCRIPTION_BACKED_TYPES or not api_key:
-        return
-    if api_key.startswith(SUBSCRIPTION_TOKEN_PREFIX):
-        return
-    raise HTTPException(
-        status_code=400,
-        detail=(
-            f"That does not look like a Claude subscription token — they begin "
-            f"with {SUBSCRIPTION_TOKEN_PREFIX!r}. Run 'claude setup-token' on "
-            f"your own machine and paste the value it prints. An Anthropic API "
-            f"key will not work here; use an Anthropic provider for that."
-        ),
-    )
+    if provider_type in SUBSCRIPTION_BACKED_TYPES and api_key:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This provider type takes no credential. "
+                "Sign in to Claude Code on the server instead."
+            ),
+        )
+
+
+def _refuse_provider_type(provider_type: str) -> None:
+    """400 when an extension's policy refuses ``provider_type`` (S-017)."""
+    refusal = provider_type_refusal(provider_type)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
+
+
+@router.get("/provider-types", response_model=list[AIProviderTypeInfo])
+async def list_provider_types(_: User = Depends(require("ai.use"))):
+    """Every provider type, and whether this install accepts it (S-017)."""
+    rows = []
+    for provider_type in PROVIDER_TYPES:
+        reason = provider_type_refusal(provider_type)
+        rows.append(AIProviderTypeInfo(type=provider_type, allowed=reason is None, reason=reason))
+    return rows
+
+
+def _queue_program_install(provider: AIProvider) -> str | None:
+    """Start installing Claude Code if this provider needs it and it is absent.
+
+    Returns the program's state (``None`` for types that need no program).
+    The download runs on a worker (``app.tasks.ai_runtime``), never in the
+    request (S-009).
+    """
+    from app.ai import claude_code
+    from app.ai.providers.factory import uses_subscription
+
+    if not uses_subscription(provider):
+        return None
+    state = claude_code.status().state
+    if state in ("missing", "failed"):
+        from app.tasks import celery_app
+
+        try:
+            # retry=False: a broker outage must not hold the request.
+            celery_app.send_task("app.tasks.ai_runtime.install_claude_code", retry=False)
+        except Exception:
+            logger.warning("ai: could not queue the Claude Code install", exc_info=True)
+    return state
 
 
 @router.get("/providers", response_model=list[AIProviderResponse])
 async def list_providers(
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(AIProvider).order_by(AIProvider.name))
@@ -131,7 +162,7 @@ async def list_providers(
 @router.post("/providers", response_model=AIProviderResponse, status_code=201)
 async def create_provider(
     payload: AIProviderCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     existing = await db.execute(select(AIProvider).where(AIProvider.name == payload.name))
@@ -156,7 +187,8 @@ async def create_provider(
             ),
         )
 
-    _check_subscription_token(payload.provider_type, payload.api_key)
+    _refuse_credential(payload.provider_type, payload.api_key)
+    _refuse_provider_type(payload.provider_type)
 
     provider = AIProvider(
         name=payload.name,
@@ -196,6 +228,8 @@ async def create_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    if provider.enabled:
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
@@ -203,7 +237,7 @@ async def create_provider(
 async def update_provider(
     provider_id: int,
     payload: AIProviderUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     provider = await db.get(AIProvider, provider_id)
@@ -223,7 +257,35 @@ async def update_provider(
             detail="An Anthropic provider needs an API key; it cannot be cleared.",
         )
 
-    _check_subscription_token(provider.provider_type, api_key)
+    _refuse_credential(provider.provider_type, api_key)
+    # A key stored under an API-key type would be handed to the program as
+    # its token once the type changes (S-014): the change must clear it.
+    if (
+        "provider_type" in data
+        and provider.provider_type in SUBSCRIPTION_BACKED_TYPES
+        and provider.encrypted_api_key
+        and api_key != ""
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This provider type takes no credential. Clear the stored key "
+                '(api_key: "") in the same change, and sign in to Claude Code on the '
+                "server instead."
+            ),
+        )
+    # Checked against the type the row has after this update: moving a
+    # refused provider to an allowed type passes, and so does taking it out
+    # of use (disabling it, unsetting the default); any other edit of it is
+    # refused (S-017).
+    standing_down = (
+        api_key is None
+        and set(data) <= {"enabled", "is_default"}
+        and not data.get("enabled")
+        and not data.get("is_default")
+    )
+    if not standing_down:
+        _refuse_provider_type(provider.provider_type)
 
     # Tri-state: absent keeps, "" clears, a value replaces.
     if api_key is not None:
@@ -249,13 +311,17 @@ async def update_provider(
     )
     await db.commit()
     await db.refresh(provider)
+    # Turning a provider on, or moving it to a program-backed type, is when
+    # the program is needed. Other edits leave a failed install alone.
+    if provider.enabled and ("enabled" in data or "provider_type" in data):
+        _queue_program_install(provider)
     return provider_to_response(provider)
 
 
 @router.delete("/providers/{provider_id}", status_code=204)
 async def delete_provider(
     provider_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     provider = await db.get(AIProvider, provider_id)
@@ -276,13 +342,29 @@ async def delete_provider(
 @router.post("/providers/{provider_id}/test", response_model=AIProviderTestResponse)
 async def test_provider(
     provider_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Check the endpoint answers with the stored credentials."""
     provider = await db.get(AIProvider, provider_id)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
+    refusal = provider_type_refusal(provider.provider_type)
+    if refusal:
+        return AIProviderTestResponse(ok=False, message=refusal)
+    state = _queue_program_install(provider)
+    if state in ("missing", "installing"):
+        return AIProviderTestResponse(
+            ok=False,
+            message="Installing the Claude Code program; try again in a few minutes.",
+        )
+    if state == "failed":
+        from app.ai import claude_code
+
+        return AIProviderTestResponse(
+            ok=False,
+            message=f"{claude_code.status().detail} Trying the install again in the background.",
+        )
     try:
         if runs_on_agent_sdk(provider):
             # No LLMProvider exists for these — the SDK owns the loop — so
@@ -305,7 +387,7 @@ async def test_provider(
         logger.warning("ai: provider test failed for %s", provider_id, exc_info=True)
         return AIProviderTestResponse(
             ok=False,
-            message="The provider test failed unexpectedly. See the LabDog logs for details.",
+            message="The provider test failed unexpectedly. See the unbork logs for details.",
         )
     return AIProviderTestResponse(ok=True, message=message)
 
@@ -321,7 +403,7 @@ async def list_sessions(
     before_id: int | None = None,
     view: SessionView = "active",
     host_id: int | None = None,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Sessions, newest first, a page at a time.
@@ -352,7 +434,7 @@ async def list_sessions(
 @router.post("/sessions/archive", response_model=AISessionBulkResult)
 async def archive_sessions(
     payload: AISessionArchiveRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Archive finished sessions: these ids, or every one that finished
@@ -426,7 +508,7 @@ async def archive_sessions(
 @router.post("/sessions/unarchive", response_model=AISessionBulkResult)
 async def unarchive_sessions(
     payload: AISessionIdsRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Put archived sessions back in the list."""
@@ -454,7 +536,7 @@ async def unarchive_sessions(
 @router.post("/sessions/delete", response_model=AISessionBulkResult)
 async def delete_sessions(
     payload: AISessionIdsRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete several sessions, skipping the ones that may not go.
@@ -487,10 +569,88 @@ async def delete_sessions(
     return AISessionBulkResult(done=done, skipped=skipped)
 
 
+@router.get("/investigations", response_model=list[InvestigationRef])
+async def list_investigations(
+    _: User = Depends(require("ai.use")),
+    db: AsyncSession = Depends(get_db),
+):
+    """The session each Investigate with AI subject would reopen.
+
+    One call for every button on a page: each looks its own subject key
+    up here to show "View investigation" instead of starting another.
+    """
+    from app.ai.subject_investigation import recent_investigations
+
+    return [
+        InvestigationRef(
+            subject_key=s.subject_key,
+            session_id=s.id,
+            status=s.status,
+            created_at=s.created_at,
+        )
+        for s in await recent_investigations(db)
+    ]
+
+
+@router.post("/investigations", response_model=InvestigateResponse)
+async def investigate_subject(
+    payload: InvestigateRequest,
+    response: Response,
+    user: User = Depends(require("ai.use")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Start a read-only assistant session about a subject, or reopen one.
+
+    The subject names ids only; the mission is written here from unbork's
+    own rows. A second press reopens the earlier session (200) unless it
+    failed, was stopped or archived, or is about a condition and more than
+    a day old; a new one is 201. The gates are the run page's: the kill
+    switch, a provider that can run tools, and the budget. Reopening needs
+    none of them.
+    """
+    from app.ai.subject_investigation import (
+        SubjectNotFound,
+        SubjectRefused,
+        existing_investigation,
+        prepare,
+        start_subject_investigation,
+        subject_key,
+    )
+
+    earlier = await existing_investigation(db, subject_key(payload.subject))
+    if earlier is not None:
+        return InvestigateResponse(session_id=earlier.id, created=False)
+
+    try:
+        provider = await service.resolve_provider(db, None)
+        service.assert_can_investigate(provider)
+        await service.assert_within_budget(db, provider)
+    except AIDisabledError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except BudgetExceededError as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+
+    try:
+        prepared = await prepare(db, payload.subject)
+    except SubjectNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SubjectRefused as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    session = await start_subject_investigation(db, payload.subject, prepared, provider, user=user)
+    await db.commit()
+
+    from app.tasks import celery_app
+
+    celery_app.send_task("app.tasks.ai_task.run_chat_session", kwargs={"session_id": session.id})
+    response.status_code = 201
+    return InvestigateResponse(session_id=session.id, created=True)
+
+
 @router.post("/sessions", response_model=AISessionResponse, status_code=201)
 async def create_session(
     payload: AISessionCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a chat session and dispatch it to a worker."""
@@ -561,7 +721,7 @@ async def _follow_up_refusal(db: AsyncSession, session: AISession) -> str | None
 @router.get("/sessions/{session_id}", response_model=AISessionDetail)
 async def get_session(
     session_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     session = await db.get(AISession, session_id)
@@ -678,13 +838,13 @@ async def _rollback_targets(
 async def roll_back_session(
     session_id: int,
     payload: AIRollbackRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Restore a host to the snapshot taken before this session changed it.
 
     Accepted, then carried out by a worker: Proxmox restores the disk, the
-    machine restarts, and LabDog waits for SSH to answer, which takes
+    machine restarts, and unbork waits for SSH to answer, which takes
     minutes. Everything that would refuse it is checked here first, so a
     refusal comes back at once rather than as a failed row later.
 
@@ -756,7 +916,7 @@ async def roll_back_session(
 async def send_message(
     session_id: int,
     payload: AISessionMessageRequest,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Add a follow-up turn and re-dispatch the session."""
@@ -811,7 +971,7 @@ async def send_message(
 @router.post("/sessions/{session_id}/cancel", response_model=AISessionResponse)
 async def cancel_session(
     session_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     session = await db.get(AISession, session_id)
@@ -852,7 +1012,7 @@ async def cancel_session(
 @router.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(
     session_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a session and its transcript.
@@ -899,7 +1059,7 @@ async def _with_snapshot_expectation(
     The operator is authorising a change to a host, and whether a rollback
     point will exist is part of what they are deciding — a host with no VM
     mapping gets no snapshot, and saying nothing would let them approve
-    under an assumption LabDog knows to be false.
+    under an assumption unbork knows to be false.
 
     Resolved in two queries rather than per row: the queue endpoint can
     return up to 200.
@@ -941,7 +1101,7 @@ async def _with_snapshot_expectation(
 async def list_approvals(
     status: str = "pending",
     limit: int = 50,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Approval requests, newest first — pending ones by default.
@@ -961,19 +1121,32 @@ async def list_approvals(
 async def decide_approval(
     approval_id: int,
     payload: AIApprovalDecision,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.approve")),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve or reject a paused command, and resume the session.
+
+    Needs ``ai.approve``, on the command's target host when it has one:
+    approving is authorising a change to that host.
 
     Deciding twice is refused rather than ignored. The first decision may
     already have run a command on a host, and a second request that
     quietly returned 200 would leave the operator believing their latest
     click was the one that counted.
     """
-    approval = await db.get(AIApprovalRequest, approval_id)
+    # BUG-138: lock the row, so a second decision arriving at the same time
+    # waits for this one's commit and then sees it, instead of both seeing
+    # "pending" and both dispatching a resume.
+    approval = await db.get(
+        AIApprovalRequest, approval_id, with_for_update=True, populate_existing=True
+    )
     if approval is None:
         raise HTTPException(status_code=404, detail="Approval request not found")
+    await require_on(
+        user,
+        "ai.approve",
+        hosts=[approval.target_host_id] if approval.target_host_id is not None else [],
+    )
     if approval.status != "pending":
         raise HTTPException(
             status_code=409,
@@ -1030,49 +1203,28 @@ async def decide_approval(
 @router.get("/sessions/{session_id}/stream")
 async def stream_session(
     session_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Relay a session's live events as SSE.
 
     Same mechanism as ``GET /api/actions/runs/{id}/stream``: the worker
-    publishes to a Redis channel, this endpoint forwards it.
+    publishes to a Redis channel, this endpoint forwards it, holding no
+    database connection while it does (BUG-152).
     """
-    session = await db.get(AISession, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    from app.api._sse import relay_channel  # noqa: PLC0415
 
-    channel = SESSION_CHANNEL.format(id=session_id)
-    current_status = session.status
+    async def _status() -> str | None:
+        session = await db.get(AISession, session_id)
+        return session.status if session is not None else None
 
-    async def event_generator():
-        import redis.asyncio as aioredis
-
-        from app.config import settings
-
-        client = aioredis.from_url(settings.redis.url)
-        pubsub = client.pubsub()
-        await pubsub.subscribe(channel)
-        try:
-            if current_status in TERMINAL_STATES:
-                yield f"event: status\ndata: {json.dumps({'status': current_status})}\n\n"
-                return
-            async for message in pubsub.listen():
-                if message["type"] != "message":
-                    continue
-                data = json.loads(message["data"])
-                event_type = data.get("event", "text")
-                yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
-                if event_type == "status" and data.get("status") in TERMINAL_STATES:
-                    return
-        finally:
-            await pubsub.unsubscribe(channel)
-            await client.aclose()
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    return await relay_channel(
+        db,
+        SESSION_CHANNEL.format(id=session_id),
+        _status,
+        terminal_states=TERMINAL_STATES,
+        default_event="text",
+        not_found="Session not found",
     )
 
 
@@ -1084,7 +1236,7 @@ async def stream_session(
 @router.get("/usage", response_model=AIUsageSummary)
 async def get_usage(
     days: int = 30,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Spend against every active limit, plus a per-day breakdown."""
@@ -1134,7 +1286,7 @@ async def get_usage(
 async def list_alerts(
     limit: int = 100,
     status: str | None = None,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Deprecated alias of ``GET /api/alerts``, kept for the life of 1.x."""
@@ -1146,7 +1298,7 @@ async def list_alerts(
 @router.post("/alerts/{alert_id}/investigate", response_model=AlertEventResponse, deprecated=True)
 async def investigate_alert_now(
     alert_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("ai.use")),
     db: AsyncSession = Depends(get_db),
 ):
     """Deprecated alias of ``POST /api/alerts/{id}/investigate``, kept for

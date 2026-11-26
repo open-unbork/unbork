@@ -12,7 +12,7 @@ def _cidr_family(cidr: str) -> str:
         return "ip"
 
 
-_COMMENT_PREFIX = "Managed by LabDog"
+_COMMENT_PREFIX = "Managed by unbork"
 
 
 def _safe_comment(text: str | None) -> str:

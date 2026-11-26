@@ -222,7 +222,7 @@ class TestHostResolution:
     async def test_an_unknown_host_resolves_to_nothing(self, db) -> None:
         """Guessing would put the investigation on the wrong host, which
         then reads healthy and reports that nothing is wrong."""
-        assert await resolve_host(db, {"instance": "not-a-labdog-host:9100"}) is None
+        assert await resolve_host(db, {"instance": "not-a-unbork-host:9100"}) is None
 
     async def test_no_host_label_at_all(self, db) -> None:
         assert await resolve_host(db, {"job": "blackbox"}) is None
@@ -237,7 +237,7 @@ class TestHostResolution:
 
 class TestTheRecordedAlert:
     async def test_labels_and_annotations_are_kept_whole(self, db) -> None:
-        """LabDog reads three keys out of them, but an investigation is
+        """unbork reads three keys out of them, but an investigation is
         only as good as its context and the operator chose what to
         label."""
         alert = from_grafana_webhook(_grafana())[0]

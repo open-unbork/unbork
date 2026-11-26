@@ -82,7 +82,7 @@ def generate_cron_playbook(host_ip: str, cron_jobs: list, ssh_key_path: str) -> 
             _add_present_cron_task(tasks, name, user, schedule, command)
 
     return {
-        "name": "LabDog Cron Job Management",
+        "name": "unbork Cron Job Management",
         "hosts": host_ip,
         "become": True,
         "gather_facts": False,

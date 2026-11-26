@@ -42,8 +42,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.actions.registry import ACTION_REGISTRY
 from app.actions.validation import build_param_model
 from app.audit.logger import log_action
-from app.gitops.importers.firewall import ModuleImportResult
-from app.gitops.schema import LabDogGroupYAML, ScheduledActionYAML
+from app.gitops.importers._common import ModuleImportResult
+from app.gitops.schema import ScheduledActionYAML, UnborkGroupYAML
 from app.models.host_group import HostGroup
 from app.models.scheduled_action import ScheduledAction
 
@@ -100,7 +100,7 @@ def _validate_entry(entry: ScheduledActionYAML) -> str | None:
 
 async def import_scheduled_actions(
     group: HostGroup,
-    parsed: LabDogGroupYAML,
+    parsed: UnborkGroupYAML,
     commit_sha: str | None,
     db: AsyncSession,
 ) -> ModuleImportResult:

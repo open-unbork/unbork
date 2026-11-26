@@ -6,12 +6,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.users import current_active_user
+from app.api._group_sync import group_member_ids
+from app.auth.permissions import require
 from app.db import get_db
 from app.drift.detector import check_drift
 from app.enum_utils import enum_str
 from app.metrics.recorder import record_drift_sample
-from app.models.host import Host, HostGroupMembership
+from app.models.host import Host
 from app.models.user import User
 from app.rules.desired_state import get_desired_state
 from app.rules.model import ChainPolicies, FirewallRuleSpec
@@ -62,7 +63,7 @@ async def _get_desired_state_for_host(
 @router.post("/hosts/{host_id}/check", response_model=DriftResponse)
 async def check_host_drift(
     host_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))
@@ -86,7 +87,7 @@ async def check_host_drift(
             checked_at=datetime.now(UTC).isoformat(),
         )
     desired, policies = await _get_desired_state_for_host(
-        host_id, db, host_source_ip=host.labdog_source_ip
+        host_id, db, host_source_ip=host.unbork_source_ip
     )
     _t0 = time.monotonic()
     result = await check_drift(host_id, desired, db, desired_policies=policies)
@@ -112,13 +113,10 @@ async def check_host_drift(
 @router.post("/groups/{group_id}/check", response_model=list[DriftResponse])
 async def check_group_drift(
     group_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
-    memberships = await db.execute(
-        select(HostGroupMembership.c.host_id).where(HostGroupMembership.c.group_id == group_id)
-    )
-    host_ids = [r[0] for r in memberships.all()]
+    host_ids = await group_member_ids(db, group_id)
     results = []
     from app.models.host import SyncStatus
 
@@ -143,7 +141,7 @@ async def check_group_drift(
             )
             continue
         desired, policies = await _get_desired_state_for_host(
-            hid, db, host_source_ip=host.labdog_source_ip
+            hid, db, host_source_ip=host.unbork_source_ip
         )
         _t0 = time.monotonic()
         result = await check_drift(hid, desired, db, desired_policies=policies)
@@ -171,7 +169,7 @@ async def check_group_drift(
 async def update_drift_settings(
     host_id: int,
     body: DriftSettingsUpdate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))

@@ -23,7 +23,7 @@ from tests.conftest import create_host, create_ssh_key
 
 pytestmark = pytest.mark.integration
 
-TRANSCRIPT = "PLAY [labdog] ***\nTASK [upgrade] ***\nfatal: [node-1]: FAILED! => rc=100\n"
+TRANSCRIPT = "PLAY [unbork] ***\nTASK [upgrade] ***\nfatal: [node-1]: FAILED! => rc=100\n"
 
 
 async def _run_with_output(db, host, *, output=TRANSCRIPT, status="failed"):
@@ -248,7 +248,7 @@ class TestDispatchWritesTheSnapshot:
             patch("app.db.task_session", new=_fake_session),
             patch("redis.from_url", return_value=_FakeRedis()),
             patch("app.tasks.action_orchestrator.celery_app.send_task"),
-            patch("app.tasks.action_orchestrator._wait", new=AsyncMock(return_value="go")),
+            patch("app.tasks.action_orchestrator._wait", new=AsyncMock(return_value=("go", {}))),
         ):
             await _run_action_async(run_id)
 

@@ -1,6 +1,7 @@
 import asyncio
 import socket
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 
@@ -19,7 +20,7 @@ def scan_network_task(self, cidr: str, port: int, timeout: float, exclude_ips: l
     # Subtract already-known hosts
     exclude_set = set(exclude_ips)
     hosts_to_scan = [h for h in all_hosts if h not in exclude_set]
-    # Reported back, or a range whose only SSH hosts are already in LabDog
+    # Reported back, or a range whose only SSH hosts are already in unbork
     # reads as "nothing found" with no hint that anything was left out.
     skipped_known = [h for h in all_hosts if h in exclude_set]
     total = len(hosts_to_scan)
@@ -49,7 +50,7 @@ def scan_network_task(self, cidr: str, port: int, timeout: float, exclude_ips: l
                 )
         return found
 
-    reachable = asyncio.run(_scan_with_progress())
+    reachable = asyncio.run(with_task_engine(_scan_with_progress()))
 
     # Attempt reverse DNS for each discovered IP
     hosts_found = []

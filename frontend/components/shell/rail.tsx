@@ -4,8 +4,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Glyph } from "./glyph"
+import { BrandWordmark } from "../brand-wordmark"
 import { AccountMenu } from "./account-menu"
-import { SETTINGS_ZONE, ZONE_DEFS, type ShellCounts, type ZoneKey } from "./zones"
+import { useAuth } from "@/lib/auth"
+import { SETTINGS_ZONE, zonesFor, type ShellCounts, type ZoneKey } from "./zones"
 
 function Badge({ n }: { n: number }) {
   return (
@@ -76,6 +78,7 @@ export function Rail({
   onToggleExpanded: () => void
 }) {
   const router = useRouter()
+  const { user } = useAuth()
   const pendingTotal = counts.pendingBlocking ?? 0
   // One row shape for zones and Settings: a fixed icon cell so the icons
   // stay put when the names slide in, then the name, then any badge.
@@ -100,14 +103,14 @@ export function Rail({
     >
       <Link
         href="/overview"
-        title="LabDog"
+        title="unbork"
         className={`mb-[9px] flex items-center gap-2 hover:no-underline ${expanded ? "pl-[6px]" : ""}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- static svg, no optimisation needed */}
-        <img src="/logo.svg" alt="LabDog" width={26} height={26} className="block" />
-        {expanded && <span className="text-[13px] font-semibold text-text">LabDog</span>}
+        <img src="/logo.svg" alt={expanded ? "" : "unbork"} width={26} height={26} className="block" />
+        {expanded && <BrandWordmark size={16} className="text-text" />}
       </Link>
-      {ZONE_DEFS.map((z) => {
+      {zonesFor(user).map((z) => {
         const on = z.k === zone
         const badge = z.k === "overview" && pendingTotal > 0
         return (
@@ -175,10 +178,11 @@ export function Rail({
 /** The rail at phone width: the four zones along the bottom edge. */
 export function MobileRail({ zone, counts }: { zone: ZoneKey; counts: ShellCounts }) {
   const router = useRouter()
+  const { user } = useAuth()
   const pendingTotal = counts.pendingBlocking ?? 0
   return (
     <nav aria-label="Zones" className="flex shrink-0 border-t border-line bg-rail pb-1">
-      {ZONE_DEFS.map((z) => {
+      {zonesFor(user).map((z) => {
         const on = z.k === zone
         return (
           <button

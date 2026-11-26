@@ -6,12 +6,12 @@
 
 **Path:** `/hosts` (Fleet · Hosts)
 
-Every host registered in LabDog, one row each. Click a row to open the
+Every host registered in unbork, one row each. Click a row to open the
 host's page.
 
 | Column | Description |
 |--------|-------------|
-| host | The name given to the host in LabDog |
+| host | The name given to the host in unbork |
 | address | Used for SSH connections and SSH-lockout rule generation |
 | status | Sync state — in sync, drifted, syncing, failed, unknown |
 | groups | The groups this host belongs to, as chips in priority order; hover a chip for its priority |
@@ -41,15 +41,22 @@ host's page.
 | Field | Notes |
 |-------|-------|
 | hostname | Display name — does not need to be the DNS name. Leave it empty to take the name the host reports over SSH. |
-| ip address | Must be reachable over SSH from the LabDog server |
+| ip address | Must be reachable over SSH from the unbork server |
 | ssh port | Default 22 |
 | ssh user | The user Ansible connects as; default `root` |
 | ssh key | One of the keys under [SSH Keys](admin.md#ssh-keys); the default key is marked |
 | groups | A checkbox list of every group, in priority order. Membership decides the configuration the host receives on its first sync. |
-| Check this host for drift | On by default. LabDog connects on a timer and reports where the host has diverged from its desired configuration — read-only. |
+| Check this host for drift | On by default. unbork connects on a timer and reports where the host has diverged from its desired configuration — read-only. |
 
 The firewall backend is detected, not chosen — see
 [Firewall backend selection](#firewall-backend-selection).
+
+A non-root ssh user needs sudo, and sudo must not require a terminal.
+unbork runs Ansible with pipelining, which sends each task down the open
+SSH session instead of copying a file over first, and pipelining cannot
+work with `Defaults requiretty` in sudoers. Current Debian, Ubuntu and
+RHEL-family releases do not set it; on a host that does, every sync and
+action fails until the line is removed.
 
 ---
 
@@ -97,17 +104,19 @@ failed run is far more likely than drift.
   run that failed and was rolled back to its snapshot. A failing row opens
   to show the reason and the run. **all schedules →** opens the Activity
   tab.
-- **host** — address and SSH port, firewall backend, Proxmox VM, when it
-  was last verified, and Grafana's resource gauges when a metrics backend
+- **host** — address and SSH port, firewall backend, when it was last
+  verified, and Grafana's resource gauges when a metrics backend
   is configured. **config** is drift as one line: *N modules in sync* on
   most days, the drifted modules in amber with **plan sync →** when a check
   found drift, or the count of modules that could not be checked. **all
-  facts ▾** shows the rest: hostname, the management IP LabDog connects
+  facts ▾** shows the rest: hostname, the management IP unbork connects
   from, sync status, last sync, last drift check, kernel, default NIC and
   the **drift monitoring** toggle. That toggle is the host-level flag,
   which governs *firewall* drift only — the other six modules each have
   their own toggle on their Config tab. See
   [Drift detection](drift-detection.md).
+- **vm mapping** — under the host card, open: the Proxmox VM behind this
+  host; see [Proxmox VM mapping](#proxmox-vm-mapping).
 - **recent activity** — runs, syncs, alerts and assistant sessions on this
   host, newest first, with the reason on a failure. Drift checks and
   collections that worked are left out, since they run every few hours.
@@ -118,9 +127,8 @@ failed run is far more likely than drift.
   modules it sets. A dashed module is one a higher layer also sets, which
   wins any conflict. **+ add to group** opens a filterable picker in place;
   **remove** takes the host out of one group.
-- **vm mapping** — folded at the foot of the tab; see
-  [Proxmox VM mapping](#proxmox-vm-mapping). **automatic fixes** below it
-  lists the alert rules that may change this host without asking.
+- **automatic fixes** — at the foot of the tab: the alert rules that may
+  change this host without asking.
 
 ### Config
 
@@ -133,7 +141,7 @@ dot for its sync state. Every module has the same layout as a group's
   diff preview first) and **add** for a host override.
 - The **effective** table: every item this host receives, whichever group it
   comes from, with a **comes from** column — the group and its priority,
-  *this host*, or *system* for LabDog's own SSH rule and the hosts file's
+  *this host*, or *system* for unbork's own SSH rule and the hosts file's
   localhost and own-name lines (see [Hosts file](groups.md#hosts-file)).
   Editing a group's item creates a host override of it; host rows can be
   edited or deleted.
@@ -167,7 +175,7 @@ An SSH terminal into the host, in place — see [Terminal](#terminal).
 
 ### Firewall backend selection
 
-LabDog manages **one** firewall backend per host — `nftables` or `iptables`
+unbork manages **one** firewall backend per host — `nftables` or `iptables`
 — shown as a tag in the Config › Firewall toolbar and in the Overview tab's
 host facts. That backend is the store **sync** writes to and **collect**
 reads from; the other backend is left untouched.
@@ -179,42 +187,42 @@ detection uses a first-match ladder rather than a simple "which is
 installed" check:
 
 1. **Only one installed** → that one.
-2. **Existing LabDog ruleset** — if LabDog already manages one backend on the
+2. **Existing unbork ruleset** — if unbork already manages one backend on the
    host, keep it (prevents flip-flopping and orphaned rules).
 3. **Container runtime** — Docker, kube-proxy in iptables mode, or nerdctl with
    CNI networking force **iptables**, which they hardcode and would otherwise
-   fight. (This sits *below* step 2, so an established LabDog setup is never
+   fight. (This sits *below* step 2, so an established unbork setup is never
    yanked out from under a container runtime.)
 4. **Active ruleset** — whichever backend already has real input filtering
    configured wins.
 5. **Default → nftables** on a greenfield host.
 
 The UI has no backend picker. To pin one yourself, set it through the API —
-`PUT /api/hosts/{id}` with `{"firewall_backend": "iptables"}` — and LabDog
+`PUT /api/hosts/{id}` with `{"firewall_backend": "iptables"}` — and unbork
 never changes it after that. While the backend is still `unknown`, the
 Firewall tab offers to install nftables — it adds a host package override
 for `nftables`, runs a package sync, then detects the backend again.
 
 ### Dual-stack hosts (both firewalls installed)
 
-Because the two firewalls are independent rule stores, a LabDog ruleset can be
-left behind in the backend LabDog is *not* managing — for example after
+Because the two firewalls are independent rule stores, an unbork ruleset can be
+left behind in the backend unbork is *not* managing — for example after
 switching backends, or after manually editing rules on the host. Collection
 only ever reads the active backend, so those leftover rules would be invisible
 in **current state** yet could still filter traffic.
 
-LabDog handles this in two ways:
+unbork handles this in two ways:
 
-- **Every firewall sync tears down LabDog's footprint in the inactive
-  backend** — dropping the `LABDOG-INPUT`/`LABDOG-OUTPUT` iptables chains, or
-  deleting the LabDog-owned nftables `inet filter` table — so there is a single
-  source of truth. Only LabDog's own rules are removed; Docker, kube-proxy, and
+- **Every firewall sync tears down unbork's footprint in the inactive
+  backend** — dropping the `UNBORK-INPUT`/`UNBORK-OUTPUT` iptables chains, or
+  deleting the unbork-owned nftables `inet filter` table — so there is a single
+  source of truth. Only unbork's own rules are removed; Docker, kube-proxy, and
   firewalld rules are left intact.
-- **Collect warns when it detects a competing LabDog ruleset** in the inactive
-  backend (e.g. *"nftables is the active backend, but LabDog-managed iptables
+- **Collect warns when it detects a competing unbork ruleset** in the inactive
+  backend (e.g. *"nftables is the active backend, but unbork-managed iptables
   rules are still present"*). Run **sync rules** to clear it.
 
-> Note: flushing the iptables `LABDOG-INPUT` chain on a host LabDog manages via
+> Note: flushing the iptables `UNBORK-INPUT` chain on a host unbork manages via
 > **nftables** does nothing to the live ruleset — the rules live in the
 > nftables `inet filter` table. Check the backend tag in the Firewall toolbar
 > if a manual firewall change isn't reflected after **collect**.
@@ -223,8 +231,7 @@ LabDog handles this in two ways:
 
 When one or more Proxmox nodes are configured under
 [Hypervisors](settings.md#proxmox-settings), the Overview tab shows a **vm
-mapping** panel, folded at the foot of the tab (**expand** opens it); the
-host card's **proxmox** line names the VM. The mapping links this host to its backing Proxmox VM or LXC
+mapping** panel under the host card. The mapping links this host to its backing Proxmox VM or LXC
 container (VM name, VMID and node) — this is what enables automatic
 snapshot + rollback for destructive [actions](actions.md).
 
@@ -288,9 +295,9 @@ A one-off scan:
 
 1. Enter a CIDR (e.g. `192.168.1.0/24`). Ranges larger than `/20` are
    refused by default — the limit is `discovery.min_prefix` in
-   `labdog.toml` (`LABDOG_DISCOVERY__MIN_PREFIX`).
+   `unbork.toml` (`UNBORK_DISCOVERY__MIN_PREFIX`).
 2. **Scan network** probes every address for an open port 22, except the
-   ones that are already hosts in LabDog. A meter shows progress; results
+   ones that are already hosts in unbork. A meter shows progress; results
    arrive as the scan runs. The result names the addresses it left out, so
    a host a scan schedule added a minute ago is not mistaken for a miss.
 3. **discovered hosts** lists each hit with its address, resolved hostname
@@ -306,7 +313,7 @@ A one-off scan:
 **Path:** `/hosts/{id}/terminal`, or the host page's **Terminal** tab
 
 A full browser-based SSH terminal powered by xterm.js. The connection goes
-through the LabDog server over a WebSocket — no direct SSH access from the
+through the unbork server over a WebSocket — no direct SSH access from the
 browser is needed.
 
 The terminal window has the same controls as a run's log (see
@@ -320,10 +327,13 @@ and `less` need it — so leave a maximized terminal with **⤡**.
 ### Notes
 
 - Sessions close after the idle timeout (`ssh.idle_timeout_seconds` in
-  [Settings](settings.md), default 30 minutes).
+  [Settings](settings.md), default 30 minutes), and in any case after the
+  session time limit (`ssh.max_session_seconds`, default 12 hours).
+- An open session closes within a minute when its user is deactivated,
+  changes their password, or logs out everywhere.
 - All terminal sessions are recorded in the [Audit Log](operations.md#audit)
   (session open/close events).
 - The SSH user and key are the same ones configured on the host.
-- Concurrent sessions per user and in total are capped in `labdog.toml`
+- Concurrent sessions per user and in total are capped in `unbork.toml`
   (`[ssh] max_sessions_per_user`, `max_total_sessions`) or the matching
-  `LABDOG_SSH__…` environment variables (see `.env.example`).
+  `UNBORK_SSH__…` environment variables (see `.env.example`).

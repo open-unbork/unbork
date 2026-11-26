@@ -22,7 +22,7 @@ name: CI
 #   * DOCKER_HUB_PAT  — Docker Hub personal access token (secret)
 #
 # Variables required (same screen, "Variables" tab):
-#   * DOCKER_HUB_REPO — full repo path in Docker Hub, e.g. "myuser/labdog".
+#   * DOCKER_HUB_REPO — full repo path in Docker Hub, e.g. "myuser/unbork".
 #     The username portion (first segment) is extracted automatically for
 #     login; the full value is used as the image name.
 
@@ -56,7 +56,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       && github.base_ref == 'main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,7 +99,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -122,7 +122,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -142,7 +142,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -157,8 +157,29 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
-
   # ---- TEST -------------------------------------------------------------
+
+  frontend-test:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci --prefer-offline
+      - name: npm test (Vitest unit tests)
+        working-directory: frontend
+        run: npm test
 
   backend-test:
     if: >-
@@ -167,14 +188,14 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_test
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -193,7 +214,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_test
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
       REDIS_URL: redis://localhost:6379/0
       SECRET_KEY: ci-test-secret-key-not-for-production
       ENCRYPTION_KEY: Y2ktdGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
@@ -222,7 +243,31 @@ jobs:
           uv pip install --system --no-deps .
       - name: pytest
         working-directory: backend
-        run: python -m pytest tests/ -v
+        # sysmon (PEP 669) watches the whole interpreter, so lines run inside
+        # SQLAlchemy's greenlets are counted without concurrency=greenlet,
+        # which would force the much slower C tracer. Same totals, measured.
+        env:
+          COVERAGE_CORE: sysmon
+        run: python -m pytest tests/ -v --cov --cov-report=term:skip-covered --cov-report=xml:coverage.xml
+      # Printed on every PR (also from forks: it needs no permissions) so
+      # each stage review has a figure to compare. No fail_under: this is
+      # a measurement, not a gate.
+      - name: Coverage summary
+        if: always()
+        working-directory: backend
+        run: |
+          if [ -f .coverage ]; then
+            total=$(python -m coverage report --format=total)
+            echo "Backend coverage: ${total}% of statements" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Backend coverage: not measured (pytest did not run)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 14
 
   frontend-build-check:
     if: >-
@@ -231,7 +276,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -267,14 +312,14 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_e2e
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_e2e
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -292,16 +337,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      LABDOG_DATABASE__URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_e2e
-      LABDOG_REDIS__URL: redis://localhost:6379/0
-      LABDOG_SECURITY__SECRET_KEY: ci-test-secret-key-not-for-production
+      UNBORK_DATABASE__URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_e2e
+      UNBORK_REDIS__URL: redis://localhost:6379/0
+      UNBORK_SECURITY__SECRET_KEY: ci-test-secret-key-not-for-production
       # Must decode to exactly 32 bytes, which is why this is the
       # conftest fixture key rather than backend-test's
-      # LABDOG_SECURITY__ENCRYPTION_KEY: that one decodes to 30 and gets
+      # UNBORK_SECURITY__ENCRYPTION_KEY: that one decodes to 30 and gets
       # away with it because pytest generates its own key at runtime.
       # This job boots the real app, which validates and refuses to start.
       # Both values are already in .gitleaks.toml's fixture allowlist.
-      LABDOG_SECURITY__ENCRYPTION_KEY: vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=
+      UNBORK_SECURITY__ENCRYPTION_KEY: vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg=
       # The suite drives the app the way an install serves it: one origin,
       # backend on :8000 serving both /api and the static export. That
       # keeps the session cookie and the CSRF double-submit same-origin,
@@ -313,7 +358,7 @@ jobs:
       # an expired session and answers by redirecting to /login. That
       # failed 53 of 77 specs on the first run here. backend/tests
       # disables it for the same reason.
-      LABDOG_RATE_LIMIT__ENABLED: "false"
+      UNBORK_RATE_LIMIT__ENABLED: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -340,22 +385,22 @@ jobs:
         run: |
           npm ci --prefer-offline
           npm run build
-      - name: Start LabDog
+      - name: Start unbork
         working-directory: backend
         # `python -m app` is the real entrypoint: it migrates, starts the
         # Celery worker+beat subprocess, then serves the API and the
         # frontend/out export that the previous step produced.
         run: |
-          nohup python -m app > /tmp/labdog-server.log 2>&1 &
+          nohup python -m app > /tmp/unbork-server.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://localhost:8000/health > /dev/null; then
-              echo "LabDog is up after ${i}s"
+              echo "unbork is up after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "LabDog did not become healthy in 60s"
-          cat /tmp/labdog-server.log
+          echo "unbork did not become healthy in 60s"
+          cat /tmp/unbork-server.log
           exit 1
       - name: Install Playwright browsers
         working-directory: frontend
@@ -365,7 +410,7 @@ jobs:
         run: npx playwright test
       - name: Server log
         if: always()
-        run: tail -n 200 /tmp/labdog-server.log || true
+        run: tail -n 200 /tmp/unbork-server.log || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -380,7 +425,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -394,6 +439,10 @@ jobs:
       - name: npm run build
         working-directory: website
         run: npm run build
+      - name: README links into the site resolve
+        # Every https://open-unbork.github.io/unbork/... link in README.md
+        # must name a page, and an anchor, the build above produced.
+        run: node website/scripts/check-readme-links.mjs
 
 
   # ---- BUILD & PUBLISH --------------------------------------------------
@@ -402,7 +451,7 @@ jobs:
   #                   (tag-release-image, after the release job, adds
   #                   :X.Y.Z, :X.Y and :X to that same image)
   # build-dev-image — push to dev           → :dev-latest + :dev-<short_sha>
-  # build-test-image — PRs + workflow_dispatch (non-main) → :test + :test-<short_sha>
+  # build-test-image — same-repository PRs (unless labelled no-test-image) + push to dev + workflow_dispatch (non-main) → :test-<short_sha>
   # All three log into Docker Hub using DOCKER_HUB_PAT.
   # The username is extracted from the first segment of DOCKER_HUB_REPO.
 
@@ -410,7 +459,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive Docker Hub username from DOCKER_HUB_REPO
@@ -422,7 +471,7 @@ jobs:
           fi
           echo "user=$(echo '${{ vars.DOCKER_HUB_REPO }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ steps.hub.outputs.user }}
           password: ${{ secrets.DOCKER_HUB_PAT }}
@@ -443,14 +492,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Test images are published as :test-<short sha> only; there is no
+  # floating :test tag (an install following one picked up whatever PR
+  # built last). Follow :dev-latest to track dev. A PR labelled
+  # `no-test-image` builds no image, which only saves a build: add the
+  # label before pushing; the lint and test jobs still run. PRs from forks
+  # build no image either, because DOCKER_HUB_PAT is not available to them.
   build-test-image:
     if: >-
-      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request'
+       && github.event.pull_request.head.repo.full_name == github.repository
+       && !contains(github.event.pull_request.labels.*.name, 'no-test-image')) ||
       (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     outputs:
       image_ref: ${{ steps.meta.outputs.image_ref }}
@@ -465,7 +522,7 @@ jobs:
           fi
           echo "user=$(echo '${{ vars.DOCKER_HUB_REPO }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ steps.hub.outputs.user }}
           password: ${{ secrets.DOCKER_HUB_PAT }}
@@ -481,7 +538,6 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ vars.DOCKER_HUB_REPO }}:test
             ${{ vars.DOCKER_HUB_REPO }}:test-${{ steps.meta.outputs.short_sha }}
           build-args: |
             GIT_SHA=${{ github.sha }}
@@ -493,7 +549,7 @@ jobs:
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [backend-lint, backend-test, frontend-build-check]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -506,7 +562,7 @@ jobs:
           fi
           echo "user=$(echo '${{ vars.DOCKER_HUB_REPO }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ steps.hub.outputs.user }}
           password: ${{ secrets.DOCKER_HUB_PAT }}
@@ -531,11 +587,14 @@ jobs:
 
   pages-build:
     # Build and upload the docs site artifact for main. Deploy step
-    # follows immediately after.
-    runs-on: ubuntu-24.04
+    # follows immediately after. A manual dispatch on dev also publishes,
+    # so the docs can be fixed between releases (e.g. after the repo
+    # rename moved the Pages address). The next push to main overwrites it.
+    runs-on: ubuntu-26.04
     if: >-
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && github.ref == 'refs/heads/main'
+      ((github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -557,14 +616,17 @@ jobs:
           include-hidden-files: true
 
   pages-deploy:
-    # Publishes the built docs site to GitHub Pages on main only.
+    # Publishes the built docs site to GitHub Pages on main, or on a
+    # manual dispatch on dev (see pages-build).
     # Requires the repository to have Pages enabled in Settings → Pages,
-    # with "Build and deployment → Source" set to "GitHub Actions".
+    # with "Build and deployment → Source" set to "GitHub Actions", and
+    # dev allowed by the github-pages environment's deployment branches.
     if: >-
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && github.ref == 'refs/heads/main'
+      ((github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
     needs: [pages-build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       pages: write
       id-token: write
@@ -586,7 +648,10 @@ jobs:
   # a hard gate: `release-artifacts` needs it, so a broken install path
   # blocks the release. See packaging/tests/ for the harness and assertions.
   packaging-smoke:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
+    # Each upgrade target has its own bounded waits; this caps the job if
+    # something outside them hangs.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -603,7 +668,7 @@ jobs:
             pull_request)
               BASE="${{ github.event.pull_request.base.sha }}"
               if git diff --name-only "$BASE" HEAD \
-                   | grep -qE '^(packaging/|backend/pyproject\.toml|backend/uv\.lock|VERSION|\.github/workflows/ci\.yml)'; then
+                   | grep -qE '^(packaging/|backend/pyproject\.toml|backend/uv\.lock|backend/alembic/|backend/app/config\.py|backend/app/__main__\.py|VERSION|\.github/workflows/ci\.yml)'; then
                 RUN=true
               fi ;;
           esac
@@ -643,8 +708,32 @@ jobs:
       - name: Build artifacts
         if: steps.decide.outputs.run == 'true'
         run: ./packaging/build.sh --version="$(tr -d '[:space:]' < VERSION)"
-      - name: Smoke-test artifacts in target-OS containers
+      - name: Download the 1.1.1 artifacts for the upgrade test
+        # The upgrade targets start from the last release before the
+        # rename (1.1.1; the same application as 1.1.0). Verified against
+        # the release's own SHA256SUMS: a mismatch fails the job, and so
+        # does a GitHub outage, which is the right direction for a
+        # release gate.
         if: steps.decide.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p packaging/dist-old
+          gh release download v1.1.1 --repo "${{ github.repository }}" \
+            --dir packaging/dist-old \
+            --pattern '*_1.1.1-1_amd64.deb' --pattern '*-1.1.1-1.x86_64.rpm' \
+            --pattern '*-1.1.1-linux-amd64.tar.gz' --pattern SHA256SUMS
+          cd packaging/dist-old && sha256sum -c --ignore-missing SHA256SUMS
+          test "$(ls *.deb *.rpm *.tar.gz | wc -l)" -eq 3
+      - name: Smoke-test artifacts in target-OS containers
+        # The fresh installs, then the upgrade from 1.1.1 with data
+        # (packaging/tests/upgrade.sh), all at once (PARALLEL).
+        if: steps.decide.outputs.run == 'true'
+        env:
+          TARGETS: deb rpm tarball upgrade-deb upgrade-rpm upgrade-tarball
+          OLD_VERSION: 1.1.1
+          PARALLEL: "1"
         run: ./packaging/tests/run-smoke.sh
       - name: systemd-analyze security
         # The unit went from 7.4 MEDIUM to 1.8 OK when the hardening
@@ -656,13 +745,13 @@ jobs:
         run: |
           set -euo pipefail
           systemd-analyze security --offline=true --no-pager \
-            packaging/systemd/labdog.service | tail -40
+            packaging/systemd/unbork.service | tail -40
           SCORE=$(systemd-analyze security --offline=true --no-pager \
-            packaging/systemd/labdog.service \
+            packaging/systemd/unbork.service \
             | grep -oE 'Overall exposure level for [^:]+: [0-9.]+' \
             | grep -oE '[0-9.]+$')
           echo "Exposure level: ${SCORE}"
-          awk -v s="$SCORE" 'BEGIN { if (s+0 > 3.0) { print "::error::labdog.service exposure " s " exceeds the 3.0 ceiling"; exit 1 } }'
+          awk -v s="$SCORE" 'BEGIN { if (s+0 > 3.0) { print "::error::unbork.service exposure " s " exceeds the 3.0 ceiling"; exit 1 } }'
 
 
   # ---- RELEASE ARTIFACTS ------------------------------------------------
@@ -695,14 +784,14 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     services:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: labdog_test
-          POSTGRES_USER: labdog
-          POSTGRES_PASSWORD: labdog
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
         ports:
           - 5432:5432
         options: >-
@@ -720,7 +809,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql+asyncpg://labdog:labdog@localhost:5432/labdog_test
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
       REDIS_URL: redis://localhost:6379/0
       SECRET_KEY: ci-test-secret-key-not-for-production
       ENCRYPTION_KEY: Y2ktdGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
@@ -789,7 +878,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write # push the auto-tag and create the release
       id-token: write # sign the provenance attestation
@@ -872,7 +961,7 @@ jobs:
         if: steps.ver.outputs.skip != 'true'
         working-directory: packaging/dist
         run: |
-          sha256sum labdog-* labdog_* > SHA256SUMS
+          sha256sum unbork-* unbork_* > SHA256SUMS
           echo "=== SHA256SUMS ==="
           cat SHA256SUMS
       - name: Attest build provenance
@@ -881,7 +970,7 @@ jobs:
         # the files match a list written by whoever wrote the files.
         # An attestation is signed by GitHub's OIDC identity for this
         # workflow run and verified with:
-        #   gh attestation verify labdog_X.Y.Z_amd64.deb --repo open-labdog/labdog
+        #   gh attestation verify unbork_X.Y.Z_amd64.deb --repo open-unbork/unbork
         if: steps.ver.outputs.skip != 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -914,7 +1003,7 @@ jobs:
           git push origin "v${V}"
       - name: Create GitHub Release
         if: steps.ver.outputs.skip != 'true'
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           name: v${{ steps.ver.outputs.version }}
@@ -936,7 +1025,7 @@ jobs:
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -960,7 +1049,7 @@ jobs:
       - name: Derive Docker Hub username from DOCKER_HUB_REPO
         id: hub
         run: echo "user=$(echo '${{ vars.DOCKER_HUB_REPO }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ steps.hub.outputs.user }}
           password: ${{ secrets.DOCKER_HUB_PAT }}
@@ -973,6 +1062,33 @@ jobs:
           args=()
           for t in $TAGS; do args+=(-t "${REPO}:${t}"); done
           docker buildx imagetools create "${args[@]}" "${REPO}:${GITHUB_SHA}"
+      # Installs from before the move to unbork pull openlabdog/labdog. Until (old-name-ok)
+      # the release lines they run reach end of life, every release is also
+      # copied there (:latest plus the version tags). Set the variable
+      # LEGACY_DOCKER_HUB_REPO and the secret LEGACY_DOCKER_HUB_PAT to turn
+      # it on; unset, the steps are skipped. The copy runs after the tags
+      # above and logs in as the legacy account, which replaces the first
+      # login, so it must stay last.
+      - name: Log in to the legacy Docker Hub account
+        if: vars.LEGACY_DOCKER_HUB_REPO != ''
+        id: legacy
+        run: echo "user=$(echo '${{ vars.LEGACY_DOCKER_HUB_REPO }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
+      - if: vars.LEGACY_DOCKER_HUB_REPO != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ steps.legacy.outputs.user }}
+          password: ${{ secrets.LEGACY_DOCKER_HUB_PAT }}
+      - name: Copy the release to the legacy repository
+        if: vars.LEGACY_DOCKER_HUB_REPO != ''
+        env:
+          REPO: ${{ vars.DOCKER_HUB_REPO }}
+          LEGACY: ${{ vars.LEGACY_DOCKER_HUB_REPO }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          set -euo pipefail
+          args=(-t "${LEGACY}:latest")
+          for t in $TAGS; do args+=(-t "${LEGACY}:${t}"); done
+          docker buildx imagetools create "${args[@]}" "${REPO}:${GITHUB_SHA}"
 
 
   # ---- SECURITY SCANS ---------------------------------------------------
@@ -983,7 +1099,7 @@ jobs:
       always() &&
       needs.build-test-image.result == 'success'
     needs: [build-test-image]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       # Check out so the scanner can read .trivyignore. Without this the
       # ignore file is absent from the runner workspace and silently has no
@@ -1006,6 +1122,185 @@ jobs:
           ignore-unfixed: "true"
           trivyignores: .trivyignore
 
+  backend-test-no-assistant:
+    # C-026: the whole suite with the assistant left out, and without the
+    # Agent SDK installed, as an image built with WITH_ASSISTANT=0 runs.
+    # The assistant's own tests skip (needs_assistant); everything else
+    # must pass, which is what catches an AI branch nobody guarded.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: unbork_test
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://unbork:unbork@localhost:5432/unbork_test
+      REDIS_URL: redis://localhost:6379/0
+      UNBORK_ASSISTANT__ENABLED: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install dependencies (no Agent SDK)
+        working-directory: backend
+        run: |
+          pip install -U pip uv -q
+          uv export --frozen --no-emit-project --extra dev --format requirements-txt -o /tmp/req.txt
+          uv pip install --system -r /tmp/req.txt
+          uv pip install --system --no-deps .
+      - name: pytest without the assistant
+        working-directory: backend
+        run: python -m pytest tests/ -q
+
+  image-without-assistant:
+    # C-026: an image built with WITH_ASSISTANT=0 has no Agent SDK, no
+    # assistant pages, and becomes ready.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch'
+       && github.ref != 'refs/heads/main'
+       && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: unbork
+          POSTGRES_USER: unbork
+          POSTGRES_PASSWORD: unbork
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build without the assistant
+        run: docker build --build-arg WITH_ASSISTANT=0 -t unbork:noai .
+      - name: No Agent SDK and no assistant pages
+        run: |
+          set -euo pipefail
+          if docker run --rm --entrypoint python unbork:noai -c "import claude_agent_sdk"; then
+            echo "::error::claude_agent_sdk is installed in the WITH_ASSISTANT=0 image"
+            exit 1
+          fi
+          pages="$(docker run --rm --entrypoint sh unbork:noai -c \
+            'ls -d /usr/lib/unbork/frontend/out/assistant /usr/lib/unbork/frontend/out/ai-providers* 2>/dev/null || true')"
+          if [ -n "$pages" ]; then
+            echo "::error::assistant pages in the WITH_ASSISTANT=0 image: $pages"
+            exit 1
+          fi
+      - name: Starts and becomes ready
+        run: |
+          set -euo pipefail
+          docker run -d --name noai --network host \
+            -e UNBORK_DATABASE__URL=postgresql+asyncpg://unbork:unbork@localhost:5432/unbork \
+            -e UNBORK_REDIS__URL=redis://localhost:6379/0 \
+            -e UNBORK_SECURITY__SECRET_KEY=ci-test-secret-key-not-for-production-0123456789 \
+            -e UNBORK_SECURITY__ENCRYPTION_KEY=vrPDeLMuFGehy2sYV//fyTd7EmnvOKbE2n4h7XM/8zg= \
+            unbork:noai
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/health/ready; then
+              echo
+              curl -fsS http://localhost:8000/api/version | grep -q '"assistant":false'
+              if curl -fsS -o /dev/null http://localhost:8000/openapi.json; then
+                ! curl -fsS http://localhost:8000/openapi.json | grep -q '"/api/ai/'
+              fi
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs noai | tail -100
+          exit 1
+
+  image-has-no-claude-code:
+    # S-009: the image must not carry the Claude Code program, which
+    # unbork downloads on first use instead. Fails on any file named
+    # claude* over 1 MB, and on a `claude` reachable on PATH.
+    if: >-
+      always() &&
+      needs.build-test-image.result == 'success'
+    needs: [build-test-image]
+    runs-on: ubuntu-26.04
+    steps:
+      - name: No Claude Code binary in the image
+        env:
+          IMAGE: ${{ needs.build-test-image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$IMAGE"
+          # As root: the image's own user cannot read every directory, and
+          # find then exits non-zero, which set -e takes for a failure.
+          found="$(docker run --rm --user 0 --entrypoint sh "$IMAGE" -c \
+            'find / -xdev -type f \( -name claude -o -name "claude-*" \) -size +1M 2>/dev/null')"
+          if [ -n "$found" ]; then
+            echo "::error::The image contains a Claude Code binary:"
+            echo "$found"
+            exit 1
+          fi
+          if docker run --rm --entrypoint sh "$IMAGE" -c 'command -v claude'; then
+            echo "::error::claude is on PATH in the image"
+            exit 1
+          fi
+          echo "No Claude Code program in $IMAGE"
+      - name: Licence, notices and source offer (S-010)
+        env:
+          IMAGE: ${{ needs.build-test-image.outputs.image_ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh "$IMAGE" -c \
+            'test -s /usr/share/doc/unbork/THIRD-PARTY-NOTICES && test -s /usr/share/doc/unbork/SOURCE-OFFER.md && test -s /usr/share/doc/unbork/LICENSE'
+          notices="$(docker run --rm --entrypoint cat "$IMAGE" /usr/share/doc/unbork/THIRD-PARTY-NOTICES)"
+          for c in ansible-core fastapi git openssh-client tini next react; do
+            grep -q "^$c " <<<"$notices" || { echo "::error::$c is not in THIRD-PARTY-NOTICES"; exit 1; }
+          done
+          labels="$(docker inspect --format '{{ json .Config.Labels }}' "$IMAGE")"
+          for k in licenses source revision documentation; do
+            grep -q "\"org.opencontainers.image.$k\"" <<<"$labels" \
+              || { echo "::error::label org.opencontainers.image.$k missing"; exit 1; }
+          done
+          grep -q "\"org.opencontainers.image.revision\":\"$SHA\"" <<<"$labels" \
+            || { echo "::error::revision label is not this commit"; exit 1; }
+
   gitleaks:
     if: >-
       github.event_name == 'pull_request' ||
@@ -1013,7 +1308,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1041,7 +1336,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -1063,7 +1358,7 @@ jobs:
         # Affects every pip release ≤ 26.0.1; upstream fix is in
         # https://github.com/pypa/pip/pull/13870 but no patched pip is
         # on PyPI yet. The vulnerability is in pip's archive handling
-        # during `pip install`; LabDog never invokes pip on user input,
+        # during `pip install`; unbork never invokes pip on user input,
         # so the attack surface is "the maintainer pip-installs a
         # malicious package while building" — same threat model as any
         # other supply-chain attack on the build host. Re-evaluate when
@@ -1077,7 +1372,7 @@ jobs:
       (github.event_name == 'workflow_dispatch'
        && github.ref != 'refs/heads/main'
        && !startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

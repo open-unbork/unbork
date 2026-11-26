@@ -67,7 +67,7 @@ class ActionRun(Base):
         nullable=True,
         index=True,
     )
-    # Set when an alert's labdog_action label started the run: the alert
+    # Set when an alert's unbork_action label started the run: the alert
     # that fired. ``SET NULL`` so pruning old alerts keeps the run.
     alert_event_id: Mapped[int | None] = mapped_column(
         ForeignKey("alert_events.id", ondelete="SET NULL"),
@@ -104,6 +104,12 @@ class ActionRun(Base):
     # to ``None`` when the run is re-dispatched and successfully claims.
     # Nullable so existing rows and non-deferred runs don't need a value.
     pending_reason: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
+    #: Set on a ``pending`` row an extension's run gate deferred
+    #: (``app.run_gate``): the host queue skips the row until then, and
+    #: ``app.tasks.run_gate_retry`` sends it again once it has passed.
+    gate_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     # The orchestrator task driving this run, and when it last proved it
     # was alive. Both NULL when nothing is driving it: not started yet,
     # handed to the group task (``supports_host=False``), or the

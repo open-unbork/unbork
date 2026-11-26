@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const TEST_EMAIL = process.env.TEST_USER_EMAIL || "e2e@labdog.io"
+const TEST_EMAIL = process.env.TEST_USER_EMAIL || "e2e@unbork.io"
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "E2eTestPass1"
 
 // These tests run WITHOUT auth state (unauthenticated)
@@ -10,7 +10,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 test.describe("Login page", () => {
   test("renders login form correctly", async ({ page }) => {
     await page.goto("/login")
-    await expect(page.getByRole("heading", { name: "LabDog" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "unbork" })).toBeVisible()
     await expect(page.locator("#email")).toBeVisible()
     await expect(page.locator("#password")).toBeVisible()
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible()
@@ -69,7 +69,7 @@ test.describe("Logout", () => {
   // and every spec that runs after it lands on /login instead of the page
   // it asked for. (It did: 53 of 77 specs failed that way the first time
   // this suite was run end to end.) Give it a throwaway account instead.
-  const LOGOUT_EMAIL = "e2e-logout@labdog.io"
+  const LOGOUT_EMAIL = "e2e-logout@unbork.io"
 
   test.beforeAll(async ({ request }) => {
     // 400 means a previous run already created it — the password is fixed,

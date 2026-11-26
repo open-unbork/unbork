@@ -5,12 +5,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api._group_sync import group_member_ids_or_400, sync_group_members
 from app.api.sync import SyncJobResponse
-from app.auth.users import current_active_user
+from app.auth.permissions import require, row_scope
 from app.crypto.encryption import decrypt_ssh_key
 from app.crypto.key_management import get_master_key
 from app.db import get_db
-from app.models.host import Host, HostGroupMembership
+from app.models.host import Host
 from app.models.host_module_status import HostModuleStatus
 from app.models.ssh_key import SSHKey
 from app.models.sync_job import SyncJob
@@ -57,7 +58,7 @@ def _entry_to_dict(entry) -> dict:
 @router.post("/hosts/{host_id}/plan", response_model=PackageSyncPlan)
 async def plan_package_sync(
     host_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))
@@ -99,7 +100,7 @@ async def plan_package_sync(
 @router.post("/hosts/{host_id}/sync", response_model=SyncJobResponse, status_code=201)
 async def trigger_package_sync(
     host_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))
@@ -147,52 +148,20 @@ async def trigger_package_sync(
 @router.post("/groups/{group_id}/sync", status_code=201)
 async def trigger_group_package_sync(
     group_id: int,
-    user: User = Depends(current_active_user),
+    user: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
-    memberships = await db.execute(
-        select(HostGroupMembership.c.host_id).where(HostGroupMembership.c.group_id == group_id)
-    )
-    host_ids = [r[0] for r in memberships.all()]
-    if not host_ids:
-        raise HTTPException(status_code=400, detail="No hosts in this group")
+    host_ids = await group_member_ids_or_400(db, group_id)
 
     from app.tasks.package_sync import run_package_sync
 
-    # BUG-37: dispatch after commit, not before — see app/api/sync.py.
-    pending: list[tuple[int, int]] = []
-    for hid in host_ids:
-        running = await db.execute(
-            select(SyncJob).where(
-                SyncJob.host_id == hid,
-                SyncJob.module_type == "package",
-                SyncJob.status.in_(["pending", "running"]),
-            )
-        )
-        if running.scalar_one_or_none():
-            continue
-
-        job = SyncJob(
-            host_id=hid,
-            group_id=group_id,
-            module_type="package",
-            status="pending",
-            triggered_by_user_id=user.id,
-        )
-        db.add(job)
-        await db.flush()
-        pending.append((job.id, hid))
-
-    await db.commit()
-    for job_id, hid in pending:
-        run_package_sync.delay(job_id=job_id, host_id=hid)
-    return {"triggered": len(pending), "skipped": len(host_ids) - len(pending)}
+    return await sync_group_members(db, group_id, host_ids, "package", user, run_package_sync)
 
 
 @router.get("/jobs/{job_id}", response_model=SyncJobResponse)
 async def get_package_sync_job(
     job_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("hosts.view", scope=row_scope(SyncJob, "job_id"))),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(SyncJob).where(SyncJob.id == job_id))
@@ -220,7 +189,7 @@ class DriftSettingsRequest(BaseModel):
 @router.post("/hosts/{host_id}/drift-check", response_model=PackageDriftCheckResponse)
 async def check_package_drift(
     host_id: int,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("sync.run")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))
@@ -305,7 +274,7 @@ async def check_package_drift(
 async def update_package_drift_settings(
     host_id: int,
     body: DriftSettingsRequest,
-    _: User = Depends(current_active_user),
+    _: User = Depends(require("config.edit")),
     db: AsyncSession = Depends(get_db),
 ):
     host_result = await db.execute(select(Host).where(Host.id == host_id))

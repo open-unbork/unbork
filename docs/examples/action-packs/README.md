@@ -1,36 +1,37 @@
 # Action Pack Examples
 
-Three working examples of the pack format, each focused on a different
+Working examples of the pack format, each focused on a different
 concept. Drop any of these into a git repo or local directory, add it
-via **Action Packs** in the LabDog UI, and the actions show up on host
+via **Action Packs** in the unbork UI, and the actions show up on host
 and group detail pages.
 
 For the mechanics — what a pack is, how it loads, how overrides resolve
 — see [the Actions user guide](../../ui/actions.md). For the end-to-end
 reference of all manifest fields, see
-[the `labdog-playbooks` README](https://github.com/open-labdog/labdog-playbooks).
+[the `unbork-playbooks` README](https://github.com/open-unbork/unbork-playbooks).
 
 | Example | What it demonstrates |
 |---|---|
-| [`minimal-pack/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/minimal-pack) | The smallest possible pack. One action, no parameters, no roles, no destructive wrapping. Start here. |
-| [`reboot-pack/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/reboot-pack) | A realistic destructive action with a parameter. Shows how `destructive: true` activates the Proxmox snapshot → verify → rollback pipeline automatically. |
-| [`with-role/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/with-role) | A pack that ships its own Ansible role and reuses it from a playbook. Shows how `ANSIBLE_ROLES_PATH` resolution works across LabDog's own and the pack's roles. |
-| [`with-verify/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/with-verify) | A destructive action with a pack-supplied verify playbook that decides pass/fail after the main playbook runs. Replaces LabDog's built-in SSH/services/packages check with the pack's own definition of success. |
+| [`minimal-pack/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/minimal-pack) | The smallest possible pack. One action, no parameters, no roles, no destructive wrapping. Start here. |
+| [`reboot-pack/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/reboot-pack) | A realistic destructive action with a parameter. Shows how `destructive: true` activates the Proxmox snapshot → verify → rollback pipeline automatically. |
+| [`with-role/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-role) | A pack that ships its own Ansible role and reuses it from a playbook. Shows how `ANSIBLE_ROLES_PATH` resolution works across unbork's own and the pack's roles. |
+| [`with-verify/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-verify) | A destructive action with a pack-supplied verify playbook that decides pass/fail after the main playbook runs. Replaces unbork's built-in SSH/services/packages check with the pack's own definition of success. |
+| [`with-quiesce/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-quiesce) | A destructive action with quiesce and unquiesce playbooks. The app is closed to writes before the snapshot and reopened after verify or rollback, so a rollback loses nothing. |
 
 ## Quick start
 
 ```bash
-# Clone or copy one of these into a place on your LabDog host
-cp -r docs/examples/action-packs/minimal-pack /srv/labdog-packs/my-first-pack
+# Clone or copy one of these into a place on your unbork host
+cp -r docs/examples/action-packs/minimal-pack /srv/unbork-packs/my-first-pack
 
 # Or make it a git repo
-cd /srv/labdog-packs/my-first-pack
+cd /srv/unbork-packs/my-first-pack
 git init -b main
 git add -A
 git commit -m "initial pack"
 ```
 
-Then in the LabDog UI:
+Then in the unbork UI:
 
 1. Go to **Operations → Actions → Packs**.
 2. Click **Add pack…**.
@@ -51,7 +52,7 @@ Then in the LabDog UI:
 ├── pack.yml                  (optional — pack metadata)
 ├── actions/
 │   └── <key>/                (one directory per action)
-│       ├── manifest.yml      (the LabDog action definition)
+│       ├── manifest.yml      (the unbork action definition)
 │       ├── playbook.yml      (the Ansible playbook)
 │       └── roles/            (optional — action-private roles)
 └── roles/                    (optional — pack-shared roles)
@@ -59,7 +60,7 @@ Then in the LabDog UI:
 ```
 
 An action is a directory: each contains its `manifest.yml` and
-`playbook.yml` side by side. LabDog discovers actions by globbing
+`playbook.yml` side by side. unbork discovers actions by globbing
 `actions/*/manifest.yml` — a directory without a `manifest.yml` is
 ignored.
 
@@ -74,14 +75,14 @@ opt-in and skipped on dry-run / failure. See
 [the Actions user guide](../../ui/actions.md#post-run-reconciliation-sync-and-register)
 for the full contract.
 
-- **`post_run_sync: [<module-name>, ...]`** — re-enforce labdog's
+- **`post_run_sync: [<module-name>, ...]`** — re-enforce unbork's
   existing desired state for the named modules after the action
   finishes (push semantic). Good for "rotate cert → reload
-  services" style actions. Don't use for installing things labdog
+  services" style actions. Don't use for installing things unbork
   doesn't already manage.
 - **`post_run_register: {<module>: [<item>, ...]}`** — register
   resources the action installed as host-scope override rows so
-  labdog manages them going forward. Items are validated against
+  unbork manages them going forward. Items are validated against
   each module's REST API Create schema; uniqueness collisions
   with operator-declared rows skip silently. Good for
   install-this-new-thing actions (e.g. install Alloy + register

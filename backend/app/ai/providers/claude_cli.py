@@ -1,12 +1,12 @@
 """Claude Code CLI backend.
 
 Runs the locally installed ``claude`` binary. Useful when the operator
-already has the CLI authenticated on the LabDog host and would rather not
+already has the CLI authenticated on the unbork host and would rather not
 manage a second API key.
 
-**LabDog owns every tool.** The CLI is invoked with its own tools
+**unbork owns every tool.** The CLI is invoked with its own tools
 disabled, so it can reason and answer but cannot touch the host itself —
-all host access goes through LabDog's classified, allowlisted,
+all host access goes through unbork's classified, allowlisted,
 audit-logged tool layer. That is the whole point of the safety model, and
 handing a second unaudited execution path to the same model would defeat
 it.
@@ -14,7 +14,7 @@ it.
 Two modes, chosen by probing the installed CLI once:
 
 - **tool mode** — ``--output-format stream-json --input-format stream-json``
-  lets LabDog feed tool results back over stdin across turns.
+  lets unbork feed tool results back over stdin across turns.
 - **single-shot** — one prompt in, text out. Used when the installed CLI
   is too old to round-trip tool results. The factory marks the provider
   ``supports_tools = False`` and the loop restricts it to reports and
@@ -24,12 +24,12 @@ Two modes, chosen by probing the installed CLI once:
 SDK does everything this does and more, so the two looked redundant, and
 the open question was whether to retire this one. The answer is no, for a
 reason that has nothing to do with capability: ``claude-agent-sdk`` is an
-optional extra. Its wheel is platform-specific and carries a ~131 MB
-Claude Code binary, so the ``.deb`` / ``.rpm`` / ``.tar.gz`` artefacts do
-not install it — only the container image does. Retiring this backend
-would leave every package install with no way to authenticate a Claude
-subscription at all, which is the one thing neither API-key backend can
-do.
+optional extra that the ``.deb`` / ``.rpm`` / ``.tar.gz`` artefacts do not
+install, and an image built without the assistant drops it too. This
+backend needs only the Claude Code program, which unbork downloads on
+first use (``app.ai.claude_code``) or finds on PATH, so it is the one way
+such an install can use a Claude subscription, which neither API-key
+backend can do.
 
 The verify step added in phase 5 also gives ``supports_tools = False`` a
 job rather than a limitation: a verify session is toolless by design (see
@@ -44,8 +44,8 @@ import asyncio
 import json
 import logging
 import os
-import shutil
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
+from pathlib import Path
 
 from app.ai.providers.base import (
     LLMProviderError,
@@ -80,30 +80,60 @@ OVERRIDING_CREDENTIAL_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 #: file left by an interactive ``claude login`` *also* outranks
 #: ``CLAUDE_CODE_OAUTH_TOKEN`` — verified against claude 2.1.220, where a
 #: stored login wins and the configured token is ignored with no warning
-#: and no difference in the output. So when a token is configured LabDog
-#: also points the CLI at a directory LabDog owns, where no interactive
+#: and no difference in the output. So when a token is configured unbork
+#: also points the CLI at a directory unbork owns, where no interactive
 #: session can leave a login behind to shadow it.
 #:
-#: ``/var/lib/labdog`` is already LabDog's state root — listed in the
+#: ``/var/lib/unbork`` is already unbork's state root — listed in the
 #: systemd unit's ``ReadWritePaths`` and the documented persistent-volume
 #: mount for container deploys — so the CLI's state travels with the rest
 #: of it and needs no extra configuration on either deployment shape.
 CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR"
-DEFAULT_CONFIG_DIR = "/var/lib/labdog/claude-cli"
+DEFAULT_CONFIG_DIR = "/var/lib/unbork/claude-cli"
 
-#: Raised when the binary is absent. Names both deployment shapes because
-#: the cause differs entirely between them: on a package install the
-#: operator supplies the binary, whereas the official container image
-#: bundles it — so a container hitting this is on a custom image or one
-#: built before the CLI was added, which is a different fix.
+#: Raised when the program is absent. Since S-009 no deployment ships it:
+#: unbork downloads it on first use (``app.ai.claude_code``), and a server
+#: that cannot reach the download puts its own copy on PATH.
 NOT_FOUND_MESSAGE = (
-    f"The {CLI_BINARY!r} CLI was not found on PATH for the LabDog service user. "
-    "On a package install, install it system-wide (a per-user install under a "
-    "home directory is not visible to the service). In a container, the official "
-    "image bundles it, so check whether you are on a custom image or one built "
-    "before it was added. Either way, an Anthropic provider needs no binary and "
-    "can also run tools. See docs/ui/assistant.md."
+    "The Claude Code program is not installed. unbork downloads it the first "
+    "time a provider that needs it is turned on or tested, in a container and "
+    "on a package install alike; the provider shows the reason when that fails. "
+    "A server without outbound access can install a `claude` program on PATH "
+    "for the unbork service user instead (system-wide: a per-user install under "
+    "a home directory is not visible to the service). An Anthropic provider "
+    "needs no program and can also run tools. See docs/ui/assistant.md."
 )
+
+
+def program_path() -> str:
+    """The program to run: the one unbork installed, else ``claude`` on PATH.
+
+    Falls back to the bare name when neither exists, so starting it fails
+    with ``FileNotFoundError`` and the caller reports :data:`NOT_FOUND_MESSAGE`.
+    """
+    from app.ai.claude_code import binary_path
+
+    found = binary_path()
+    return str(found) if found is not None else CLI_BINARY
+
+
+#: The program's sign-in file inside its config directory.
+CREDENTIALS_FILE = ".credentials.json"
+
+
+def keeps_home_sign_in(env: Mapping[str, str], config_dir: str) -> bool:
+    """Whether to leave the config directory alone for an older sign-in.
+
+    Before 2.0 a provider without a token read the program's default
+    directory, ``~/.claude``, so an operator may have signed in there. Until
+    there is a sign-in in ``config_dir``, pinning would hide that one; it is
+    used instead (S-014). Signing in as the docs now say moves to
+    ``config_dir`` for good.
+    """
+    if (Path(config_dir) / CREDENTIALS_FILE).is_file():
+        return False
+    home = env.get("HOME")
+    return bool(home) and (Path(home) / ".claude" / CREDENTIALS_FILE).is_file()
 
 
 def build_cli_env(
@@ -115,16 +145,19 @@ def build_cli_env(
 
     With a token: inject it, drop the two variables that would silently
     take precedence over it, and isolate the config directory so a stored
-    login cannot do the same thing from disk.
+    login cannot do the same thing from disk. Only a provider saved by an
+    earlier version still holds a token (S-014): new ones take none.
 
-    Without one: pass the environment through untouched. That case is an
-    operator who authenticated the CLI on the host and wants LabDog to use
-    it, so neither the credential variables nor the config directory may be
-    disturbed — isolating the config directory here would break exactly the
-    setup it is meant to serve.
+    Without one: the operator's own sign-in on the server is used. The
+    config directory is pinned to unbork's state directory, unless the
+    service environment already sets ``CLAUDE_CONFIG_DIR``, so a sign-in
+    made as the docs describe survives a restart or a replaced container.
+    The credential variables are left alone.
     """
     env = dict(os.environ if base is None else base)
     if not oauth_token:
+        if not keeps_home_sign_in(env, config_dir):
+            env.setdefault(CONFIG_DIR_ENV, config_dir)
         return env
     env[OAUTH_TOKEN_ENV] = oauth_token
     env[CONFIG_DIR_ENV] = config_dir
@@ -154,7 +187,7 @@ class ClaudeCLIProvider:
         self.model = model
         self.timeout_seconds = timeout_seconds
         # A one-year subscription token from ``claude setup-token``, stored
-        # encrypted like every other LabDog credential. None means "use
+        # encrypted like every other unbork credential. None means "use
         # whatever the host is already authenticated with".
         self.oauth_token = oauth_token
         self.config_dir = config_dir
@@ -166,13 +199,13 @@ class ClaudeCLIProvider:
     def _ensure_config_dir(self) -> None:
         """Create the isolated config directory, best effort.
 
-        Only relevant when a token is configured — that is the only case
-        where the directory is used at all. The CLI runs fine without it
-        (a missing directory just means no persisted state), so a failure
-        here must not stop a session from starting; it is logged and left
-        alone.
+        Only when the CLI's environment points at it: a ``CLAUDE_CONFIG_DIR``
+        the service environment sets is the operator's to create. The CLI
+        runs fine without it (a missing directory just means no persisted
+        state), so a failure here must not stop a session from starting; it
+        is logged and left alone.
         """
-        if not self.oauth_token:
+        if self.env.get(CONFIG_DIR_ENV) != self.config_dir:
             return
         try:
             os.makedirs(self.config_dir, exist_ok=True)
@@ -185,10 +218,10 @@ class ClaudeCLIProvider:
             )
 
     def _argv(self, prompt: str) -> list[str]:
-        argv = [CLI_BINARY, "-p", prompt]
+        argv = [program_path(), "-p", prompt]
         if self.model:
             argv += ["--model", self.model]
-        # Deny the CLI its own tools — host access belongs to LabDog's
+        # Deny the CLI its own tools — host access belongs to unbork's
         # classified tool layer, not to a second unaudited path.
         argv += ["--disallowedTools", "*"]
         return argv
@@ -224,8 +257,8 @@ class ClaudeCLIProvider:
     ) -> AsyncIterator[StreamEvent]:
         if tools:
             raise LLMProviderError(
-                "The Claude CLI backend cannot execute tool calls. Configure an "
-                "OpenAI-compatible or Anthropic provider for agentic sessions."
+                "A Claude single-shot provider cannot run tools. Use a Claude agent, "
+                "Anthropic or OpenAI-compatible provider for agentic sessions."
             )
 
         prompt = self._flatten(messages)
@@ -304,12 +337,15 @@ class ClaudeCLIProvider:
         trivial round-trip against the account, which is the same bargain
         every other provider's test already makes.
         """
-        path = shutil.which(CLI_BINARY)
-        if not path:
+        from app.ai.claude_code import binary_path
+
+        found = binary_path()
+        if found is None:
             raise LLMProviderError(NOT_FOUND_MESSAGE)
+        path = str(found)
         self._ensure_config_dir()
 
-        code, version, stderr = await self._run([CLI_BINARY, "--version"], timeout=30)
+        code, version, stderr = await self._run([path, "--version"], timeout=30)
         if code != 0:
             raise LLMProviderError(stderr[:300] or "CLI error")
 
@@ -332,7 +368,7 @@ async def cli_supports_stream_json() -> bool:
     """
     try:
         proc = await asyncio.create_subprocess_exec(
-            CLI_BINARY,
+            program_path(),
             "--help",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

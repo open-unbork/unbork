@@ -265,7 +265,7 @@ class TestADryRunDoesNotBuyAVerdict:
 class TestAnUnreadableJournalIsNotAQuietOne:
     """The bug this class exists for was observed in production.
 
-    LabDog connects to most hosts as an unprivileged user. ``journalctl``
+    unbork connects to most hosts as an unprivileged user. ``journalctl``
     run by such a user prints only that user's own journal and **exits 0**,
     so a host that had just logged an error-priority entry reported none.
     The evidence rendered that as "the journal was read and had no
@@ -290,7 +290,7 @@ class TestAnUnreadableJournalIsNotAQuietOne:
         assert "had no error-priority entries" in text
 
     def test_real_entries_are_shown(self) -> None:
-        text = _rendered(journal_errors="Aug 14 14:02:35 jellyfin labdog-example[1]: simulated")
+        text = _rendered(journal_errors="Aug 14 14:02:35 jellyfin unbork-example[1]: simulated")
         assert "simulated" in text
         assert UNAVAILABLE not in text
 

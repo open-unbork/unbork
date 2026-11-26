@@ -8,7 +8,7 @@ nightly twenty-host action — in a table the claim protocol scans on
 every sync, action and drift check.
 
 Window: ``logging.run_retention_days`` (default 90, ``0`` = keep
-forever), settable in ``labdog.toml`` or the settings UI. Kept separate
+forever), settable in ``unbork.toml`` or the settings UI. Kept separate
 from ``logging.audit_retention_days`` deliberately: an audit trail is
 usually wanted for longer than an ansible transcript, and an operator
 who shortens one rarely means to shorten the other.
@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ _TERMINAL_ACTION_RUN_STATUSES = ("succeeded", "partial", "failed", "cancelled")
 )
 def prune_old_action_runs() -> dict:
     """Delete terminal action_runs older than ``logging.run_retention_days``."""
-    return asyncio.run(_prune_action_runs())
+    return asyncio.run(with_task_engine(_prune_action_runs()))
 
 
 @celery_app.task(
@@ -65,7 +66,7 @@ def prune_old_action_runs() -> dict:
 )
 def prune_old_sync_jobs() -> dict:
     """Delete terminal sync_jobs older than ``logging.run_retention_days``."""
-    return asyncio.run(_prune_sync_jobs())
+    return asyncio.run(with_task_engine(_prune_sync_jobs()))
 
 
 async def _get_retention_days(db) -> int:

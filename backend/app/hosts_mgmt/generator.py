@@ -1,6 +1,5 @@
-import yaml
-
 from app.ansible_runtime.inventory import generate_inventory
+from app.ansible_runtime.playbook_yaml import dump_playbook
 
 
 def generate_hosts_file_playbook(
@@ -34,7 +33,7 @@ def generate_hosts_file_playbook(
 
     playbook = [
         {
-            "name": "LabDog /etc/hosts management",
+            "name": "unbork /etc/hosts management",
             "hosts": "all",
             "become": True,
             "gather_facts": False,
@@ -42,7 +41,7 @@ def generate_hosts_file_playbook(
         }
     ]
 
-    playbook_yaml = yaml.dump(playbook, default_flow_style=False, sort_keys=False)
+    playbook_yaml = dump_playbook(playbook)
     inventory_json = generate_inventory(host_ip, ssh_port, ssh_key_path, ssh_user)
 
     return playbook_yaml, inventory_json

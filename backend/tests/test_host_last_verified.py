@@ -1,9 +1,9 @@
-"""BUG-99: a host is stale when LabDog has not verified it, not when it
+"""BUG-99: a host is stale when unbork has not verified it, not when it
 has not been synced.
 
 The stale-hosts panel read ``hosts.last_sync_at``, which only a sync run
 that applied something writes. A host already in sync never gets one, so
-every such host read "never" for good, even though LabDog collected its
+every such host read "never" for good, even though unbork collected its
 state and checked it for drift that same day.
 """
 

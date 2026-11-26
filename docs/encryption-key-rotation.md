@@ -2,7 +2,7 @@
 
 This document explains when and how to rotate `security.encryption_key` —
 the AES-256-GCM master key that protects every encrypted credential stored in
-LabDog's database (`ssh_keys.encrypted_private_key`,
+unbork's database (`ssh_keys.encrypted_private_key`,
 `proxmox_nodes.encrypted_token_secret`,
 `git_repositories.encrypted_https_token`,
 `git_repositories.encrypted_webhook_secret`,
@@ -41,7 +41,7 @@ LabDog's database (`ssh_keys.encrypted_private_key`,
    proceeding.
 
 3. **Have both keys to hand** — the old key (current value of
-   `LABDOG_SECURITY__ENCRYPTION_KEY` in production) and the new key generated
+   `UNBORK_SECURITY__ENCRYPTION_KEY` in production) and the new key generated
    above.  Do not discard the old key until step 6 passes.
 
 ---
@@ -56,7 +56,7 @@ progress.
 **.deb / systemd install:**
 
 ```
-systemctl stop labdog labdog-celery
+systemctl stop unbork   # the Celery workers run inside this service
 ```
 
 **Docker Compose:**
@@ -71,9 +71,9 @@ The script connects to the database, checks that all migrations are applied,
 then re-encrypts every encrypted column in a single transaction.
 
 ```
-cd /path/to/labdog/backend
-LABDOG_OLD_KEY=<old-base64-key> \
-LABDOG_NEW_KEY=<new-base64-key> \
+cd /path/to/unbork/backend
+UNBORK_OLD_KEY=<old-base64-key> \
+UNBORK_NEW_KEY=<new-base64-key> \
     .venv/bin/python -m scripts.rotate_encryption_key
 ```
 
@@ -107,10 +107,10 @@ exit code means the rotation did not complete — see [Failure modes](#failure-m
 
 ### 4. Update the production configuration
 
-Replace the value of `LABDOG_SECURITY__ENCRYPTION_KEY` (or `[security]
-encryption_key` in `labdog.toml`) with the new key.
+Replace the value of `UNBORK_SECURITY__ENCRYPTION_KEY` (or `[security]
+encryption_key` in `unbork.toml`) with the new key.
 
-**.deb / systemd install** — edit `/etc/labdog/labdog.toml` and set:
+**.deb / systemd install** — edit `/etc/unbork/unbork.toml` and set:
 
 ```toml
 [security]
@@ -124,7 +124,7 @@ encryption_key = "<new-base64-key>"
 docker compose up -d api celery
 ```
 
-Do **not** restart LabDog before updating the key — it will fail to decrypt
+Do **not** restart unbork before updating the key — it will fail to decrypt
 the credentials it just had re-encrypted.
 
 ### 5. Restart the API and Celery workers
@@ -132,14 +132,14 @@ the credentials it just had re-encrypted.
 **.deb / systemd install:**
 
 ```
-systemctl start labdog labdog-celery
+systemctl start unbork
 ```
 
 **Docker Compose:** restart is handled by `docker compose up -d` in step 4.
 
 ### 6. Verify correct operation
 
-- Log in to the LabDog web interface.
+- Log in to the unbork web interface.
 - Navigate to **Admin → SSH Keys** and confirm the list loads without error.
 - Trigger a sync against a known-reachable host and confirm it completes
   successfully.
@@ -153,7 +153,7 @@ systemctl start labdog labdog-celery
 If step 6 fails, the old key is still valid — rotation does not destroy the
 old key, the operator does.  To roll back:
 
-1. Revert `LABDOG_SECURITY__ENCRYPTION_KEY` to the old key in the production
+1. Revert `UNBORK_SECURITY__ENCRYPTION_KEY` to the old key in the production
    configuration.
 2. Restart the API and Celery workers.
 3. Retry step 6 to confirm the service is healthy under the old key.
@@ -187,7 +187,7 @@ The CLI validates both keys before touching the database.  A key that does
 not decode to exactly 32 bytes is rejected immediately:
 
 ```
-ERROR: new key (--new-key / LABDOG_NEW_KEY) must decode to exactly 32 bytes, got N
+ERROR: new key (--new-key / UNBORK_NEW_KEY) must decode to exactly 32 bytes, got N
 ```
 
 Generate a correct key with `python -m app.crypto.key_management` and retry.

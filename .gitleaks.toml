@@ -1,4 +1,4 @@
-# gitleaks config for LabDog
+# gitleaks config for unbork
 #
 # Extends the default ruleset (so new leaks still get caught) and adds
 # narrow allowlist entries for known-fixture / known-historical
@@ -43,7 +43,7 @@ paths = [
     #                           literal string NOTAREALKEYBODY…, not key
     #                           material.
     '''^backend/tests/test_transcript_redaction\.py$''',
-    '''^labdog\.toml$''',
+    '''^unbork\.toml$''',
     # Historical-only path. The plans/ directory no longer exists in
     # the working tree, but a historical commit contains a multi-agent
     # plan doc whose Section 6 step-8 inlined fake-PEM
@@ -63,7 +63,7 @@ stopwords = []
 # rewritten again. Re-run gitleaks and update them if that happens.
 commits = [
     # docker-compose.yml used BARRICADE_SECURITY__* placeholder keys —
-    # superseded by LABDOG_* env vars in dev/labdog.toml; never production.
+    # superseded by UNBORK_* env vars in dev/unbork.toml; never production.
     # (Was 37d3ca56a03e61f6 before the 2026-08 history rewrite.)
     "d1e740b9a680c2ab070ca290336e3d1915ed606d",
 ]
@@ -80,7 +80,7 @@ regexes = [
     # Test secret key string used by CI + tests.
     '''(ci-)?test-secret-key-not-for-production''',
     # Old Barricade-era dev compose values, never used in production
-    # and superseded by the rebranded LABDOG_* env vars in dev/labdog.toml.
+    # and superseded by the rebranded UNBORK_* env vars in dev/unbork.toml.
     '''BARRICADE_SECURITY__SECRET_KEY''',
     '''BARRICADE_SECURITY__ENCRYPTION_KEY''',
     # app/ai/redaction.py replaces PEM private keys with a placeholder. An
@@ -92,5 +92,5 @@ regexes = [
     # construction: it is the string that *replaces* a secret, so anything
     # containing it is redacted output, never a credential.
     '''\{PLACEHOLDER\}''',
-    '''redacted by labdog''',
+    '''redacted by unbork''',
 ]

@@ -15,6 +15,7 @@ nothing upstream of it does.
 import logging
 from datetime import UTC
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -107,11 +108,11 @@ async def _collect_and_diff(host, hms, db):
 
     await refresh_host_sync_status(host, db)
 
-    if not host.labdog_source_ip:
+    if not host.unbork_source_ip:
         try:
             imported_key = asyncssh.import_private_key(private_key_pem)
             async with ssh_connect_host(host, db, client_keys=[imported_key]) as probe:
-                host.labdog_source_ip = await get_source_ip(probe)
+                host.unbork_source_ip = await get_source_ip(probe)
         except Exception:
             # Best-effort optimisation for the next merge, not part of the
             # verdict. Debug level because a host that fails this fails it
@@ -122,30 +123,26 @@ async def _collect_and_diff(host, hms, db):
 
 async def check_resolver_drift_for_one_host(host, hms, db) -> bool:
     """`app.tasks.drift_sweep.CheckOne` adapter for the resolver module."""
-    from datetime import datetime
-
     import asyncssh
+
+    from app.tasks.drift_sweep import record_check_error, record_unreachable
 
     try:
         diff = await _collect_and_diff(host, hms, db)
         return diff is not None
     except (OSError, asyncssh.Error, TimeoutError) as e:
-        hms.sync_status = "unknown"
-        hms.last_drift_check_at = datetime.now(UTC)
-        hms.error_message = f"Host unreachable: {e or 'connection timed out'}"
+        record_unreachable(hms, e)
         return True
     except Exception as e:
         logger.exception("resolver drift check failed for host %s", host.id)
-        hms.sync_status = "error"
-        hms.last_drift_check_at = datetime.now(UTC)
-        hms.error_message = str(e)
+        record_check_error(hms, e)
         return True
 
 
 @celery_app.task(
     bind=True,
     name="app.tasks.resolver_drift.run_resolver_drift_check",
-    queue="long_running",
+    queue="drift",
 )
 def run_resolver_drift_check(self, host_id: int) -> dict:
     """Check DNS resolver drift on a single host via SSH, on demand."""
@@ -173,20 +170,19 @@ def run_resolver_drift_check(self, host_id: int) -> dict:
                 "desired": diff.desired,
             }
 
-    return asyncio.run(_run())
+    return asyncio.run(with_task_engine(_run()))
 
 
 @celery_app.task(
     name="app.tasks.resolver_drift.check_all_resolver_drift",
-    queue="long_running",
+    queue="drift",
 )
 def check_all_resolver_drift():
     """Periodic task: resolver drift for every host with resolver drift enabled."""
-    import asyncio
+    from app.tasks.drift_sweep import run_sweep
 
-    from app.tasks.drift_sweep import sweep_module
-
-    return asyncio.run(sweep_module("resolver", check_resolver_drift_for_one_host))
+    # Fans out one check per host on the drift queue; see app.tasks.drift_sweep.
+    return run_sweep("resolver")
 
 
 def _register_resolver_drift_schedule():

@@ -523,19 +523,19 @@ def test_runner_events_to_task_events_resolves_real_event_shape() -> None:
     """
     realistic_events = [
         # Packages play
-        _real_shape_event("playbook_on_play_start", "LabDog Package Management"),
-        _real_shape_event("playbook_on_task_start", "LabDog Package Management"),
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Gathering Facts"),
+        _real_shape_event("playbook_on_play_start", "unbork Package Management"),
+        _real_shape_event("playbook_on_task_start", "unbork Package Management"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Gathering Facts"),
         # Services play
-        _real_shape_event("playbook_on_play_start", "LabDog service management"),
+        _real_shape_event("playbook_on_play_start", "unbork service management"),
         _real_shape_event(
-            "runner_on_ok", "LabDog service management", task="Gather systemd service facts"
+            "runner_on_ok", "unbork service management", task="Gather systemd service facts"
         ),
         _real_shape_event(
-            "runner_on_skipped", "LabDog service management", task="Remove orphaned overrides"
+            "runner_on_skipped", "unbork service management", task="Remove orphaned overrides"
         ),
         # Hosts file play
-        _real_shape_event("runner_on_ok", "LabDog /etc/hosts management", task="Deploy /etc/hosts"),
+        _real_shape_event("runner_on_ok", "unbork /etc/hosts management", task="Deploy /etc/hosts"),
         # Firewall (nftables) play
         _real_shape_event(
             "runner_on_ok",
@@ -543,7 +543,7 @@ def test_runner_events_to_task_events_resolves_real_event_shape() -> None:
             task="Apply nftables rules atomically",
         ),
         # Unrelated event types should not produce projection rows.
-        {"event": "verbose", "event_data": {"play": "LabDog Package Management"}},
+        {"event": "verbose", "event_data": {"play": "unbork Package Management"}},
         {"event": "playbook_on_stats", "event_data": {}},
     ]
 
@@ -574,10 +574,10 @@ def test_runner_events_to_task_events_marks_failed_event_correctly() -> None:
         ),
         _real_shape_event(
             "runner_on_unreachable",
-            "LabDog DNS resolver sync",
+            "unbork DNS resolver sync",
             task="Render resolver config",
         ),
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Install package: vim"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Install package: vim"),
     ]
 
     projected = _runner_events_to_task_events(events)
@@ -618,9 +618,9 @@ async def test_orchestrator_outcomes_real_event_fixture(db: AsyncSession, tmp_pa
     # the modules emit no events (no managed config / idempotent
     # no-op) so they should land as ``no_tasks``.
     events = [
-        _real_shape_event("runner_on_ok", "LabDog Package Management", task="Gathering Facts"),
+        _real_shape_event("runner_on_ok", "unbork Package Management", task="Gathering Facts"),
         _real_shape_event(
-            "runner_on_ok", "LabDog service management", task="Gather systemd service facts"
+            "runner_on_ok", "unbork service management", task="Gather systemd service facts"
         ),
         _real_shape_event(
             "runner_on_ok",
@@ -653,3 +653,33 @@ async def test_orchestrator_outcomes_real_event_fixture(db: AsyncSession, tmp_pa
     # Modules with no events → no_tasks.
     for module in ("resolver", "hosts-file", "cron", "linux-users"):
         assert outcomes[module] == "no_tasks", f"{module}: {outcomes[module]}"
+
+
+async def test_a_failed_run_with_no_events_is_an_error_not_in_sync(db: AsyncSession, tmp_path):
+    """BUG-129: a playbook that fails to parse emits no task events, and
+    every module used to come back ``no_tasks`` (shown as in sync). A host
+    that fails in one play never reaches the later ones either."""
+    from app.models.host import FirewallBackend
+
+    ssh_key = await create_ssh_key(db)
+    host = await create_host(db, ssh_key_id=ssh_key.id)
+    host.firewall_backend = FirewallBackend.nftables
+    await db.flush()
+    private_data_dir = str(tmp_path / "runner")
+    os.makedirs(private_data_dir, exist_ok=True)
+
+    fake_runner = _FakeRunner(events=[_make_event("runner_on_failed", ["firewall"])])
+    fake_runner.status = "failed"
+    fake_runner.rc = 2
+    outcomes, _playbook, _inventory = await orchestrate_host_sync(
+        host.id,
+        None,
+        db,
+        decrypt_key_fn=_make_decrypt_fn(b"FAKE PRIVATE KEY"),
+        run_ansible_fn=_make_run_ansible_fn(fake_runner),
+        ssh_key_path=str(tmp_path / "id_ed25519"),
+        private_data_dir=private_data_dir,
+    )
+
+    assert outcomes
+    assert set(outcomes.values()) == {"error"}, outcomes

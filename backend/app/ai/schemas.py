@@ -9,7 +9,7 @@ non-blank value replaces it.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -97,6 +97,14 @@ class AIProviderUpdate(BaseModel):
         return _validate_ca_cert_pem(v)
 
 
+class AIProviderRuntime(BaseModel):
+    """The Claude Code program's install state (S-009)."""
+
+    # Mirrors app.ai.claude_code.State, which is imported lazily here.
+    state: Literal["ready", "missing", "installing", "failed"]
+    detail: str
+
+
 class AIProviderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
@@ -124,6 +132,15 @@ class AIProviderResponse(BaseModel):
     #: an expired one stops a scheduled session dead — so this is computed
     #: and surfaced rather than left for the operator to remember.
     credential_expires_at: datetime | None
+    #: Why an extension's provider type policy refuses this provider's type
+    #: (S-017); null when it is allowed. A refused provider cannot be tested
+    #: or used until its type is changed.
+    refused_reason: str | None = None
+    #: Whether the Claude Code program these backends run is installed
+    #: (S-009): ``{state, detail}`` with state ``ready``, ``missing``,
+    #: ``installing`` or ``failed``. Null for API-key types, which need no
+    #: program.
+    runtime: AIProviderRuntime | None = None
     input_cost_per_mtok: float
     output_cost_per_mtok: float
     monthly_budget: float
@@ -153,10 +170,17 @@ def credential_expiry(provider: AIProvider) -> datetime | None:
     return provider.credential_set_at + SUBSCRIPTION_TOKEN_LIFETIME
 
 
+def _runtime() -> AIProviderRuntime:
+    from app.ai import claude_code
+
+    return AIProviderRuntime(**claude_code.status().as_dict())
+
+
 def provider_to_response(provider: AIProvider) -> AIProviderResponse:
     # Imported here: factory pulls in the provider backends, which the
     # schema module itself has no need for.
     from app.ai.providers.factory import sends_data_offsite, supports_tools, uses_subscription
+    from app.ai.providers.policy import provider_type_refusal
 
     return AIProviderResponse(
         id=provider.id,
@@ -176,6 +200,8 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         sends_data_offsite=sends_data_offsite(provider),
         uses_subscription=uses_subscription(provider),
         credential_expires_at=credential_expiry(provider),
+        refused_reason=provider_type_refusal(provider.provider_type),
+        runtime=_runtime() if uses_subscription(provider) else None,
         input_cost_per_mtok=provider.input_cost_per_mtok,
         output_cost_per_mtok=provider.output_cost_per_mtok,
         monthly_budget=provider.monthly_budget,
@@ -183,6 +209,14 @@ def provider_to_response(provider: AIProvider) -> AIProviderResponse:
         created_at=provider.created_at,
         updated_at=provider.updated_at,
     )
+
+
+class AIProviderTypeInfo(BaseModel):
+    """One provider type and whether this install accepts it (S-017)."""
+
+    type: str
+    allowed: bool
+    reason: str | None = None
 
 
 class AIProviderTestResponse(BaseModel):
@@ -262,6 +296,11 @@ class AISessionResponse(BaseModel):
     #: The run this session investigates, when it was started from the
     #: run page. NULL once that run is pruned.
     investigates_action_run_id: int | None = None
+    #: What an Investigate with AI button elsewhere started it about
+    #: ("resource", "sync", "stuck", "drift", "host") and that subject's
+    #: key ("resource:7:disk"). NULL for other sessions.
+    subject_kind: str | None = None
+    subject_key: str | None = None
     iterations: int
     prompt_tokens: int
     completion_tokens: int
@@ -440,7 +479,7 @@ class AIUsageSummary(BaseModel):
 
 
 class AlertDispatchOut(BaseModel):
-    """What one alert's ``labdog_action`` label came to — see
+    """What one alert's ``unbork_action`` label came to — see
     app.alerts.models.AlertActionDispatch."""
 
     id: int
@@ -498,7 +537,7 @@ class AlertEventResponse(BaseModel):
     #: whole transcript. Enough to see what it decided without leaving the
     #: page; the link is there for the reasoning.
     investigation_summary: str | None = None
-    #: Whether a full-auto fix worked, as LabDog checked it afterwards —
+    #: Whether a full-auto fix worked, as unbork checked it afterwards —
     #: see ``app.ai.models.REMEDIATION_OUTCOMES``. NULL when there was
     #: nothing to check.
     remediation_outcome: str | None = None
@@ -508,6 +547,77 @@ class AlertEventResponse(BaseModel):
     #: running, succeeded, failed, or refused, and what happened.
     rollback_status: str | None = None
     rollback_detail: str | None = None
-    #: What the alert's labdog_action label came to: at most one entry.
+    #: What the alert's unbork_action label came to: at most one entry.
     actions: list[AlertDispatchOut] = []
+    created_at: datetime
+
+
+# --- investigate with AI (subjects) ----------------------------------------
+#
+# What an "Investigate with AI" button names. Ids only: the server reads
+# its own rows and writes the mission (app.ai.subject_investigation).
+
+
+class ResourceSubject(BaseModel):
+    """A host's CPU, memory or root disk, from the resource hot spots or
+    the host's Metrics tab."""
+
+    kind: Literal["resource"]
+    host_id: int
+    metric: Literal["cpu", "memory", "disk"]
+
+
+class SyncSubject(BaseModel):
+    """A failed sync job."""
+
+    kind: Literal["sync"]
+    sync_job_id: int
+
+
+class StuckSubject(BaseModel):
+    """An operation running past the stale threshold."""
+
+    kind: Literal["stuck"]
+    op: Literal["sync", "action"]
+    id: int
+
+
+class DriftSubject(BaseModel):
+    """A host's drift: one module's, or (``module`` unset) every module
+    that is drifted or could not be checked."""
+
+    kind: Literal["drift"]
+    host_id: int
+    module: str | None = Field(default=None, max_length=50)
+
+
+class HostSubject(BaseModel):
+    """A whole host's health."""
+
+    kind: Literal["host"]
+    host_id: int
+
+
+InvestigationSubject = Annotated[
+    ResourceSubject | SyncSubject | StuckSubject | DriftSubject | HostSubject,
+    Field(discriminator="kind"),
+]
+
+
+class InvestigateRequest(BaseModel):
+    subject: InvestigationSubject
+
+
+class InvestigateResponse(BaseModel):
+    session_id: int
+    #: False when an earlier session about the same subject was reopened.
+    created: bool
+
+
+class InvestigationRef(BaseModel):
+    """The session a button reopens instead of starting another."""
+
+    subject_key: str
+    session_id: int
+    status: str
     created_at: datetime

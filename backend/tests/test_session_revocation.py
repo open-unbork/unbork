@@ -1,6 +1,6 @@
 """SEC-30: logging out, and changing a password, must revoke the session.
 
-LabDog's auth cookie is a stateless JWT. Logout cleared it in the
+unbork's auth cookie is a stateless JWT. Logout cleared it in the
 browser and did nothing else, so a cookie somebody had already copied —
 from a shared machine, a proxy log, an XSS payload — stayed valid for
 the rest of ``session_lifetime_seconds``, 24 hours by default. Changing
@@ -33,14 +33,14 @@ ANOTHER = "AnotherGoodOne1!Xy"
 
 def _auth_cookie(client) -> str:
     """The auth cookie as an attacker would have copied it."""
-    value = client.cookies.get("labdog_auth")
+    value = client.cookies.get("unbork_auth")
     assert value, "no auth cookie on the logged-in client"
     return value
 
 
 async def _replay(client, cookie: str):
     """Send a request with *cookie*, bypassing the client's own jar."""
-    return await client.get("/api/users/me", headers={"Cookie": f"labdog_auth={cookie}"})
+    return await client.get("/api/users/me", headers={"Cookie": f"unbork_auth={cookie}"})
 
 
 class TestLogoutRevokes:
@@ -78,7 +78,9 @@ class TestAPasswordChangeRevokes:
         self, regular_user_client
     ):
         stolen = _auth_cookie(regular_user_client)
-        resp = await regular_user_client.patch("/api/users/me", json={"password": GOOD})
+        resp = await regular_user_client.patch(
+            "/api/users/me", json={"current_password": "TestPass1!", "password": GOOD}
+        )
         assert resp.status_code == 200, resp.text
         assert (await _replay(regular_user_client, stolen)).status_code == 401
 
@@ -109,6 +111,7 @@ class TestAPasswordChangeRevokes:
             hashed_password=ph.hash(GOOD),
             is_active=True,
             is_superuser=False,
+            role="operator",
             is_verified=True,
         )
         db.add(victim)
@@ -125,7 +128,7 @@ class TestAPasswordChangeRevokes:
                 "/api/auth/jwt/login", data={"username": email, "password": GOOD}
             )
             assert login.status_code in (200, 204), login.text
-            stolen = victim_client.cookies.get("labdog_auth")
+            stolen = victim_client.cookies.get("unbork_auth")
             assert (await _replay(victim_client, stolen)).status_code == 200
 
             reset = await superuser_client.post(
@@ -231,6 +234,7 @@ class TestLoggingBackInWorks:
                 hashed_password=ph.hash(GOOD),
                 is_active=True,
                 is_superuser=False,
+                role="operator",
                 is_verified=True,
             )
         )
@@ -259,6 +263,7 @@ class TestLoggingBackInWorks:
                 hashed_password=ph.hash(GOOD),
                 is_active=True,
                 is_superuser=False,
+                role="operator",
                 is_verified=True,
             )
         )
@@ -270,7 +275,7 @@ class TestLoggingBackInWorks:
             follow_redirects=True,
         ) as c:
             await c.post("/api/auth/jwt/login", data={"username": email, "password": GOOD})
-            await c.patch("/api/users/me", json={"password": ANOTHER})
+            await c.patch("/api/users/me", json={"current_password": GOOD, "password": ANOTHER})
             again = await c.post(
                 "/api/auth/jwt/login", data={"username": email, "password": ANOTHER}
             )

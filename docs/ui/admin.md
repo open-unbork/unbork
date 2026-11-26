@@ -9,15 +9,15 @@ the Operations zone.
 
 **Path:** `/ssh-keys` (Settings › Access)
 
-The credentials LabDog connects to managed hosts with. Each key carries the
+The credentials unbork connects to managed hosts with. Each key carries the
 user it logs in as. Private keys are encrypted at rest with AES-256-GCM
-using `LABDOG_SECURITY__ENCRYPTION_KEY`, and never shown again after upload.
+using `UNBORK_SECURITY__ENCRYPTION_KEY`, and never shown again after upload.
 
 ### Adding a key
 
 **Upload key…** asks for a name, the SSH user (default `root`), and the
 private key in PEM or OpenSSH format. Passphrase-protected keys are not
-supported — LabDog uses keys from background workers with nobody there to
+supported — unbork uses keys from background workers with nobody there to
 type a passphrase. Tick **set as the default key** to make it the one new
 hosts get.
 
@@ -59,42 +59,92 @@ The audit log is in the Operations zone — see
 
 ## Users
 
-**Path:** `/users` (Settings › Access) — superusers only
+**Path:** `/users` (Settings › Access) — admins only
 
-LabDog user accounts. Anyone else who opens the page is told it is for
-administrators rather than shown an empty table.
+Every account has one of three roles. The role decides what the account can
+do everywhere: on every page, through the API, and in the SSH terminal.
 
-| Column | Description |
-|--------|-------------|
-| user | The email address they sign in with; **you** marks your own row |
-| status | `active` or `inactive` — an inactive account cannot sign in |
-| role | **superuser** — manages accounts, integrations and settings |
-| created | When the account was created |
+| Role | Can |
+|------|-----|
+| **viewer** | See hosts, groups, configuration, drift, runs, dashboards and the audit log. Change nothing. |
+| **operator** | Everything a viewer can, plus: edit host and group configuration, plan and run syncs, run discovery and scans, run actions, manage scheduled actions, open the SSH terminal, use the AI assistant and approve its changes, and set up alert-triggered actions. |
+| **admin** | Everything an operator can, plus: integrations that hold credentials (git repositories, action packs and pack winners, Proxmox nodes, Grafana, notification email, AI providers, SSH keys), application settings, and user accounts. |
 
-Each row has **edit** (email, and whether the account is active), **reset
-password** and **delete**. **New user…** creates an account from an email,
-a password typed twice, and whether it is a superuser — the role is chosen
-at creation; the screen has no promote or demote. The search box filters by
-email; the **status** (active / inactive) and **role** (superuser / user)
-chips narrow the list.
+SSH session transcripts in the audit log need the operator role: a
+transcript is everything typed and printed in a root shell.
+
+A role change, disabling an account, and a password reset all end that
+account's sessions at once; the user signs in again and gets the new rights.
+
+Accounts that existed before roles were added kept what they could do:
+superusers became admins and everyone else became an operator.
+
+### The Users page
+
+The table lists each account's display name and email, role, status, last
+sign-in and age. Filter by role (including **no role**, for accounts that can
+sign in but do nothing) or status, or search by name or email. A **must change
+password** tag marks accounts still holding a password an admin chose.
+
+- **New user…** asks for an email, an optional display name, a password, and
+  a role. Each role in the picker says what it can do. The account must
+  choose its own password at first sign-in unless you untick that box.
+- **edit** changes the email, display name, role and active flag. On your own
+  account the role and active flag are locked.
+- **reset password** sets a new password and signs the account out
+  everywhere. By default the user must replace it at their next sign-in.
+
+### What other roles see
+
+Controls a role cannot use are hidden or disabled rather than left to fail:
+viewers get read-only configuration editors and no sync, add or delete
+buttons; the Run button in action dialogs is disabled without the operator
+role; the host Terminal tab and the Assistant zone are hidden from viewers.
+If a request is refused anyway, the error names the permission it needed.
+
+### Rules that always hold
+
+- At least one active admin remains. Demoting, disabling or deleting the
+  last one is refused.
+- At least one active admin can sign in with a password. Accounts created
+  by directory sign-in (Enterprise) have none and cannot sign in when the
+  identity provider is down, so the last admin with a password is kept the
+  same way.
+- Nobody changes their own role, disables themselves, or deletes their own
+  account.
 
 ### First user
 
-The first account to register is made a superuser automatically.
-Registration is open only until that first account exists; after that, new
-accounts are created here by a superuser.
+The first account to register becomes an admin. Registration is open only
+until that first account exists; after that, admins create accounts here.
 
-### Resetting a password
+### New accounts and password resets
 
-**reset password** sets a new password for the user. They are not notified
-— tell them out of band.
-
-### Deleting
-
-You cannot delete your own account, and the last superuser cannot be
-deleted — there is always at least one.
+An admin who creates an account or resets a password chooses that password,
+so by default the user must replace it at their next sign-in. Until they do,
+everything except changing their password is refused. The user is not
+notified; tell them out of band. New accounts are viewers unless a role is
+chosen.
 
 ### Changing your own password
 
 Use **Change password…** in the account menu behind the avatar at the foot
-of the rail. Every user has it; it does not need superuser access.
+of the rail. Every role has it. It asks for your current password, and it
+signs you out everywhere, including the browser you are using.
+
+### Recovering access from the server
+
+When no admin can sign in, use the command line on the server (inside the
+container for Docker installs):
+
+```bash
+python -m app.auth.users_cli list
+python -m app.auth.users_cli set-role someone@example.com admin
+python -m app.auth.users_cli reset-password someone@example.com
+python -m app.auth.users_cli create new@example.com --role admin
+```
+
+Passwords are read from a prompt, or from standard input with
+`--password-stdin`, never from the command line. Every command writes an
+audit row. `set-role` also re-enables the account and still refuses to leave
+no active admin.

@@ -82,7 +82,8 @@ test.describe("Groups page", () => {
     await expect(page.getByRole("button", { name: "Run action…" })).toBeVisible()
     // Plan sync is the sync entry point; an empty group has nothing to plan.
     await expect(page.getByRole("button", { name: "Plan sync — 0 hosts" })).toBeDisabled()
-    // Delete sits in the danger zone, folded until asked for.
+    // Delete sits in the danger zone inside the settings bar, folded twice.
+    await page.getByRole("button", { name: "edit settings" }).click()
     await page.getByTestId("group-settings-row").getByRole("button", { name: "expand" }).click()
     await expect(page.getByRole("button", { name: "Delete group" })).toBeVisible()
   })
@@ -96,6 +97,9 @@ test.describe("Groups page", () => {
 
     await page.goto(`/groups/${group.id}`)
     await expect(page.getByRole("heading", { name: groupName }).getByText("priority 42")).toBeVisible()
+    // The folded settings bar names it too; the form opens on edit.
+    await expect(page.getByTestId("group-settings-row")).toContainText("priority42")
+    await page.getByRole("button", { name: "edit settings" }).click()
     await expect(page.getByLabel("priority", { exact: true })).toHaveValue("42")
   })
 
@@ -107,6 +111,7 @@ test.describe("Groups page", () => {
     const group = await res.json()
 
     await page.goto(`/groups/${group.id}`)
+    await page.getByRole("button", { name: "edit settings" }).click()
     const save = page.getByRole("button", { name: "Save changes" })
     await expect(save).toBeDisabled()
     await page.getByLabel("description").fill("after")
@@ -135,19 +140,21 @@ test.describe("Groups page", () => {
     await expect(page.getByRole("button", { name: "Services", pressed: true })).toBeVisible()
   })
 
-  // A real CA certificate (EC P-256, CA:TRUE, valid 2026–2126) that the
+  // A real CA certificate (EC P-256, CA:TRUE, valid 100 years from 2026) that the
   // backend's PEM validator accepts, so the add goes all the way through
   // the API. The editor once sent `pem` for `pem_content`; only a live
   // backend rejects that, so this runs the form rather than seeding by API.
   const E2E_CA_PEM = `-----BEGIN CERTIFICATE-----
-MIIBejCCASGgAwIBAgIUN+SuaZjYowWTWSwCkJAq+tE+8uowCgYIKoZIzj0EAwIw
-MjEbMBkGA1UEAwwSTGFiRG9nIGUyZSB0ZXN0IENBMRMwEQYDVQQKDApMYWJEb2cg
-ZTJlMCAXDTI2MDEwMTAwMDAwMFoYDzIxMjYwMTAxMDAwMDAwWjAyMRswGQYDVQQD
-DBJMYWJEb2cgZTJlIHRlc3QgQ0ExEzARBgNVBAoMCkxhYkRvZyBlMmUwWTATBgcq
-hkjOPQIBBggqhkjOPQMBBwNCAASvMh75uiNeWis4hVlYDFS5Uh4hfZxrmiW4X1Sr
-rKhqKow1wUZEILBNh/YZvU/vHrsmDT+G9pjN0wTZCoyMojm6oxMwETAPBgNVHRMB
-Af8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIAJpdT141l/f6LZbd0q2oyyWLGAN
-TjIIGPY0y9owejh0AiBZDQ3rkCgh7O9lkUGjPac4TmKyBVy5h9OBxBhBKeccGQ==
+MIIByzCCAXGgAwIBAgIUbnFM8SPOOAMfI3rjZybTQQ5DHnowCgYIKoZIzj0EAwIw
+MjETMBEGA1UECgwKdW5ib3JrIGUyZTEbMBkGA1UEAwwSdW5ib3JrIGUyZSB0ZXN0
+IENBMCAXDTI2MTExNzE0NDIwOVoYDzIxMjYxMDI0MTQ0MjA5WjAyMRMwEQYDVQQK
+DAp1bmJvcmsgZTJlMRswGQYDVQQDDBJ1bmJvcmsgZTJlIHRlc3QgQ0EwWTATBgcq
+hkjOPQIBBggqhkjOPQMBBwNCAARL1ztEO9Rt+ayT2pwqHmhXkKUSR1zyMQFZn5jx
+LkG7IaB7LEdsb6n6CZsoNP7AmYsO4n83XflHOVGkm4O1wxJyo2MwYTAdBgNVHQ4E
+FgQU7xQkebhFxPBn7f6I8GhKhopJBsswHwYDVR0jBBgwFoAU7xQkebhFxPBn7f6I
+8GhKhopJBsswDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZI
+zj0EAwIDSAAwRQIhAKl9PufAA/TFOmBep7r57v7Xn+jeeALBdwjYoAQDxsimAiAG
+VpWSdAfbjLY+I51tyCQePpDsZC1rE/V4idZZ9T/mKQ==
 -----END CERTIFICATE-----`
 
   test("CA certificates editor adds a certificate", async ({ request, page }) => {
@@ -166,7 +173,7 @@ TjIIGPY0y9owejh0AiBZDQ3rkCgh7O9lkUGjPac4TmKyBVy5h9OBxBhBKeccGQ==
     await expect(dialog).toBeHidden()
     // The subject column is parsed from the PEM server-side.
     const row = page.getByRole("row").filter({ hasText: "e2e test CA" })
-    await expect(row).toContainText("CN=LabDog e2e test CA")
+    await expect(row).toContainText("CN=unbork e2e test CA")
   })
 
   test("Members tab adds and removes a host", async ({ request, page }) => {

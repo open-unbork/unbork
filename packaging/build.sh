@@ -21,7 +21,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Build LabDog as a pre-built tarball and Linux packages.
+Build unbork as a pre-built tarball and Linux packages.
 
 Options:
   --version=X.Y.Z   Package version (default: $VERSION, auto-read from pyproject.toml)
@@ -43,9 +43,9 @@ Prerequisites:
   nfpm         https://nfpm.goreleaser.com/install/ (for deb/rpm only)
 
 Output (in packaging/dist/):
-  labdog-VERSION-linux-amd64.tar.gz
-  labdog_VERSION_amd64.deb
-  labdog-VERSION-1.x86_64.rpm
+  unbork-VERSION-linux-amd64.tar.gz
+  unbork_VERSION_amd64.deb
+  unbork-VERSION-1.x86_64.rpm
 EOF
     exit 0
 }
@@ -148,7 +148,7 @@ esac
 DIST_DIR="$SCRIPT_DIR/dist"
 step "Build complete — artifacts:"
 echo ""
-for f in "$DIST_DIR"/labdog-* "$DIST_DIR"/labdog_*; do
+for f in "$DIST_DIR"/unbork-* "$DIST_DIR"/unbork_*; do
     [[ -f "$f" ]] || continue
     SIZE=$(du -sh "$f" | cut -f1)
     SHA=$(sha256sum "$f" | cut -d' ' -f1)

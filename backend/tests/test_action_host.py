@@ -169,7 +169,7 @@ async def _seed_proxmox_node(db) -> int:
     node = ProxmoxNode(
         name=f"pve-{id(db)}",
         api_url="https://pve.test:8006",
-        token_id="labdog@pve!ci",
+        token_id="unbork@pve!ci",
         encrypted_token_secret=encrypt_ssh_key("token-secret", get_master_key()),
         verify_ssl=False,
     )
@@ -500,7 +500,8 @@ def test_run_ansible_passes_check_to_ansible_runner(tmp_path):
     is the only thing that turns check mode on."""
     from app.ansible_runtime.runner import run_ansible
 
-    with patch("ansible_runner.run") as run:
+    with patch("ansible_runner.interface.init_runner") as run:
+        run.return_value.config.env = {}
         run_ansible(
             playbook_yaml="- hosts: all\n  tasks: []\n",
             inventory_json="{}",

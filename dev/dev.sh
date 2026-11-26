@@ -6,13 +6,13 @@ ROOT_DIR="${SCRIPT_DIR}/.."
 PIDFILE_DIR="${ROOT_DIR}/.dev-pids"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-# Seed .env with dev-only secrets on first run. LabDog rejects the insecure
-# placeholder keys in labdog.toml at startup, so we generate a real pair here
+# Seed .env with dev-only secrets on first run. unbork rejects the insecure
+# placeholder keys in unbork.toml at startup, so we generate a real pair here
 # and persist them for subsequent runs.
 ensure_dev_env() {
   if [[ -f "$ENV_FILE" ]] \
-     && grep -q "^LABDOG_SECURITY__SECRET_KEY=" "$ENV_FILE" \
-     && grep -q "^LABDOG_SECURITY__ENCRYPTION_KEY=" "$ENV_FILE"; then
+     && grep -q "^UNBORK_SECURITY__SECRET_KEY=" "$ENV_FILE" \
+     && grep -q "^UNBORK_SECURITY__ENCRYPTION_KEY=" "$ENV_FILE"; then
     return
   fi
 
@@ -30,10 +30,10 @@ ensure_dev_env() {
   enc=$("$venv_python" -c 'import os, base64; print(base64.b64encode(os.urandom(32)).decode())')
 
   touch "$ENV_FILE"
-  grep -q "^LABDOG_SECURITY__SECRET_KEY=" "$ENV_FILE" \
-    || echo "LABDOG_SECURITY__SECRET_KEY=${secret}" >> "$ENV_FILE"
-  grep -q "^LABDOG_SECURITY__ENCRYPTION_KEY=" "$ENV_FILE" \
-    || echo "LABDOG_SECURITY__ENCRYPTION_KEY=${enc}" >> "$ENV_FILE"
+  grep -q "^UNBORK_SECURITY__SECRET_KEY=" "$ENV_FILE" \
+    || echo "UNBORK_SECURITY__SECRET_KEY=${secret}" >> "$ENV_FILE"
+  grep -q "^UNBORK_SECURITY__ENCRYPTION_KEY=" "$ENV_FILE" \
+    || echo "UNBORK_SECURITY__ENCRYPTION_KEY=${enc}" >> "$ENV_FILE"
   chmod 600 "$ENV_FILE"
 }
 
@@ -58,18 +58,18 @@ Commands:
   status      Show running dev processes
   logs        Tail all dev logs
   infra       Start only postgres + redis (docker)
-  backend     Start only backend (labdog + celery)
+  backend     Start only backend (unbork + celery)
   frontend    Start only frontend (next dev)
   migrate     Run alembic upgrade head
   migrate-down  Roll back one migration (alembic downgrade -1)
   migrate-new <msg>  Generate a new migration (alembic revision --autogenerate)
 
 Environment:
-  LABDOG_PLAYBOOKS_LOCAL=/path  On start, register a labdog-playbooks working
+  UNBORK_PLAYBOOKS_LOCAL=/path  On start, register an unbork-playbooks working
               copy as a local action pack (and disable the seeded git pack)
 
 Infrastructure (postgres, redis) runs via docker compose.
-Backend (labdog, celery worker, celery beat) and frontend (next dev) run as local processes.
+Backend (unbork, celery worker, celery beat) and frontend (next dev) run as local processes.
 EOF
   exit 1
 }
@@ -85,34 +85,34 @@ log() {
 #--- Local playbooks pack ---
 #
 # Action packs are synced from git at runtime; nothing ships with the
-# app. A fresh dev DB has the seeded labdog-playbooks git pack, which
+# app. A fresh dev DB has the seeded unbork-playbooks git pack, which
 # syncs from GitHub on start.
 #
-# To iterate on a labdog-playbooks working copy without pushing every
-# change, set LABDOG_PLAYBOOKS_LOCAL=/path/to/labdog-playbooks. Start
+# To iterate on an unbork-playbooks working copy without pushing every
+# change, set UNBORK_PLAYBOOKS_LOCAL=/path/to/unbork-playbooks. Start
 # then registers that directory as a local pack named
-# "labdog-playbooks-local" and disables the seeded git pack, so the two
+# "unbork-playbooks-local" and disables the seeded git pack, so the two
 # don't contest every action key. Unset it and re-enable the git pack
 # in the UI to go back.
 
-LOCAL_PACK_NAME="labdog-playbooks-local"
+LOCAL_PACK_NAME="unbork-playbooks-local"
 
 register_local_playbooks_pack() {
-  [[ -n "${LABDOG_PLAYBOOKS_LOCAL:-}" ]] || return 0
+  [[ -n "${UNBORK_PLAYBOOKS_LOCAL:-}" ]] || return 0
   local path
-  path="$(cd "${LABDOG_PLAYBOOKS_LOCAL}" 2>/dev/null && pwd)" || {
-    log "ERROR: LABDOG_PLAYBOOKS_LOCAL=${LABDOG_PLAYBOOKS_LOCAL} does not exist"
+  path="$(cd "${UNBORK_PLAYBOOKS_LOCAL}" 2>/dev/null && pwd)" || {
+    log "ERROR: UNBORK_PLAYBOOKS_LOCAL=${UNBORK_PLAYBOOKS_LOCAL} does not exist"
     exit 1
   }
   log "Registering ${path} as local pack ${LOCAL_PACK_NAME}..."
   docker compose -f "${SCRIPT_DIR}/docker-compose.yml" --env-file "${ENV_FILE}" \
-    exec -T postgres psql -q -v ON_ERROR_STOP=1 -U labdog -d labdog \
+    exec -T postgres psql -q -v ON_ERROR_STOP=1 -U unbork -d unbork \
       -v name="${LOCAL_PACK_NAME}" -v path="${path}" <<'SQL'
 INSERT INTO action_packs (name, enabled, source_type, local_path, path, trusted, created_at, updated_at)
 VALUES (:'name', true, 'local', :'path', '', true, now(), now())
 ON CONFLICT (name) DO UPDATE SET local_path = EXCLUDED.local_path, enabled = true, updated_at = now();
 UPDATE action_packs SET enabled = false, updated_at = now()
-WHERE name = 'labdog-playbooks' AND source_type = 'git';
+WHERE name = 'unbork-playbooks' AND source_type = 'git';
 SQL
 }
 
@@ -122,7 +122,7 @@ start_infra() {
   log "Starting postgres + redis..."
   docker compose -f "${SCRIPT_DIR}/docker-compose.yml" --env-file "${ENV_FILE}" up -d postgres redis
   log "Waiting for postgres..."
-  until docker compose -f "${SCRIPT_DIR}/docker-compose.yml" --env-file "${ENV_FILE}" exec -T postgres pg_isready -U labdog &>/dev/null; do
+  until docker compose -f "${SCRIPT_DIR}/docker-compose.yml" --env-file "${ENV_FILE}" exec -T postgres pg_isready -U unbork &>/dev/null; do
     sleep 1
   done
   log "Postgres ready."
@@ -152,7 +152,7 @@ start_backend() {
 
   # Run migrations
   log "Running migrations..."
-  (cd "${ROOT_DIR}/backend" && LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/alembic" upgrade head)
+  (cd "${ROOT_DIR}/backend" && UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/alembic" upgrade head)
   register_local_playbooks_pack
 
   # Prepend the venv bin to PATH so child processes (e.g. ansible-runner
@@ -161,28 +161,28 @@ start_backend() {
   # missing from subprocess PATH even though the Python imports work.
   local venv_path="${VENV}:${PATH}"
 
-  # LabDog (python -m app with auto-reload, no embedded celery, skip migrate since we ran it above)
-  # LABDOG_DEV_MODE disables static frontend serving so the Next.js dev server on :3000 is used.
-  log "Starting labdog..."
-  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" LABDOG_DEV_MODE=1 LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/python" -m app --reload --no-celery --skip-migrate \
-    >"${logdir}/labdog.log" 2>&1) &
-  echo $! > "${PIDFILE_DIR}/labdog.pid"
+  # unbork (python -m app with auto-reload, no embedded celery, skip migrate since we ran it above)
+  # UNBORK_DEV_MODE disables static frontend serving so the Next.js dev server on :3000 is used.
+  log "Starting unbork..."
+  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" UNBORK_DEV_MODE=1 UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/python" -m app --reload --no-celery --skip-migrate \
+    >"${logdir}/unbork.log" 2>&1) &
+  echo $! > "${PIDFILE_DIR}/unbork.pid"
 
   # Celery worker
   log "Starting celery worker..."
-  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/celery" -A app.tasks worker \
+  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/celery" -A app.tasks worker \
     --max-tasks-per-child=100 -Q default,long_running --loglevel=info \
     >"${logdir}/celery-worker.log" 2>&1) &
   echo $! > "${PIDFILE_DIR}/celery-worker.pid"
 
   # Celery beat
   log "Starting celery beat..."
-  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/celery" -A app.tasks beat \
+  (cd "${ROOT_DIR}/backend" && PATH="${venv_path}" UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/celery" -A app.tasks beat \
     --scheduler redbeat.RedBeatScheduler --loglevel=info \
     >"${logdir}/celery-beat.log" 2>&1) &
   echo $! > "${PIDFILE_DIR}/celery-beat.pid"
 
-  log "Backend running — labdog at http://localhost:8000"
+  log "Backend running — unbork at http://localhost:8000"
 }
 
 kill_pattern() {
@@ -202,10 +202,10 @@ kill_pattern() {
 }
 
 stop_backend() {
-  kill_pattern "python -m app" "labdog"
+  kill_pattern "python -m app" "unbork"
   kill_pattern "celery -A app.tasks worker" "celery-worker"
   kill_pattern "celery -A app.tasks beat" "celery-beat"
-  rm -f "${PIDFILE_DIR}"/{labdog,celery-worker,celery-beat}.pid 2>/dev/null
+  rm -f "${PIDFILE_DIR}"/{unbork,celery-worker,celery-beat}.pid 2>/dev/null
 }
 
 #--- Frontend ---
@@ -239,7 +239,7 @@ run_migrate() {
   ensure_dev_env
   load_dev_env
   log "Running migrations..."
-  (cd "${ROOT_DIR}/backend" && LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/alembic" upgrade head)
+  (cd "${ROOT_DIR}/backend" && UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/alembic" upgrade head)
   log "Migrations complete."
 }
 
@@ -249,7 +249,7 @@ run_migrate_down() {
     exit 1
   fi
   log "Rolling back one migration..."
-  (cd "${ROOT_DIR}/backend" && LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/alembic" downgrade -1)
+  (cd "${ROOT_DIR}/backend" && UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/alembic" downgrade -1)
   log "Rollback complete."
 }
 
@@ -264,7 +264,7 @@ run_migrate_new() {
     exit 1
   fi
   log "Generating migration: ${msg}"
-  (cd "${ROOT_DIR}/backend" && LABDOG_CONFIG="${SCRIPT_DIR}/labdog.toml" "${VENV}/alembic" revision --autogenerate -m "$msg")
+  (cd "${ROOT_DIR}/backend" && UNBORK_CONFIG="${SCRIPT_DIR}/unbork.toml" "${VENV}/alembic" revision --autogenerate -m "$msg")
   log "Migration generated."
 }
 
@@ -290,10 +290,10 @@ show_status() {
   done
 
   if port_listening 8000; then
-    printf "  %-20s %s\n" "labdog" "running (:8000)"
+    printf "  %-20s %s\n" "unbork" "running (:8000)"
     running=$((running + 1))
   else
-    printf "  %-20s %s\n" "labdog" "stopped"
+    printf "  %-20s %s\n" "unbork" "stopped"
   fi
 
   if pgrep -f "celery -A app.tasks worker" &>/dev/null; then

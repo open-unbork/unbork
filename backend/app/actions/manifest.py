@@ -1,6 +1,6 @@
 """Manifest schema for action playbooks.
 
-An action manifest is a YAML file that declares how LabDog should present
+An action manifest is a YAML file that declares how unbork should present
 and invoke a playbook: display name, version, parameters, and safety flags.
 Manifests are the data-driven replacement for the hardcoded ``register()``
 calls that used to live in ``registry.py``.
@@ -16,7 +16,22 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+#: Extra-vars unbork sets on the playbooks of an action with quiesce hooks.
+#: ``unbork_quiesced`` (true) reaches the main and verify playbooks of a
+#: quiesced run; ``unbork_run_outcome`` reaches the unquiesce playbook.
+#: A group run sets each of them per member through a lookup table it
+#: also passes (``unbork_quiesced_hosts``, ``unbork_run_outcomes``): as
+#: extra-vars, so a play's own ``vars:`` default can never mask them, as it
+#: would an inventory host var.
+QUIESCED_VAR = "unbork_quiesced"
+RUN_OUTCOME_VAR = "unbork_run_outcome"
+QUIESCED_HOSTS_VAR = "unbork_quiesced_hosts"
+RUN_OUTCOMES_VAR = "unbork_run_outcomes"
+RESERVED_EXTRA_VARS = frozenset(
+    {QUIESCED_VAR, RUN_OUTCOME_VAR, QUIESCED_HOSTS_VAR, RUN_OUTCOMES_VAR}
+)
 
 
 class ManifestParameter(BaseModel):
@@ -38,9 +53,9 @@ class MetricsBackendMapping(BaseModel):
     from the Mimir and Loki instances that host resolves to (its own
     assignment, else its highest-priority group's, else the default; see
     ``app.grafana.service.resolve_host_instance``), so e.g.
-    labdog-playbooks' alloy-install action ships to the same backend LabDog
+    unbork-playbooks' alloy-install action ships to the same backend unbork
     queries for that host, without the operator re-typing URLs. Keeping the
-    var *names* in the manifest means LabDog core never hardcodes
+    var *names* in the manifest means unbork core never hardcodes
     ``alloy_*``.
     """
 
@@ -103,7 +118,7 @@ class ActionManifest(BaseModel):
         default=None,
         description=(
             "Optional filename (relative to the manifest's directory) of a "
-            "second playbook that decides post-run success. When set, LabDog "
+            "second playbook that decides post-run success. When set, unbork "
             "runs it after the main playbook against the same host with the "
             "same extra_vars and pack roles; the Ansible exit status becomes "
             "the verification result. Only fires for destructive actions on "
@@ -119,12 +134,63 @@ class ActionManifest(BaseModel):
             "unset."
         ),
     )
+    quiesce_playbook: str | None = Field(
+        default=None,
+        description=(
+            "Optional filename (relative to the manifest's directory) of a "
+            "playbook that stops writes on the host before unbork snapshots "
+            "it: maintenance mode, writers stopped, a database checkpoint. "
+            "With nothing written between the snapshot and a rollback, the "
+            "rollback loses nothing. Runs only when a snapshot will be "
+            "attempted (destructive action, snapshot enabled, Proxmox VM "
+            "mapping, not a dry run). Requires unquiesce_playbook. The main "
+            "and verify playbooks then receive unbork_quiesced=true, so a "
+            "verify playbook must pass while the host is quiesced."
+        ),
+    )
+    unquiesce_playbook: str | None = Field(
+        default=None,
+        description=(
+            "Optional filename of the playbook that reopens the host. unbork "
+            "runs it after verify and after any rollback, also when the run "
+            "fails, times out or raises, with unbork_run_outcome set to "
+            "'succeeded', 'failed' or 'rolled_back'. After a rollback the "
+            "VM is back in its quiesced state, so the playbook must work on "
+            "the reverted system too, and it must be safe to run twice. "
+            "Requires quiesce_playbook."
+        ),
+    )
+    quiesce_timeout_seconds: int = Field(
+        default=300,
+        ge=1,
+        le=86400,
+        description=(
+            "Budget for each of the quiesce and unquiesce playbooks. Ignored when they are unset."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _quiesce_pair(self) -> ActionManifest:
+        if (self.quiesce_playbook is None) != (self.unquiesce_playbook is None):
+            raise ValueError(
+                "quiesce_playbook and unquiesce_playbook go together: declare "
+                "both or neither. A host quiesced with no way to reopen it is "
+                "an outage."
+            )
+        reserved = {p.key for p in self.parameters} & RESERVED_EXTRA_VARS
+        if reserved:
+            raise ValueError(
+                f"Parameter key(s) {sorted(reserved)} are reserved: unbork sets "
+                "them itself around a quiesced run."
+            )
+        return self
+
     ai_verify_prompt: str | None = Field(
         default=None,
         description=(
             "What the AI verify step should confirm after this action, in "
             "plain language -- e.g. 'Confirm the kernel booted the new "
-            "version and no service failed to start.' LabDog collects the "
+            "version and no service failed to start.' unbork collects the "
             "evidence (services, packages, load, disk, recent errors) and "
             "asks the configured AI provider to answer PASS, FAIL, or "
             "INCONCLUSIVE about it. Only fires for destructive actions on "
@@ -151,11 +217,11 @@ class ActionManifest(BaseModel):
     metrics_backend: MetricsBackendMapping | None = Field(
         default=None,
         description=(
-            "Opt-in mapping that lets LabDog inject each host's Grafana "
+            "Opt-in mapping that lets unbork inject each host's Grafana "
             "destinations (URLs, tenants, TLS verification) into this action's "
-            "playbook vars at dispatch (e.g. labdog-playbooks' alloy-install "
-            "action). LabDog also "
-            "always injects labdog_host_id / labdog_hostname for per-host "
+            "playbook vars at dispatch (e.g. unbork-playbooks' alloy-install "
+            "action). unbork also "
+            "always injects unbork_host_id / unbork_hostname for per-host "
             "runs so shipped metrics are queryable back."
         ),
     )
@@ -188,7 +254,7 @@ class ActionManifest(BaseModel):
             "after the action succeeds. Each named module is dispatched "
             "through the normal sync pipeline against the same target "
             "host (per-host fan-out for group-dispatched actions). "
-            "Semantics are 'push labdog's desired state', NOT 'collect "
+            "Semantics are 'push unbork's desired state', NOT 'collect "
             "current state' -- only declare modules where re-enforcing "
             "the existing config is what the action wants. Skipped on "
             "dry-run and on action failure. Module names must match "
@@ -212,7 +278,7 @@ class ActionManifest(BaseModel):
     post_run_register: dict[str, list[dict[str, Any]]] = Field(
         default_factory=dict,
         description=(
-            "Resources to register as host-scope overrides in labdog's "
+            "Resources to register as host-scope overrides in unbork's "
             "desired-state model after the action succeeds. Top-level "
             "keys are canonical module names (packages, resolver, "
             "services, hosts-file, cron, linux-users, firewall); each "
@@ -224,12 +290,12 @@ class ActionManifest(BaseModel):
             "action succeeded. Conflicts (uniqueness collisions with "
             "existing rows) are skipped silently and logged so "
             "operator-declared rows win over action-declared ones. "
-            "Use this for actions that install resources labdog "
+            "Use this for actions that install resources unbork "
             "should manage going forward (e.g. install Alloy + "
             "register alloy.service + alloy package). Do NOT use "
             "actions to mutate firewall, hosts-file, resolver, or "
             "SSH-keys without first declaring them here or via "
-            "labdog's UI/API -- those modules purge unknown entries "
+            "unbork's UI/API -- those modules purge unknown entries "
             "on next sync."
         ),
     )

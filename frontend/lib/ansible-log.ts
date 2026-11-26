@@ -3,7 +3,7 @@
  * log can be coloured. Ansible runs with ANSIBLE_NOCOLOR=1 and older rows
  * have their ANSI stripped, so the colour has to come from the words: the
  * `ok:` / `changed:` / `fatal:` that open a line, the `TASK [...]` headers,
- * `PLAY RECAP`, and LabDog's own `[preflight]` / `[cleanup]` lines.
+ * `PLAY RECAP`, and unbork's own `[preflight]` / `[cleanup]` lines.
  *
  * Every line keeps its exact text. Joining `text` with "\n" gives back the
  * input, which is what lets the log colour the text without changing what
@@ -26,8 +26,8 @@ export type LineKind =
   | "ignored"
   | "error"
   | "warning"
-  | "labdog"
-  | "labdog-failed"
+  | "unbork"
+  | "unbork-failed"
   | "section"
   | "plain"
 
@@ -41,7 +41,7 @@ export interface LogLine {
 
 /** The kinds "jump to first failure" looks for. Only the line that opens a
  *  block counts, so one failure is one stop. */
-export const FAILURE_KINDS: ReadonlySet<LineKind> = new Set(["error", "fatal", "failed", "unreachable", "labdog-failed"])
+export const FAILURE_KINDS: ReadonlySet<LineKind> = new Set(["error", "fatal", "failed", "unreachable", "unbork-failed"])
 
 const STATUS = /^(ok|changed|skipping|failed|fatal|unreachable|rescued|ignored|included): /
 const PLAY = /^PLAY \[/
@@ -50,9 +50,9 @@ const RECAP = /^PLAY RECAP\b/
 const RECAP_ROW = /^\S.*\s:\s+ok=\d+/
 const ERROR = /^\[ERROR\]:/
 const WARNING = /^\[(DEPRECATION )?WARNING\]:/
-// LabDog's own step lines: "[preflight] host reachable", "[cleanup] …".
-const LABDOG = /^\[[a-z][a-z-]*\] /
-const LABDOG_FAILED = /\b(status=failed|passed=False|success=False|failed|unreachable)\b/
+// unbork's own step lines: "[preflight] host reachable", "[cleanup] …".
+const UNBORK = /^\[[a-z][a-z-]*\] /
+const UNBORK_FAILED = /\b(status=failed|passed=False|success=False|failed|unreachable)\b/
 // "=== Ansible output ===", and the per-host header the combined view adds.
 const SECTION = /^={3,} .* ={3,}$/
 const OPENS_BRACKET = /(=> |^ *)[{[]$/
@@ -73,7 +73,7 @@ export function parseAnsibleLog(text: string): LogLine[] {
       continue
     }
     if (block) {
-      const structural = STATUS.test(line) || TASK.test(line) || PLAY.test(line) || RECAP.test(line) || LABDOG.test(line) || SECTION.test(line)
+      const structural = STATUS.test(line) || TASK.test(line) || PLAY.test(line) || RECAP.test(line) || UNBORK.test(line) || SECTION.test(line)
       if (structural || (block.until === "blank" && line.trim() === "")) {
         block = null
       } else {
@@ -104,8 +104,8 @@ export function parseAnsibleLog(text: string): LogLine[] {
     } else if (WARNING.test(line)) {
       kind = "warning"
       block = { kind, until: "blank" }
-    } else if (LABDOG.test(line)) {
-      kind = LABDOG_FAILED.test(line) ? "labdog-failed" : "labdog"
+    } else if (UNBORK.test(line)) {
+      kind = UNBORK_FAILED.test(line) ? "unbork-failed" : "unbork"
     } else if (SECTION.test(line)) {
       kind = "section"
     }

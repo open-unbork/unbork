@@ -184,7 +184,7 @@ class TestResolverCollectorParsers:
 
     def test_parse_networkmanager_conf(self):
         """Parse NetworkManager conf."""
-        text = "# Managed by LabDog\n[global-dns-domain-*]\nservers=8.8.8.8,1.1.1.1\n"
+        text = "# Managed by unbork\n[global-dns-domain-*]\nservers=8.8.8.8,1.1.1.1\n"
         result = parse_networkmanager_conf(text)
         assert result["nameservers"] == ["8.8.8.8", "1.1.1.1"]
         assert result["search_domains"] == []
@@ -257,9 +257,9 @@ class TestResolverPlaybook:
     def test_cloud_init_disable_tasks_lead_playbook(self, resolver_type):
         tasks = _tasks_for(resolver_type)
         assert tasks[0]["ansible.builtin.stat"]["path"] == "/etc/cloud/cloud.cfg.d"
-        assert tasks[0]["register"] == "labdog_cloud_init_dir"
+        assert tasks[0]["register"] == "unbork_cloud_init_dir"
         assert tasks[1]["ansible.builtin.copy"]["dest"] == CLOUD_INIT_DISABLE_PATH
-        assert tasks[1]["when"] == "labdog_cloud_init_dir.stat.exists"
+        assert tasks[1]["when"] == "unbork_cloud_init_dir.stat.exists"
 
     def test_resolv_conf_replaces_symlink_before_writing(self):
         tasks = _tasks_for("resolv_conf")
@@ -280,7 +280,7 @@ class TestResolverEndpointAuth:
     without logging in. Auth now lives on the router, which is also why a
     route added later cannot repeat the omission.
 
-    Note this is *not* a privilege check: LabDog's model is flat and every
+    Note this is *not* a privilege check: unbork's model is flat and every
     authenticated user may read these. The assertion is only that an
     anonymous caller cannot.
     """

@@ -2,7 +2,7 @@
 
 Both tables are treated as audit data and share the same retention window:
 ``logging.audit_retention_days`` (default 90, ``0`` = keep forever), an app
-setting changed on the Settings page. labdog.toml has no say in it.
+setting changed on the Settings page. unbork.toml has no say in it.
 
 Tasks:
     prune_old_audit_logs         -- deletes audit_log rows older than the window
@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.db import with_task_engine
 from app.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 )
 def prune_old_audit_logs() -> dict:
     """Delete audit_log rows older than ``logging.audit_retention_days``."""
-    return asyncio.run(_prune_audit_logs())
+    return asyncio.run(with_task_engine(_prune_audit_logs()))
 
 
 @celery_app.task(
@@ -37,7 +38,7 @@ def prune_old_audit_logs() -> dict:
 )
 def prune_old_ssh_transcripts() -> dict:
     """Delete ssh_session_transcripts rows older than ``logging.audit_retention_days``."""
-    return asyncio.run(_prune_ssh_transcripts())
+    return asyncio.run(with_task_engine(_prune_ssh_transcripts()))
 
 
 async def _get_retention_days(db) -> int:

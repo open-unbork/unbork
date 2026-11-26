@@ -29,8 +29,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.logger import log_action
-from app.gitops.importers.firewall import ModuleImportResult
-from app.gitops.schema import DiscoveryYAML, LabDogGlobalYAML
+from app.gitops.importers._common import ModuleImportResult
+from app.gitops.schema import DiscoveryYAML, UnborkGlobalYAML
 from app.models.host_group import HostGroup
 from app.models.scan_config import ScanConfig
 from app.models.ssh_key import SSHKey
@@ -93,7 +93,7 @@ async def _resolve_references(
 
 
 async def import_discovery(
-    parsed: LabDogGlobalYAML,
+    parsed: UnborkGlobalYAML,
     commit_sha: str,
     db: AsyncSession,
 ) -> ModuleImportResult:

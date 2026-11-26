@@ -69,7 +69,7 @@ class TestWhatItCarries:
         assert "  157| [rollback] success=True" in mission
         assert "run_id=242" in mission
 
-    def test_a_failed_labdog_step_is_not_listed_twice(self):
+    def test_a_failed_unbork_step_is_not_listed_twice(self):
         mission = build_mission(_run(), [_host_run()])
         assert mission.count("[verify] pack playbook exit=2 status=failed") == 1
 

@@ -17,12 +17,12 @@ case "$1" in
 esac
 
 # Idempotent setup — safe to run on every install/upgrade.
-mkdir -p /var/lib/labdog /var/log/labdog
-chown labdog:labdog /var/lib/labdog /var/log/labdog
-chmod 750 /var/lib/labdog /var/log/labdog
+mkdir -p /var/lib/unbork /var/log/unbork
+chown unbork:unbork /var/lib/unbork /var/log/unbork
+chmod 750 /var/lib/unbork /var/log/unbork
 
 if command -v systemd-tmpfiles > /dev/null 2>&1; then
-    systemd-tmpfiles --create labdog.conf 2>/dev/null || true
+    systemd-tmpfiles --create unbork.conf 2>/dev/null || true
 fi
 
 if command -v systemctl > /dev/null 2>&1; then
@@ -32,23 +32,23 @@ fi
 if [ "$FIRST_INSTALL" -eq 1 ]; then
     cat <<'EOF'
 
-LabDog installed successfully.
+unbork installed successfully.
 
 Next steps:
-  1. Edit /etc/labdog/labdog.toml — set [security] secret_key and
+  1. Edit /etc/unbork/unbork.toml — set [security] secret_key and
      encryption_key (generate: openssl rand -base64 32), [database] url,
-     and [security] labdog_server_ip.
+     and [security] unbork_server_ip.
   2. Enable and start the service:
-       systemctl enable --now labdog.service
+       systemctl enable --now unbork.service
   3. Check status:
-       systemctl status labdog.service
-       journalctl -u labdog -f
+       systemctl status unbork.service
+       journalctl -u unbork -f
 
 EOF
 else
     # Upgrade — restart if the service is currently running.
     if command -v systemctl > /dev/null 2>&1 \
-       && systemctl is-active --quiet labdog.service 2>/dev/null; then
-        systemctl restart labdog.service 2>/dev/null || true
+       && systemctl is-active --quiet unbork.service 2>/dev/null; then
+        systemctl restart unbork.service 2>/dev/null || true
     fi
 fi

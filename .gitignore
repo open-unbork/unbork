@@ -9,6 +9,7 @@ venv/
 env/
 build/
 dist/
+dist-old/
 *.egg-info/
 .eggs/
 *.egg
@@ -23,6 +24,7 @@ packaging/staging/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
 .tox/
 
 # IDEs
@@ -61,6 +63,7 @@ packaging/.cache/
 
 # Generated at Docker/packaging build time — never committed
 backend/app/_build_info.py
+backend/app/_built_without_assistant
 # Staged from the repo-root VERSION at build time so setuptools' dynamic
 # version resolves (see packaging/Makefile _build-venv). Root VERSION is
 # the source of truth; this copy is build-only.
@@ -71,8 +74,9 @@ backend/VERSION
 # up as untracked in the meantime.
 backend/app/ansible/
 
-# Maintainer's local working notes — design drafts, exploratory
-# scaffolding, multi-agent plan docs. Public-facing roadmap and bug
-# registry live at TODO.md and BUGS.md at the repo root. See
-# CONTRIBUTING.md (`plans/` is local-only) for the policy.
-#/plans/
+# `plans/` is a branch-scoped scratchpad (see CONTRIBUTING.md). It is
+# committed on work branches and deleted before the PR, so it is not
+# ignored here. `planning/` is the staged roadmap and is tracked on `dev`.
+
+# Redis snapshots left by a local redis-server
+dump.rdb

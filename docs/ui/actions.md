@@ -5,7 +5,7 @@ page, and their Activity tab; the library, packs and schedules at
 `/actions` (Operations → Actions — `?tab=library|packs|schedules`;
 `/action-packs` and `/schedules` redirect there).
 
-Actions are **Ansible playbook runs** LabDog can trigger against a host,
+Actions are **Ansible playbook runs** unbork can trigger against a host,
 a group, or the entire fleet. Run them ad-hoc, or schedule them via cron
 on the [Schedules tab](#scheduled-actions).
 The same execution path serves both — there's no "ad-hoc only" or
@@ -13,7 +13,7 @@ The same execution path serves both — there's no "ad-hoc only" or
 
 The catalog comes from two sources:
 
-- **Built-in pseudo-actions** (`_builtin.*`) wrap operations LabDog
+- **Built-in pseudo-actions** (`_builtin.*`) wrap operations unbork
   already performs internally: `_builtin.sync` (coalesced per-host
   module sync), `_builtin.drift_check` (compare desired vs current
   state), and `_builtin.collect_state` (refresh cached host facts).
@@ -22,15 +22,15 @@ The catalog comes from two sources:
   cannot register a key starting with `_`.
 - **Pack-supplied actions** come from **packs** — pluggable collections
   of playbooks, from a git repository or a local directory. None is
-  built into LabDog: a fresh install registers the
-  [`labdog-playbooks`](#the-labdog-playbooks-pack) pack, and admins add
+  built into unbork: a fresh install registers the
+  [`unbork-playbooks`](#the-unbork-playbooks-pack) pack, and admins add
   their own alongside it or instead of it.
 
 - [Running actions](#running-actions)
 - [Scheduled actions](#scheduled-actions)
 - [Group-dispatch actions](#group-dispatch-actions)
 - [Action packs](#action-packs)
-  - [The labdog-playbooks pack](#the-labdog-playbooks-pack)
+  - [The unbork-playbooks pack](#the-unbork-playbooks-pack)
   - [Adding a pack](#adding-a-pack)
   - [Pack precedence and resolving conflicts](#pack-precedence-and-resolving-conflicts)
   - [Provenance: which pack won?](#provenance-which-pack-won)
@@ -58,7 +58,8 @@ There are three ways to start one:
 
 The run dialog picks the **action**, takes its parameters (if any) and,
 for a group, a **parallelism** — *All at once*, or *Rolling* 1, 2 or 5 at a
-time. **Preview (dry-run)** runs the same playbook with
+time. Rolling keeps that many hosts running and starts the next as soon
+as one finishes; a slow host holds only its own slot. **Preview (dry-run)** runs the same playbook with
 `ansible-playbook --check`: tasks report what they would change without
 changing it, and no snapshot is taken because nothing needs rolling back.
 **Run** runs it for real. A task a pack marks `check_mode: false` (a
@@ -112,9 +113,9 @@ the tasks around it:
 |---|---|
 | Green | `ok:` results |
 | Amber | `changed:`, `rescued:`, `...ignoring` and `[WARNING]` |
-| Red | `failed:`, `fatal:`, `unreachable:` and `[ERROR]`, with the result or explanation under them, and LabDog's own lines when they report a failure (`[verify] … status=failed`) |
+| Red | `failed:`, `fatal:`, `unreachable:` and `[ERROR]`, with the result or explanation under them, and unbork's own lines when they report a failure (`[verify] … status=failed`) |
 | Grey | `skipping:` and `included:` |
-| Blue | `PLAY` headers and LabDog's own step lines (`[preflight]`, `[snapshot]`, `[cleanup]`, …) |
+| Blue | `PLAY` headers and unbork's own step lines (`[preflight]`, `[snapshot]`, `[cleanup]`, …) |
 | Bold | `TASK` headers |
 
 In each `PLAY RECAP` row the host is bold and each count that is not zero
@@ -142,28 +143,39 @@ says when that is off your network.
 
 The session is told what ran, with which parameters, and how each host
 ended. From each host's log (the failed hosts of a group run, up to three)
-it gets LabDog's own steps (`[preflight]`, `[verify]`, `[rollback]`…), the
+it gets unbork's own steps (`[preflight]`, `[verify]`, `[rollback]`…), the
 play recaps and every failed task with the lines before it. It reads the
 rest of the log itself, and can look at the hosts, but cannot change
 them. Pressing the button again opens the same session, unless that one
 failed or was stopped. The run's head links to every session started
 from it.
 
-A multi-host run survives LabDog restarting in the middle of it — which
-upgrading Docker on LabDog's own host will do. Within about ten minutes
-LabDog notices that nothing is handing out the run's hosts any more and
-picks the run up again. A host that was mid-action when LabDog went down
+**Re-run…** in a finished run's head opens the run dialog again on the
+same host or group, filled in with that run's parameters and, for a group,
+its parallelism. Change anything before clicking **Run** or **Preview**;
+the new run gets its own screen and the old one is left as it was. When
+the action's manifest has changed since, the dialog says so and leaves out
+any parameter the action no longer takes. The button is disabled for a
+fleet run (run its schedule again from
+[Scheduled actions](#scheduled-actions)), for a run whose host or group
+was deleted, and for an action no pack supplies any more.
+
+A multi-host run survives unbork restarting in the middle of it — which
+upgrading Docker on unbork's own host will do. Within about ten minutes
+unbork notices that nothing is handing out the run's hosts any more and
+picks the run up again. A host that was mid-action when unbork went down
 is marked failed once it passes its deadline (the action's timeout plus
 verify and grace), since there is no telling how far it got; its log
 stops where the restart cut it off. The hosts the run had not reached
 then run as usual, at the run's parallelism.
 
-**Who can run actions:** any logged-in user. **Who can configure packs
-or schedules:** superusers only.
+**Who can run actions:** operators and admins. **Who can manage
+schedules:** operators and admins. **Who can configure packs and pick
+winners:** admins only. See [roles](admin.md#users).
 
 ### Group-dispatch actions
 
-Most actions fan out per-host: LabDog dispatches one Celery task per
+Most actions fan out per-host: unbork dispatches one Celery task per
 target host with a single-host inventory, and a parallelism setting
 controls how many run concurrently. A few actions need the whole
 group's hosts visible to a single ansible run — for example,
@@ -176,7 +188,7 @@ the rest of the cluster keeps serving traffic. Such actions declare
 - The action is only offered for groups (the action's manifest sets
   `supports_host: false`, so a host target makes no sense).
 - The Run dialog has no special pre-flight — there are no per-member
-  roles to assign in LabDog. Just pick the group and run.
+  roles to assign in unbork. Just pick the group and run.
 - The parallelism picker is hidden — group-dispatched runs are always
   one ansible-runner invocation against a flat multi-host inventory;
   the pack's playbook decides ordering with Ansible's `serial:`,
@@ -185,7 +197,7 @@ the rest of the cluster keeps serving traffic. Such actions declare
   driven by the same ansible-runner invocation. Per-host events get
   routed back to the matching row by inventory hostname.
 - Destructive group-dispatched runs get the same per-host
-  snapshot/verify/rollback envelope as host-targeted runs: LabDog
+  snapshot/verify/rollback envelope as host-targeted runs: unbork
   snapshots every member with a Proxmox VM mapping before the
   playbook, runs verify on each host after, and rolls back any host
   whose action or verify failed (auto_rollback toggle). Per-host
@@ -195,7 +207,7 @@ the rest of the cluster keeps serving traffic. Such actions declare
   the re-run skip already-succeeded hosts (k8s-upgrade detects
   already-on-target nodes via a `kubelet --version` probe).
 
-`labdog-playbooks`' `k8s-upgrade` discovers control-plane vs worker by
+`unbork-playbooks`' `k8s-upgrade` discovers control-plane vs worker by
 probing each node for `/etc/kubernetes/manifests/kube-apiserver.yaml`
 in a setup play, then `serial: 1` upgrades control-plane nodes
 followed by workers. The action is currently **apt-only** — Debian
@@ -259,7 +271,7 @@ scheduled_actions:
 
 ## Action packs
 
-A pack is a collection of playbooks + their LabDog manifests. Each
+A pack is a collection of playbooks + their unbork manifests. Each
 action key in the registry comes from exactly one pack. When two packs
 declare the same key, the operator pins which pack wins via a per-key
 *resolution*; until pinned, the key is **unresolved** and the action
@@ -267,11 +279,11 @@ is unrunnable (see
 [below](#pack-precedence-and-resolving-conflicts)). There is no
 global pack ordering.
 
-### The labdog-playbooks pack
+### The unbork-playbooks pack
 
-A fresh install registers one pack, `labdog-playbooks`, on the git
-repository
-[`open-labdog/labdog-playbooks`](https://github.com/open-labdog/labdog-playbooks)
+A fresh install registers one pack, `unbork-playbooks` (it kept its
+name from before the rename), on the git repository
+[`open-unbork/unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 (branch `main`). It syncs on startup like any other pack and supplies
 the baseline actions, among them:
 
@@ -287,14 +299,14 @@ Nothing about it is special. Edit, disable or delete it like any other
 pack. Until a pack has synced, only the built-in `_builtin.*` actions
 are available.
 
-- **No GitHub access** (an air-gapped site): edit the `labdog-playbooks`
+- **No GitHub access** (an air-gapped site): edit the `unbork-playbooks`
   repository under [Git Repos](gitops-ui.md) to point at an internal
   mirror, or add a local-directory pack holding a copy.
 - **A private fork**: add your fork as a pack and pin its keys with **win
-  all keys**, or delete `labdog-playbooks` so your fork is the only
+  all keys**, or delete `unbork-playbooks` so your fork is the only
   contributor.
 - **Deleted it by mistake**: add the repository again
-  (`https://github.com/open-labdog/labdog-playbooks`, branch `main`, no
+  (`https://github.com/open-unbork/unbork-playbooks`, branch `main`, no
   credentials), then **Add pack…** on it with the path left blank.
 
 To override one of its actions, add a pack that declares the same key
@@ -326,7 +338,7 @@ root and walks the whole repo to find them — `packs/<name>/`,
 `actions/<name>/`, the repo root itself, all work. If no `pack.yml`
 exists anywhere but the repo root has an `actions/*/manifest.yml`
 tree, the repo is treated as a single root-level pack (matches the
-[`labdog-playbooks`](https://github.com/open-labdog/labdog-playbooks)
+[`unbork-playbooks`](https://github.com/open-unbork/unbork-playbooks)
 convention).
 
 **Per-pack alternative.** When you want to add a single pack, or the
@@ -338,8 +350,8 @@ Packs** (Integrations → Action Packs) → **Add Pack**. Fields:
 | Name | Admin-chosen label; must be unique. |
 | Source | `Git repository` or `Local directory`. |
 | Git repository | Dropdown of configured `GitRepository` rows. Only shown for source = Git. If empty, add one under [Git Repos](gitops-ui.md) first. |
-| Path inside the repo | Subpath where the pack lives (e.g. `packs/labdog-default`). Leave empty when the pack is at the repo root. Only shown for source = Git. |
-| Filesystem path | Absolute path on the LabDog host. Only shown for source = Local. LabDog reads the directory in place — nothing is cloned. |
+| Path inside the repo | Subpath where the pack lives (e.g. `packs/unbork-default`). Leave empty when the pack is at the repo root. Only shown for source = Git. |
+| Filesystem path | Absolute path on the unbork host. Only shown for source = Local. unbork reads the directory in place — nothing is cloned. |
 | Enabled | Uncheck to keep the pack configured but out of the registry. |
 
 A new pack joins the **Pack Sources** table — packs are unordered.
@@ -348,7 +360,7 @@ existing pack wins automatically. Keys that *do* collide become
 *unresolved* (you must pin a winner). See
 [below](#pack-precedence-and-resolving-conflicts).
 
-On save, LabDog resolves the linked repository's URL, branch, and
+On save, unbork resolves the linked repository's URL, branch, and
 credentials; clones into `<packs_root>/<pack_id>/`; and folds the
 pack's actions into the registry. If the sync fails, the row is still
 saved with `last_sync_status=failed`; fix the config and hit **Sync**
@@ -360,7 +372,7 @@ or HTTPS tokens. Rotating a credential there propagates to every pack
 using that repo at the next sync — no per-pack duplication.
 
 **SSH host-key verification** uses TOFU (trust-on-first-use) to stay
-consistent with the rest of LabDog's git integration. Packs don't
+consistent with the rest of unbork's git integration. Packs don't
 require pasted `known_hosts`.
 
 ### Pack precedence and resolving conflicts
@@ -372,7 +384,7 @@ cases:
 | Case | What happens |
 |---|---|
 | **Uncontested** — one pack declares the key | That pack wins automatically. Status **ok**. No picker. |
-| **Contested + pinned** — multiple packs declare the key, operator has chosen a winner | The pinned pack wins. Status **pinned** (or **frozen** for auto-pins LabDog wrote on a fresh sync conflict, awaiting your confirmation). |
+| **Contested + pinned** — multiple packs declare the key, operator has chosen a winner | The pinned pack wins. Status **pinned** (or **frozen** for auto-pins unbork wrote on a fresh sync conflict, awaiting your confirmation). |
 | **Contested + unresolved** — multiple packs declare the key, no pin yet | Action is *unrunnable*: `POST /api/actions/runs` returns 409, the action is tagged **unresolved** wherever it is listed and cannot be run, and its registry row reads **pick winner**. |
 
 The **Packs** tab (Operations → Actions → Packs) is two panels:
@@ -405,7 +417,7 @@ the final `{created, updated, skipped}` numbers.
 
 #### Freeze-on-fresh-conflict
 
-LabDog never silently flips a winner. When a sync introduces a new
+unbork never silently flips a winner. When a sync introduces a new
 manifest that turns a previously-uncontested key into a contested
 one, the rebuild **freezes** the winner to whichever pack was
 previously serving that key by writing an `action_resolution` row
@@ -451,12 +463,12 @@ The three example packs in
 [`docs/examples/action-packs/`](../examples/action-packs/) cover the
 bread and butter:
 
-- [`minimal-pack/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/minimal-pack) — smallest
+- [`minimal-pack/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/minimal-pack) — smallest
   possible pack, one action with no parameters.
-- [`reboot-pack/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/reboot-pack) — a
+- [`reboot-pack/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/reboot-pack) — a
   destructive action with a parameter, suitable as a template for
   things that modify host state.
-- [`with-role/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/with-role) — a pack that
+- [`with-role/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-role) — a pack that
   ships its own Ansible role and reuses it from a playbook.
 
 ### Pack layout
@@ -466,7 +478,7 @@ bread and butter:
 ├── pack.yml                  (optional; metadata only, not load-critical)
 ├── actions/
 │   └── <key>/                (one directory per action)
-│       ├── manifest.yml      (the LabDog action definition)
+│       ├── manifest.yml      (the unbork action definition)
 │       ├── playbook.yml      (the Ansible playbook)
 │       └── roles/            (optional; action-private roles)
 │           └── <role-name>/  (auto-resolved by Ansible)
@@ -474,12 +486,12 @@ bread and butter:
     └── <role-name>/          (added to ANSIBLE_ROLES_PATH)
 ```
 
-LabDog discovers actions by globbing `actions/*/manifest.yml`. Each
+unbork discovers actions by globbing `actions/*/manifest.yml`. Each
 manifest names a `playbook` file relative to its own directory
 (conventionally `playbook.yml`). An action is a directory: copy
 `actions/<key>/` into another pack to override that action wholesale.
 
-**Only the playbook and roles reach a run.** LabDog copies the playbook
+**Only the playbook and roles reach a run.** unbork copies the playbook
 file, alone, into the directory it runs Ansible in, and puts the action's
 roles on `ANSIBLE_ROLES_PATH`. Nothing else next to the playbook comes
 along, so task files, vars files, templates and files belong in a role.
@@ -489,7 +501,7 @@ is refused when the pack loads, with a log line naming the file.
 
 **Action-private vs shared roles.** Put a role under
 `actions/<key>/roles/<role-name>/` when it is private to one action.
-LabDog puts that directory on `ANSIBLE_ROLES_PATH` ahead of the pack's
+unbork puts that directory on `ANSIBLE_ROLES_PATH` ahead of the pack's
 `roles/`, so no config is needed. Use the top-level `<pack>/roles/` only
 for roles genuinely reused across multiple actions.
 
@@ -521,6 +533,9 @@ ai_verify_prompt: >-         # optional; what the AI verify step should confirm
   indicates a driver problem.
 ai_verify_fail_closed: false # optional; whether an INCONCLUSIVE AI verdict
                              # fails the action. See "AI verification" below.
+quiesce_playbook: quiesce.yml     # optional, with unquiesce_playbook; see
+unquiesce_playbook: unquiesce.yml # "Quiesce hooks for stateful applications"
+quiesce_timeout_seconds: 300      # optional; budget for each of the two
 parameters:                  # passed as --extra-vars at run time
   - key: my_param
     label: My parameter
@@ -535,15 +550,14 @@ parameters:                  # passed as --extra-vars at run time
     default: low
 ```
 
-Unknown fields are rejected (the manifest is validated with pydantic
-`extra="forbid"`), so typos fail loudly instead of silently doing
-nothing. The manifests in
-[`labdog-playbooks/actions/`](https://github.com/open-labdog/labdog-playbooks/tree/main/actions)
+Unknown top-level fields are ignored, so a manifest written for a
+newer unbork still loads on an older one; parameters reject unknown keys. The manifests in
+[`unbork-playbooks/actions/`](https://github.com/open-unbork/unbork-playbooks/tree/main/actions)
 are working examples of every field.
 
 ### Playbook conventions
 
-- **`hosts: all`.** LabDog generates a single-host inventory per run;
+- **`hosts: all`.** unbork generates a single-host inventory per run;
   anything more specific won't match.
 - **`become: true`** when you need root. Most actions do.
 - **Parameters arrive as top-level Ansible variables** via
@@ -553,7 +567,7 @@ are working examples of every field.
   report instead of changing anything. Mark read-only probes whose output
   later tasks need `check_mode: false` so they still run in a preview, and
   guard anything `command`/`shell` would change with
-  `when: not ansible_check_mode`. (Before this was fixed, LabDog passed
+  `when: not ansible_check_mode`. (Before this was fixed, unbork passed
   `ansible_check_mode=True` as an extra-var, which ansible-core ignores, so
   a "dry run" made real changes. A pack that had worked around that with
   its own preview parameter can keep it.)
@@ -571,7 +585,7 @@ are working examples of every field.
   ```
 
 - **Roles in your pack's `roles/`** are automatically on
-  `ANSIBLE_ROLES_PATH` alongside LabDog's own roles. `include_role: name:
+  `ANSIBLE_ROLES_PATH` alongside unbork's own roles. `include_role: name:
   my-role` just works.
 
 ### Destructive actions and snapshot safety
@@ -579,9 +593,9 @@ are working examples of every field.
 Set `destructive: true` on the manifest when the action mutates host
 state in a way that's hard to undo (reboots, package upgrades, config
 rewrites). For destructive actions, **if the host has a Proxmox VM
-mapping**, LabDog automatically:
+mapping**, unbork automatically:
 
-1. Takes a Proxmox snapshot named `labdog-<run_id>-<timestamp>`.
+1. Takes a Proxmox snapshot named `unbork-<run_id>-<timestamp>`.
 2. Runs the playbook.
 3. Runs a post-run SSH + services + packages health check.
 4. On success, deletes the snapshot.
@@ -589,7 +603,7 @@ mapping**, LabDog automatically:
    SSH, and marks the host as `out_of_sync`.
 
 If Proxmox reports the VM as locked when the snapshot is taken (most
-often because a scheduled backup is running), LabDog waits and retries
+often because a scheduled backup is running), unbork waits and retries
 every 30 seconds instead of failing straight away. Each wait shows up in
 the run log as a `[snapshot] VM 101 is locked (backup) — waiting for the
 lock to clear …` line. If the lock hasn't cleared after
@@ -608,7 +622,7 @@ VM mapping.
 ### Custom verification (pack-supplied)
 
 Packs can declare their own definition of success. When a manifest sets
-`verify_playbook`, LabDog runs that playbook after the main one and its
+`verify_playbook`, unbork runs that playbook after the main one and its
 `ansible-runner` exit status becomes the verification result — a
 failed task fails the verify, which fails the action, which triggers
 rollback.
@@ -653,19 +667,88 @@ net doesn't apply). If you need verification on a non-destructive
 action, either mark it destructive or do the checks as tasks inside
 the main playbook.
 
-**Default behaviour when no verify_playbook is set:** LabDog runs the
+**Default behaviour when no verify_playbook is set:** unbork runs the
 built-in SSH + services + packages check (healthy if every
 currently-desired service is running and every desired package is
 installed). The full working example is
-[`docs/examples/action-packs/with-verify/`](https://github.com/open-labdog/labdog/tree/main/docs/examples/action-packs/with-verify).
+[`docs/examples/action-packs/with-verify/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-verify).
 
-**Reusable verify templates** ship in the `labdog-playbooks` repo
-under [`verify/`](https://github.com/open-labdog/labdog-playbooks/tree/main/verify)
+**Reusable verify templates** ship in the `unbork-playbooks` repo
+under [`verify/`](https://github.com/open-unbork/unbork-playbooks/tree/main/verify)
 — point `verify_playbook:` at one of them (e.g.
 `../../verify/post-upgrade.yml` — `../../` reaches the pack root from
 inside the action directory) and pass overrides through manifest
 parameters. The `linux-upgrade` action in that repo uses
 `verify/post-upgrade.yml` and is the reference implementation.
+
+### Quiesce hooks for stateful applications
+
+A rollback restores the whole VM to the moment of the snapshot, so
+anything users wrote while the action ran (a push, an upload, a database
+row) is lost with it. A pack can close that window with two more
+playbooks:
+
+```yaml
+# actions/upgrade-app/manifest.yml
+destructive: true
+quiesce_playbook: quiesce.yml       # closes the app to writes
+unquiesce_playbook: unquiesce.yml   # reopens it
+quiesce_timeout_seconds: 300        # budget for each of the two; default 300
+```
+
+Declare both or neither: a manifest with only one fails to load. With
+them, a run goes:
+
+1. **Quiesce.** Maintenance mode, writers stopped, a database
+   checkpoint. If it fails, no snapshot is taken, the unquiesce playbook
+   runs, and the host run fails with "Quiesce failed". Refusing here,
+   before the snapshot, is also the cheapest place for a pack's own
+   "is this server healthy and ready" checks.
+2. **Snapshot.**
+3. **Playbook**, then **verify**. Both get the extra-var
+   `unbork_quiesced: true`.
+4. **Rollback**, if the playbook or verify failed and automatic rollback
+   is on.
+5. **Unquiesce**, with `unbork_run_outcome` set to `succeeded`,
+   `failed` or `rolled_back`.
+6. **Snapshot cleanup**, after a success or a rollback, and only once
+   the unquiesce succeeded. A host left closed keeps its snapshot.
+
+The hooks run only when a snapshot will be attempted: a destructive
+action, snapshots enabled for the run, a host with a Proxmox VM mapping,
+and not a dry run. Without a snapshot there is no rollback to make
+lossless, so the host stays open.
+
+Rules for the two playbooks:
+
+- **Verify runs while the host is quiesced.** Close the application to
+  everything except loopback, or teach the health check to accept the
+  closed state when `unbork_quiesced` is true. A maintenance mode that
+  makes the health endpoint fail fails every verify.
+- **The unquiesce playbook must work on both systems.** After a rollback
+  the VM is back at the snapshot, which was taken while quiesced, so the
+  same steps have to reopen the upgraded and the reverted system.
+- **It must be safe to run twice**, by hand too. unbork runs it on every
+  exit path after the quiesce started: success, failure, an error inside
+  unbork, a timed-out run. If it fails after a successful run, the host
+  run fails with "Unquiesce failed", the snapshot is kept, and nothing is
+  rolled back. Run the playbook by hand to reopen the application.
+- No action may declare a parameter named `unbork_quiesced`,
+  `unbork_run_outcome`, `unbork_quiesced_hosts` or `unbork_run_outcomes`.
+
+The application is offline for the whole run, so the run dialog says so
+for these actions. In a group-dispatch run, unbork quiesces the members
+that have a VM mapping in one run of the quiesce playbook, drops any
+member it fails on (after reopening it), and reopens every member in one
+run of the unquiesce playbook, where each member gets its own
+`unbork_run_outcome`. Both variables are extra-vars in either kind of
+run, so a playbook may give them a default in its own `vars:` without
+masking unbork's value. Members are reopened together, so a member that
+succeeded stays closed until the slowest rollback of the run is done. An unbork older than these hooks ignores the three
+fields and runs the action without them.
+
+A working example is
+[`docs/examples/action-packs/with-quiesce/`](https://github.com/open-unbork/unbork/tree/main/docs/examples/action-packs/with-quiesce).
 
 ### AI verification
 
@@ -685,18 +768,18 @@ ai_verify_prompt: >
 ai_verify_fail_closed: true             # default false
 ```
 
-LabDog collects the evidence itself — managed services, managed
+unbork collects the evidence itself — managed services, managed
 packages, load average, root filesystem usage, and error-priority
 journal entries from the last ten minutes — renders it into the prompt,
 and asks your configured AI provider one question about it. The model
 gets **no tools**: it cannot run commands or open connections, so the
-only thing it can reason from is the evidence LabDog gathered. Readings
+only thing it can reason from is the evidence unbork gathered. Readings
 that could not be taken are marked `UNAVAILABLE` rather than left blank,
 so a failed check cannot be mistaken for a healthy one.
 
 **Reading the journal needs privilege.** `journalctl` run by an ordinary
 user shows only that user's *own* entries and still exits successfully,
-so an unprivileged read looks exactly like a quiet host. LabDog connects
+so an unprivileged read looks exactly like a quiet host. unbork connects
 as root where you configured it to, and otherwise uses `sudo -n`. If the
 SSH user has neither, the reading is reported as `UNAVAILABLE` with the
 reason — you will see it in the evidence and in the verdict, rather than
@@ -773,7 +856,7 @@ step is skipped and the action's own result stands.
 ### Post-run reconciliation: sync and register
 
 An action's manifest can opt in to two post-success hooks that bridge
-the action world and labdog's desired-state modules. Both are
+the action world and unbork's desired-state modules. Both are
 declarative, both fire only on successful non-dry-run completion,
 both fan out per-host for group-dispatched actions, and both log
 without affecting the action's terminal status if they fail.
@@ -786,7 +869,7 @@ post_run_sync:
   - services
 ```
 
-After success, labdog queues a normal per-host sync for each named
+After success, unbork queues a normal per-host sync for each named
 module against the same target host — only that module. The syncs
 start as soon as the action releases the host (or after anything
 already waiting on it) and route through the standard
@@ -795,17 +878,17 @@ playbook, audit row, the works. A module that already has a sync
 waiting on the host is not queued twice.
 
 Semantics are **push, not collect**. Use this when the action
-needs labdog's existing config to be (re-)enforced after the
+needs unbork's existing config to be (re-)enforced after the
 action runs — e.g. a kernel-upgrade action that wants the firewall
 ruleset reapplied because the upgrade swapped backends, or a cert-
 rotation action that wants services reloaded.
 
 **Don't use `post_run_sync` for "install this new thing" actions.**
-Those modules manage labdog's *declared* desired state. If the
-action installs a service labdog doesn't declare (e.g. a fresh
+Those modules manage unbork's *declared* desired state. If the
+action installs a service unbork doesn't declare (e.g. a fresh
 `alloy.service` install), `post_run_sync: [services]` won't add
-alloy to labdog's desired set; the existing cleanup pass would
-also skip it (no labdog marker). For install actions, use
+alloy to unbork's desired set; the existing cleanup pass would
+also skip it (no unbork marker). For install actions, use
 `post_run_register` instead.
 
 #### `post_run_register` — register installed resources
@@ -821,9 +904,9 @@ post_run_register:
       enabled: true
 ```
 
-After success, labdog inserts each declared resource as a **host-
+After success, unbork inserts each declared resource as a **host-
 scope override row** (`host_id=<target>`, `group_id=NULL`) so the
-resource becomes labdog-managed from that point on. After the
+resource becomes unbork-managed from that point on. After the
 inserts, a `post_run_sync` is automatically queued for the
 affected modules so the Host detail tabs reflect the new state
 as soon as the action finishes (no waiting for the next drift check).
@@ -838,12 +921,12 @@ implicit and must not be declared.
 **Conflict semantic: skip silently on uniqueness collision.** If
 the operator has already declared the resource for that host
 (e.g. `alloy.service` with `state: stopped`, deliberately), the
-manifest declaration is ignored and labdog logs `post_run_register:
+manifest declaration is ignored and unbork logs `post_run_register:
 skipping services[0] on host=42 -- already declared`. Operator
 intent wins.
 
 **When to use `post_run_register`:** action installs something
-labdog should manage going forward. Examples: an `alloy-install`
+unbork should manage going forward. Examples: an `alloy-install`
 action registers `alloy.service` + the `alloy` package; an
 `add-monitoring-user` action registers the new user under
 `linux-users`. After the action runs, drift checks and syncs treat
@@ -851,7 +934,7 @@ the new rows like any other operator-declared row.
 
 #### Purge-mode modules: a warning
 
-Four module categories overwrite the host with labdog's complete
+Four module categories overwrite the host with unbork's complete
 desired state on every sync (i.e. unknown entries get removed):
 
 - **firewall** — rebuilds the nftables ruleset from scratch
@@ -860,15 +943,15 @@ desired state on every sync (i.e. unknown entries get removed):
 - **resolver** — overwrites resolver config (resolv.conf / NM /
   systemd-resolved) with desired settings
 - **SSH keys** (within `linux-users`) — exclusive mode; deletes all
-  keys not in labdog's desired set
+  keys not in unbork's desired set
 
 **Do not use actions to mutate these without also declaring them in
-labdog's desired state — either via `post_run_register:` or via the
+unbork's desired state — either via `post_run_register:` or via the
 UI/API first.** Otherwise the next sync removes whatever the action
 installed.
 
 The other module behaviours are tolerant: `packages`, `cron`,
-`linux-users` (non-SSH), and `services` (non-labdog-marked units)
+`linux-users` (non-SSH), and `services` (non-unbork-marked units)
 leave unknown entries alone. Install-this-new-thing actions
 targeting only those modules are safe even without
 `post_run_register` — though without it, the resources won't
@@ -908,8 +991,8 @@ Check that the host has a VM mapping under the Proxmox integration
 (host page → Overview → vm mapping). Without a mapping, destructive actions
 run without snapshot protection.
 
-**Where the checkouts live.** LabDog clones git packs into
+**Where the checkouts live.** unbork clones git packs into
 `<settings.ansible.packs_root_dir>/<pack_id>` — default
-`/var/lib/labdog/packs/<pack_id>`. If you're running in Docker and
+`/var/lib/unbork/packs/<pack_id>`. If you're running in Docker and
 don't want cold-starts to re-clone everything, mount a persistent
 volume at that path.

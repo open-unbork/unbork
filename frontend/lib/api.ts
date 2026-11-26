@@ -42,7 +42,7 @@ export class ApiError extends Error {
 const _MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 /**
- * Read the labdog_csrf double-submit cookie value from document.cookie.
+ * Read the unbork_csrf double-submit cookie value from document.cookie.
  * Returns an empty string when the cookie is absent (e.g. not logged in).
  * The value is base64url-safe so no URL-decoding is needed.
  */
@@ -51,8 +51,20 @@ function _readCsrfCookie(): string {
   const match = document.cookie
     .split(";")
     .map((c) => c.trim())
-    .find((c) => c.startsWith("labdog_csrf="))
-  return match ? match.slice("labdog_csrf=".length) : ""
+    .find((c) => c.startsWith("unbork_csrf="))
+  return match ? match.slice("unbork_csrf=".length) : ""
+}
+
+/**
+ * Turn the backend's 403 details into something a person can act on.
+ * `Missing permission: config.edit` comes from `require()` on every route;
+ * `password_change_required` from an administrator-set password.
+ */
+export function describeForbidden(detail: string): string {
+  const missing = /^Missing permission: (\S+)$/.exec(detail)
+  if (missing) return `Your role cannot do this (it needs ${missing[1]}). Ask an admin if you need it.`
+  if (detail === "password_change_required") return "Choose your own password before you continue."
+  return detail
 }
 
 export async function apiFetch<T>(
@@ -104,6 +116,7 @@ export async function apiFetch<T>(
         detail = body.detail
       }
     } catch {}
+    if (res.status === 403) detail = describeForbidden(detail)
     throw new ApiError(detail, res.status)
   }
   if (res.status === 204 || res.headers.get("content-length") === "0") return undefined as T

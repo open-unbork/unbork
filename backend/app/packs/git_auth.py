@@ -20,7 +20,7 @@ Host-key verification is real TOFU (SEC-27). It used to be
 unconditional acceptance: every invocation started from an empty
 known-hosts file, so there was never a first use and therefore never a
 mismatch to detect. Anyone able to intercept the connection to the pack
-repository could serve arbitrary playbooks, which LabDog then runs
+repository could serve arbitrary playbooks, which unbork then runs
 against the fleet as root.
 
 Now the known-hosts file is a real file in the same temp directory:
@@ -142,7 +142,7 @@ def git_auth_context(
 @contextmanager
 def _materialised_ssh_key(private_key: str) -> Iterator[Path]:
     """Write the key to a 0700 temp dir with 0600 perms, yield path, clean up."""
-    tmpdir = tempfile.mkdtemp(prefix="labdog-pack-ssh-")
+    tmpdir = tempfile.mkdtemp(prefix="unbork-pack-ssh-")
     try:
         os.chmod(tmpdir, 0o700)
         key_path = Path(tmpdir) / "id"
@@ -194,7 +194,7 @@ def build_ssh_command(key_path: str, known_hosts_path: str, *, pinned: bool) -> 
     about.
 
     ``GlobalKnownHostsFile=/dev/null`` keeps the controller's
-    system-wide known-hosts out of the decision: LabDog verifies against
+    system-wide known-hosts out of the decision: unbork verifies against
     the key it recorded for this repository, not against whatever else
     the host happens to trust.
     """

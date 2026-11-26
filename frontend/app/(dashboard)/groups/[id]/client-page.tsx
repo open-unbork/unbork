@@ -202,13 +202,11 @@ export default function GroupDetailPage() {
           catalog={catalog}
           onTab={(t) => (t === "schedules" ? navigate({ tab: "activity", view: "schedules" }) : t === "activity" ? navigate({ tab: "activity", view: "runs" }) : navigate({ tab: t }))}
           onModule={(m) => navigate({ tab: "config", module: m })}
-          bottom={
-            <>
-              <GroupSettings key={group.id} group={group} summary={summary} groups={summaries ?? []} hosts={hosts ?? []} memberCount={members.length} onSaved={invalidate} />
-              <GitOpsPanel group={group} onChanged={invalidate} />
-              <DangerZone group={group} memberCount={members.length} onDeleted={invalidate} />
-            </>
-          }
+          settings={{
+            form: <GroupSettings key={group.id} group={group} summary={summary} groups={summaries ?? []} hosts={hosts ?? []} memberCount={members.length} onSaved={invalidate} />,
+            gitops: <GitOpsPanel group={group} onChanged={invalidate} />,
+            danger: <DangerZone group={group} memberCount={members.length} onDeleted={invalidate} />,
+          }}
         />
       )}
 
@@ -559,7 +557,7 @@ function GitOpsPanel({ group, onChanged }: { group: HostGroup; onChanged: () => 
           <Field label="file path">
             <input className="inp mono" value={filePath} placeholder="groups/my-group.yaml" onChange={(e) => setFilePath(e.target.value)} />
           </Field>
-          <span className="text-[11px] text-text-3">The file replaces what is declared here; edits made in LabDog are overwritten on the next import.</span>
+          <span className="text-[11px] text-text-3">The file replaces what is declared here; edits made in unbork are overwritten on the next import.</span>
         </Modal>
       )}
     </Panel>

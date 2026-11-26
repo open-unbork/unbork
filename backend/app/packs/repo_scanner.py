@@ -61,7 +61,7 @@ class DetectedGitopsFile:
 
     ``group_name`` is the value of the ``group:`` top-level key,
     extracted best-effort even when the file fails strict schema
-    validation. Errors from ``LabDogGroupYAML.model_validate`` land in
+    validation. Errors from ``UnborkGroupYAML.model_validate`` land in
     ``errors``; the wizard surfaces them inline.
     """
 
@@ -82,7 +82,7 @@ def scan_repository(
     *,
     repo_name: str | None = None,
 ) -> ScanResult:
-    """Walk ``clone_path`` and return everything LabDog might activate.
+    """Walk ``clone_path`` and return everything unbork might activate.
 
     See module docstring for what 'pack' and 'gitops file' mean. The
     scan is non-recursive at the top, and each action is a directory
@@ -265,7 +265,7 @@ def _build_gitops_finding(root: Path, path: Path) -> DetectedGitopsFile | None:
 
     ``None`` for files that parse but lack a ``group:`` key — those are
     just regular YAML files that happen to live in the repo, not
-    LabDog gitops definitions.
+    unbork gitops definitions.
     """
     rel = path.relative_to(root).as_posix()
     errors: list[ScanError] = []
@@ -292,10 +292,10 @@ def _build_gitops_finding(root: Path, path: Path) -> DetectedGitopsFile | None:
     # Best-effort full schema validation. Failure is non-fatal — the
     # finding is still emitted with the extracted group_name so the
     # operator sees what's there and what's wrong with it.
-    from app.gitops.schema import LabDogGroupYAML
+    from app.gitops.schema import UnborkGroupYAML
 
     try:
-        LabDogGroupYAML.model_validate(raw)
+        UnborkGroupYAML.model_validate(raw)
     except Exception as exc:
         errors.append(ScanError(file=rel, message=f"gitops schema validation failed: {exc}"))
 

@@ -35,7 +35,7 @@ def _frag(module: str, task_name: str = "stub") -> PlaybookFragment:
         module=module,
         plays=[
             {
-                "name": f"LabDog {module}",
+                "name": f"unbork {module}",
                 "hosts": HOSTS_SENTINEL,
                 "tasks": [{"name": task_name, "ansible.builtin.debug": {"msg": "ok"}}],
             }
@@ -48,9 +48,9 @@ def test_orders_plays_in_canonical_order_regardless_of_input():
         compose_playbook([_frag("firewall"), _frag("services"), _frag("packages")])
     )
     assert [p["name"] for p in out] == [
-        "LabDog packages",
-        "LabDog services",
-        "LabDog firewall",
+        "unbork packages",
+        "unbork services",
+        "unbork firewall",
     ]
 
 
@@ -62,14 +62,14 @@ def test_module_filter_selects_subset():
         )
     )
     assert len(out) == 1
-    assert out[0]["name"] == "LabDog firewall"
+    assert out[0]["name"] == "unbork firewall"
 
 
 def test_module_filter_silently_skips_modules_not_in_fragments():
     out = yaml.safe_load(
         compose_playbook([_frag("firewall")], module_filter=["firewall", "services"])
     )
-    assert [p["name"] for p in out] == ["LabDog firewall"]
+    assert [p["name"] for p in out] == ["unbork firewall"]
 
 
 def test_empty_module_filter_raises():
@@ -81,7 +81,7 @@ def test_none_module_filter_includes_all():
     out = yaml.safe_load(
         compose_playbook([_frag("firewall"), _frag("packages")], module_filter=None)
     )
-    assert {p["name"] for p in out} == {"LabDog firewall", "LabDog packages"}
+    assert {p["name"] for p in out} == {"unbork firewall", "unbork packages"}
 
 
 def test_hosts_sentinel_replaced_with_alias():

@@ -3,7 +3,7 @@
 `claude setup-token` mints a one-year token, and Anthropic's own
 documentation warns that a session running unattended "stops making
 progress once the credential expires and can't recover until you sign in
-again". LabDog's scheduled checks are exactly that kind of session, so
+again". unbork's scheduled checks are exactly that kind of session, so
 without this the first sign of an expired token is nightly reports
 quietly stopping.
 """

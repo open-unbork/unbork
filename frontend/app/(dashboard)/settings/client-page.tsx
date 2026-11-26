@@ -4,10 +4,12 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
-import { useAuth } from "@/lib/auth"
+import { can, ROLE_INFO, useAuth, type User } from "@/lib/auth"
 import { shortAgo } from "@/lib/fleet"
 import type { AIProvider, AIUsageSummary, AlertIntakeStatus, EmailSettings, GitRepository, GrafanaInstance, MetricsStatus, ProxmoxNode, SSHKey } from "@/lib/types"
 import { MetricsScrapeCard } from "@/components/metrics-scrape-card"
+import { settingsSections } from "@/lib/extensions"
+import { useFeatures } from "@/lib/features"
 import { Dot, PageHead, Panel, Tabs, type Tone } from "@/components/ld"
 
 import { SettingsEditor } from "./settings-editor"
@@ -35,15 +37,22 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const section = (search.get("section") as Section | null) ?? "integrations"
   const setSection = (s: string) => router.push(s === "integrations" ? "/settings" : `/settings?section=${s}`)
+  // Sections an extension (Enterprise) adds; Community has none.
+  const extra = settingsSections.filter((x) => !x.permission || can(user, x.permission))
+  // No AI section on a server without the assistant (C-026).
+  const { assistant } = useFeatures()
+  const tabs = [...SECTIONS.filter((x) => assistant || x.k !== "ai"), ...extra.map((x) => ({ k: x.key, label: x.label }))]
+  const ExtraSection = extra.find((x) => x.key === section)?.Component
 
   return (
     <>
       <PageHead title="Settings" sub="Integrations are a registry; the rest is database-backed and takes effect immediately.">
-        <Tabs tabs={SECTIONS} value={section} onChange={setSection} />
+        <Tabs tabs={tabs} value={section} onChange={setSection} />
       </PageHead>
       <div className="scroll flex-1 p-3.5">
+        {ExtraSection && <ExtraSection />}
         {section === "integrations" && <Integrations />}
-        {section === "ai" && (
+        {section === "ai" && assistant && (
           <div className="flex flex-col gap-3">
             <Panel title="providers" meta="who answers the assistant">
               <ProvidersRow />
@@ -51,12 +60,12 @@ export default function SettingsPage() {
             <SettingsEditor categories={["ai"]} />
           </div>
         )}
-        {section === "access" && <Access superuser={!!user?.is_superuser} />}
+        {section === "access" && <Access user={user} />}
         {section === "fleet" && <SettingsEditor categories={["drift", "ssh", "ansible", "actions", "scheduling", "alerts", "workflow", "discovery"]} includeUncategorised />}
         {section === "system" && (
           <div className="flex flex-col gap-3">
             <SettingsEditor categories={["logging"]} />
-            <Panel title="prometheus export" meta="scrape LabDog itself">
+            <Panel title="prometheus export" meta="scrape unbork itself">
               <div className="p-3">
                 <MetricsScrapeCard />
               </div>
@@ -98,11 +107,15 @@ function Card({ name, state, status, detail, meta, href, action, more }: { name:
 }
 
 function Integrations() {
+  const { user } = useAuth()
+  const { assistant } = useFeatures()
   const q = { retry: false }
+  // AI providers need ai.use, which a viewer lacks.
+  const ai = { ...q, enabled: can(user, "ai.use") }
   const { data: nodes } = useQuery<ProxmoxNode[]>({ queryKey: ["proxmox-nodes"], queryFn: () => apiFetch<ProxmoxNode[]>("/api/proxmox/nodes"), ...q })
   const { data: grafana } = useQuery<GrafanaInstance[]>({ queryKey: ["grafana-instances"], queryFn: () => apiFetch<GrafanaInstance[]>("/api/grafana/instances"), ...q })
   const { data: repos } = useQuery<GitRepository[]>({ queryKey: ["git-repos"], queryFn: () => apiFetch<GitRepository[]>("/api/git-repos"), ...q })
-  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), ...q })
+  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), ...ai })
   const { data: metrics } = useQuery<MetricsStatus>({ queryKey: ["metrics-status"], queryFn: () => apiFetch<MetricsStatus>("/api/metrics/status"), ...q })
   const { data: email } = useQuery<EmailSettings>({ queryKey: ["notification-email"], queryFn: () => apiFetch<EmailSettings>("/api/notifications/email"), ...q })
   const { data: intake } = useQuery<AlertIntakeStatus>({ queryKey: ["alert-intake"], queryFn: () => apiFetch<AlertIntakeStatus>("/api/alerts/intake"), ...q })
@@ -139,14 +152,16 @@ function Integrations() {
         href="/git-repos"
         action="Configure…"
       />
-      <Card
-        name="AI providers"
-        state={enabledProviders.length ? "ok" : "idle"}
-        detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
-        meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
-        href="/ai-providers"
-        action="Configure…"
-      />
+      {assistant && (
+        <Card
+          name="AI providers"
+          state={enabledProviders.length ? "ok" : "idle"}
+          detail={enabledProviders.length ? enabledProviders.map((p) => `${p.name} · ${p.model}`).join(", ") : "none enabled"}
+          meta={enabledProviders.length ? "budgets and autonomy under Settings · AI" : "the assistant is off until a provider is enabled"}
+          href="/ai-providers"
+          action="Configure…"
+        />
+      )}
       <Card
         name="Email"
         state={email?.ready ? "ok" : email?.enabled ? "warn" : "idle"}
@@ -159,7 +174,7 @@ function Integrations() {
         name="Prometheus export"
         state={metrics?.enabled ? "ok" : "idle"}
         detail={metrics?.enabled ? metrics.scrape_url : "disabled"}
-        meta={metrics?.enabled ? `cached ${metrics.cache_ttl_seconds}s · unauthenticated by design` : "opt-in; LabDog's own health as a scrape target"}
+        meta={metrics?.enabled ? `cached ${metrics.cache_ttl_seconds}s · unauthenticated by design` : "opt-in; unbork's own health as a scrape target"}
         href="/settings?section=system"
         action="Details"
       />
@@ -169,7 +184,7 @@ function Integrations() {
 }
 
 /**
- * Grafana alerts coming in. The webhook token is in labdog.toml, not a
+ * Grafana alerts coming in. The webhook token is in unbork.toml, not a
  * setting, so this card is the one place the UI says that an intake which
  * is on is refusing every webhook for want of one. Git push webhooks are
  * on the Git remotes card, per repository.
@@ -179,7 +194,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   if (!s.intake_enabled) return { state: "idle", status: "off", detail: "intake off", meta: "turn on alerts.intake_enabled to record Grafana alerts" }
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   const last = [s.last_webhook_alert_at, s.last_poll_alert_at].filter((t): t is string => !!t).sort().at(-1)
-  // With the rules off, any alert Grafana labels labdog_ai_automate=true
+  // With the rules off, any alert Grafana labels unbork_ai_automate=true
   // may act, so a short token always costs something; with them on, only
   // when the list has rules. Actions on the list need the token too.
   const fullAutoPossible = !s.full_auto_rules_enabled || s.full_auto_rules > 0
@@ -187,7 +202,7 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
   const meta = [
     last ? `last alert ${shortAgo(last)} ago` : "no alert received yet",
     s.poll_minutes > 0 && `polls Alertmanager every ${s.poll_minutes} min`,
-    !s.token_set && "set [alerts] webhook_token in labdog.toml",
+    !s.token_set && "set [alerts] webhook_token in unbork.toml",
     weak && (s.allowed_actions > 0 ? "token under 32 characters: no actions, no full auto" : "token under 32 characters: no full auto"),
   ].filter(Boolean).join(" · ")
   return {
@@ -202,8 +217,10 @@ function intakeCard(s: AlertIntakeStatus | undefined): { state: Tone; status?: s
 }
 
 function ProvidersRow() {
-  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), retry: false })
-  const { data: usage } = useQuery<AIUsageSummary>({ queryKey: ["ai-usage"], queryFn: () => apiFetch<AIUsageSummary>("/api/ai/usage"), retry: false })
+  const { user } = useAuth()
+  const mayUseAi = can(user, "ai.use")
+  const { data: providers } = useQuery<AIProvider[]>({ queryKey: ["ai-providers"], queryFn: () => apiFetch<AIProvider[]>("/api/ai/providers"), retry: false, enabled: mayUseAi })
+  const { data: usage } = useQuery<AIUsageSummary>({ queryKey: ["ai-usage"], queryFn: () => apiFetch<AIUsageSummary>("/api/ai/usage"), retry: false, enabled: mayUseAi })
   const enabled = (providers ?? []).filter((p) => p.enabled)
   return (
     <div className="flex flex-wrap items-center gap-3 p-[11px]">
@@ -223,7 +240,9 @@ function ProvidersRow() {
   )
 }
 
-function Access({ superuser }: { superuser: boolean }) {
+function Access({ user }: { user: User | null }) {
+  const manage = can(user, "users.manage")
+  const role = user?.role ? ROLE_INFO[user.role].label : null
   const { data: keys } = useQuery<SSHKey[]>({ queryKey: ["ssh-keys"], queryFn: () => apiFetch<SSHKey[]>("/api/ssh-keys"), retry: false })
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
@@ -237,17 +256,17 @@ function Access({ superuser }: { superuser: boolean }) {
       />
       <Card
         name="Users"
-        state={superuser ? "ok" : "idle"}
-        detail={superuser ? "you are a superuser" : "administrators only"}
-        meta={superuser ? "accounts and superuser status" : "ask an administrator to manage accounts"}
-        href={superuser ? "/users" : "/settings?section=access"}
-        action={superuser ? "Manage users…" : "Superuser gate"}
+        state={manage ? "ok" : "idle"}
+        detail={role ? `your role: ${role}` : "you have no role"}
+        meta={manage ? "accounts and their roles" : "ask an admin to manage accounts or change your role"}
+        href={manage ? "/users" : "/settings?section=access"}
+        action={manage ? "Manage users…" : "Admins only"}
       />
       <Panel title="your account" meta="password + sign out">
         <div className="flex flex-col gap-2 p-[11px] text-[11.5px] text-text-3">
           <span>Changing your password and signing out live behind the avatar at the foot of the rail, where they cannot be mistaken for navigation.</span>
           <span>
-            What LabDog emails you is under{" "}
+            What unbork emails you is under{" "}
             <Link href="/notifications#yours" className="underline">
               Email
             </Link>

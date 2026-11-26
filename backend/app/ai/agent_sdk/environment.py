@@ -9,7 +9,7 @@ The Agent SDK does not work that way. ``ClaudeAgentOptions.env`` is an
 **overlay**: the SDK composes the child environment as
 ``{**os.environ, **options.env}``. A variable removed from the overlay is
 therefore not removed at all — the inherited value survives, and it is
-precisely the value that outranks the token LabDog configured.
+precisely the value that outranks the token unbork configured.
 
 Deleting is not available, so the variables are set to empty instead.
 Verified against the real binary: with a bogus ``ANTHROPIC_API_KEY``
@@ -42,6 +42,7 @@ from app.ai.providers.claude_cli import (
     DEFAULT_CONFIG_DIR,
     OAUTH_TOKEN_ENV,
     OVERRIDING_CREDENTIAL_ENV,
+    keeps_home_sign_in,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,23 +88,25 @@ def build_sdk_env(
 ) -> dict[str, str]:
     """The ``ClaudeAgentOptions.env`` overlay for one session.
 
-    With a token: inject it, blank out the variables that would otherwise
+    With a token (only a provider saved by an earlier version still holds
+    one, S-014): inject it, blank out the variables that would otherwise
     take precedence, and pin the config directory so a stored login cannot
     shadow it from disk.
 
-    Without one: return an empty overlay. That case is an operator who
-    authenticated Claude Code on the host and wants LabDog to use that
-    login, so neither the credential variables nor the config directory may
-    be disturbed — pinning the config directory here would break exactly
-    the setup it is meant to serve.
+    Without one: the operator's own sign-in on the server is used. Pin the
+    config directory to unbork's state directory, unless the service
+    environment already sets ``CLAUDE_CONFIG_DIR``, so that sign-in
+    survives a restart. The credential variables are left alone.
 
     ``inherited`` is only read to decide which variables actually need
     neutralising; it defaults to the real environment.
     """
-    if not oauth_token:
-        return {}
-
     source = os.environ if inherited is None else inherited
+    if not oauth_token:
+        if source.get(CONFIG_DIR_ENV) or keeps_home_sign_in(source, config_dir):
+            return {}
+        return {CONFIG_DIR_ENV: config_dir}
+
     env: dict[str, str] = {
         OAUTH_TOKEN_ENV: oauth_token,
         CONFIG_DIR_ENV: config_dir,

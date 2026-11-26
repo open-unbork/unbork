@@ -34,7 +34,7 @@ from app.models.user import User
 
 _ALGORITHM = "HS256"
 _AUDIENCE = ["fastapi-users:auth"]
-_COOKIE_NAME = "labdog_auth"
+_COOKIE_NAME = "unbork_auth"
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def _is_same_origin(origin: str, host: str | None) -> bool:
 
     A cross-site page cannot pass this: the browser sets ``Origin`` to that
     page's origin, not ours. A DNS-rebound name does pass, since then the
-    ``Host`` is the attacker's name too, but the browser holds no LabDog
+    ``Host`` is the attacker's name too, but the browser holds no unbork
     cookie for that name, so the handshake still fails authentication.
     """
     if not host:

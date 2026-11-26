@@ -1,0 +1,40 @@
+# Overlay for run_one.sh's "split" config: the image under test run as
+# separate role containers (plan step 3) instead of one "all" container.
+# Same total slots as "raised": worker 2 x 4 + worker-drift 4 +
+# worker-actions 4 + orchestrator 12.
+x-role: &role
+  extends: { file: docker-compose.yml, service: unbork }
+  container_name: !reset null
+  ports: !reset []
+
+services:
+  unbork:
+    environment:
+      UNBORK_ROLE: api
+
+  beat:
+    <<: *role
+    environment:
+      UNBORK_ROLE: beat
+
+  orchestrator:
+    <<: *role
+    environment:
+      UNBORK_ROLE: orchestrator
+
+  worker:
+    <<: *role
+    environment:
+      UNBORK_ROLE: worker
+
+  worker-drift:
+    <<: *role
+    environment:
+      UNBORK_ROLE: worker-drift
+      UNBORK_CELERY__DRIFT_CONCURRENCY: ${DRIFT_CONCURRENCY:-4}
+
+  worker-actions:
+    <<: *role
+    environment:
+      UNBORK_ROLE: worker-actions
+      UNBORK_CELERY__ACTIONS_CONCURRENCY: ${ACTIONS_CONCURRENCY:-4}

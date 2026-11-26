@@ -24,7 +24,7 @@ import asyncssh
 from sqlalchemy import select
 
 from app.ai.redaction import redact
-from app.ai.safety import classify_command, is_allowed
+from app.ai.safety import Verdict, classify_command, is_allowed
 from app.ai.tools.base import ToolContext, ToolResult, tool
 from app.crypto.encryption import decrypt_ssh_key
 from app.crypto.key_management import get_master_key
@@ -42,6 +42,12 @@ MAX_OUTPUT_CHARS = 12_000
 # as a whole; this stops one hung command eating all of it.
 COMMAND_TIMEOUT_SECONDS = 120
 
+#: The shell commands run under, which is the one the classifier models.
+BASH_PATH = "/bin/bash"
+#: What the login shell is asked to run. Fixed text: the command arrives on
+#: stdin, so no shell but bash ever parses model output (SEC-45).
+BASH_WRAPPER = f"exec {BASH_PATH} -s"
+
 
 def _truncate(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
@@ -50,7 +56,7 @@ def _truncate(text: str) -> str:
     omitted = len(text) - (half * 2)
     return (
         f"{text[:half]}\n\n"
-        f"... [{omitted} characters omitted by LabDog; narrow the command "
+        f"... [{omitted} characters omitted by unbork; narrow the command "
         f"with grep, head, or --since to see the rest] ...\n\n"
         f"{text[-half:]}"
     )
@@ -61,7 +67,7 @@ def _truncate(text: str) -> str:
     description=(
         "Run a shell command on a managed host over SSH and return its output. "
         "Read-only commands (status, logs, package queries, network state) run "
-        "immediately. A command LabDog cannot confirm only reads is treated as "
+        "immediately. A command unbork cannot confirm only reads is treated as "
         "a change, and refused unless this session's autonomy level permits "
         "changes; the refusal names the read-only forms of that command. A small "
         "set of destructive commands is always blocked. Prefer specific, bounded "
@@ -107,6 +113,30 @@ async def _run_ssh_command(ctx: ToolContext, args: dict[str, Any]) -> ToolResult
         return ToolResult("command must not be empty.", ok=False, classification="read_only")
 
     # Gate 1: scope.
+    if (refusal := _scope_refusal(ctx, host_id)) is not None:
+        return refusal
+
+    # Gate 2: what does this command actually do?
+    verdict = classify_command(command)
+
+    # Gate 3: is that permitted here?
+    if (refusal := _autonomy_refusal(ctx, host_id, verdict)) is not None:
+        return refusal
+
+    loaded = await _host_and_client_key(ctx, host_id)
+    if isinstance(loaded, ToolResult):
+        return loaded
+    host, imported_key = loaded
+
+    result = await _run_under_bash(ctx, host, host_id, imported_key, command, verdict)
+    if isinstance(result, ToolResult):
+        return result
+    return _command_result(host, host_id, verdict, result)
+
+
+def _scope_refusal(ctx: ToolContext, host_id: int) -> ToolResult | None:
+    """Refuse a host outside the session's allowlist, or every host when
+    the session has none."""
     if ctx.target_host_ids and host_id not in ctx.target_host_ids:
         return ToolResult(
             f"Host {host_id} is not in scope for this session. You may only run "
@@ -122,41 +152,49 @@ async def _run_ssh_command(ctx: ToolContext, args: dict[str, Any]) -> ToolResult
             classification="denied",
             summary="no target hosts",
         )
+    return None
 
-    # Gate 2: what does this command actually do?
-    verdict = classify_command(command)
 
-    # Gate 3: is that permitted here?
-    #
-    # An operator-approved call is evaluated as though the session were
-    # full_auto rather than skipping the gate: `is_allowed` still refuses a
-    # denied verdict at that level, so approving something cannot promote it
-    # past the denylist. The narrower reading matters because this is the
-    # last check before a socket opens.
+def _autonomy_refusal(ctx: ToolContext, host_id: int, verdict: Verdict) -> ToolResult | None:
+    """Refuse a command the session's autonomy level does not permit.
+
+    An operator-approved call is evaluated as though the session were
+    full_auto rather than skipping the gate: `is_allowed` still refuses a
+    denied verdict at that level, so approving something cannot promote it
+    past the denylist. The narrower reading matters because this is the
+    last check before a socket opens.
+    """
     allowed, reason = is_allowed(verdict, "full_auto" if ctx.preapproved else ctx.autonomy_level)
-    if not allowed:
-        logger.info(
-            "ai session %s: refused command on host %s (%s)",
-            ctx.session_id,
-            host_id,
-            verdict.classification,
-        )
-        return ToolResult(
-            f"{reason}\n\nThe command was not run. If you need this change, "
-            f"explain what it would do and why, and stop — the operator will "
-            f"decide.",
-            ok=False,
-            target_host_id=host_id,
-            classification=verdict.classification,
-            summary=reason[:200],
-        )
+    if allowed:
+        return None
+    logger.info(
+        "ai session %s: refused command on host %s (%s)",
+        ctx.session_id,
+        host_id,
+        verdict.classification,
+    )
+    return ToolResult(
+        f"{reason}\n\nThe command was not run. If you need this change, "
+        f"explain what it would do and why, and stop — the operator will "
+        f"decide.",
+        ok=False,
+        target_host_id=host_id,
+        classification=verdict.classification,
+        summary=reason[:200],
+    )
 
+
+async def _host_and_client_key(
+    ctx: ToolContext, host_id: int
+) -> tuple[Host, asyncssh.SSHKey] | ToolResult:
+    """The host and its imported private key, or the answer that says why
+    there is none."""
     host = (await ctx.db.execute(select(Host).where(Host.id == host_id))).scalar_one_or_none()
     if host is None:
         return ToolResult(f"No host with id {host_id}.", ok=False, classification="read_only")
     if not host.ssh_key_id:
         return ToolResult(
-            f"Host {host.hostname} has no SSH key assigned in LabDog.",
+            f"Host {host.hostname} has no SSH key assigned in unbork.",
             ok=False,
             target_host_id=host_id,
             classification="read_only",
@@ -184,11 +222,29 @@ async def _run_ssh_command(ctx: ToolContext, args: dict[str, Any]) -> ToolResult
             target_host_id=host_id,
             classification="read_only",
         )
+    return host, imported_key
 
+
+async def _run_under_bash(
+    ctx: ToolContext,
+    host: Host,
+    host_id: int,
+    imported_key: asyncssh.SSHKey,
+    command: str,
+    verdict: Verdict,
+) -> asyncssh.SSHCompletedProcess | ToolResult:
+    """Run ``command`` on the host, or the answer that says why it could not."""
     try:
         async with ssh_connect_host(host, ctx.db, client_keys=[imported_key]) as conn:
-            result = await asyncio.wait_for(
-                conn.run(command, check=False), timeout=COMMAND_TIMEOUT_SECONDS
+            # SEC-45: the classifier models bash. Handing the string to
+            # conn.run() let the target user's login shell parse it, and
+            # under zsh or fish some text bash treats as a literal argument
+            # is command execution, classified read_only and run without
+            # approval. The command now goes to bash on stdin, so the login
+            # shell only ever sees a fixed wrapper with no model input in it.
+            return await asyncio.wait_for(
+                conn.run(BASH_WRAPPER, input=command, check=False),
+                timeout=COMMAND_TIMEOUT_SECONDS,
             )
     except HostKeyMismatchError as exc:
         return ToolResult(
@@ -218,9 +274,26 @@ async def _run_ssh_command(ctx: ToolContext, args: dict[str, Any]) -> ToolResult
             summary="ssh error",
         )
 
+
+def _command_result(
+    host: Host, host_id: int, verdict: Verdict, result: asyncssh.SSHCompletedProcess
+) -> ToolResult:
+    """What the model is told the command did."""
     stdout = (result.stdout or "").strip()
     stderr = (result.stderr or "").strip()
     exit_status = result.exit_status
+
+    if exit_status == 127 and BASH_PATH in stderr and not stderr.startswith("bash:"):
+        # The login shell could not start bash; nothing ran. Running the
+        # command in that shell instead is exactly what SEC-45 removed.
+        return ToolResult(
+            f"{host.hostname} has no {BASH_PATH}. The AI tools only run commands "
+            "under bash, the shell the safety classifier understands.",
+            ok=False,
+            target_host_id=host_id,
+            classification=verdict.classification,
+            summary="no bash on host",
+        )
 
     parts = [f"exit status: {exit_status}"]
     if stdout:
