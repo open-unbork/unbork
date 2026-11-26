@@ -115,6 +115,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Changed
 
+- The README says which parts are AGPL (everything in this repository)
+  and that the Enterprise edition is a separate commercial package.
+
 - **The Docker image no longer contains the Claude Code program.** It is
   downloaded to the state volume (`/var/lib/unbork/claude-code`) the first
   time a provider that needs it is turned on, tested or used, and checked

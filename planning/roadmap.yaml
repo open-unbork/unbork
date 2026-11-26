@@ -421,8 +421,8 @@ items:
     depends_on: []
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-noz19h
     spec: items/S-007-say-in-the-readme-which-parts-are.md
     notes: "Open point of the repository-split item, and it should be true on the day of the first release."
   - id: C-052
