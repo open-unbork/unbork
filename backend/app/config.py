@@ -560,20 +560,48 @@ def _validate_required(s: Settings, old_toml_keys: list[str] | None = None) -> N
 #: them is told what it is ignoring.
 _OLD_ENV_PREFIX = "LABDOG_"  # old-name-ok
 _OLD_CONFIG_PATH = Path("/etc/labdog/labdog.toml")  # old-name-ok
+#: Directories the old package used. A path setting under one of them is
+#: named like an old key. Database URLs are not paths and are left alone:
+#: the database keeps whatever name it had.
+_OLD_NAME = _OLD_ENV_PREFIX.lower().rstrip("_")
+_OLD_PATHS = tuple(f"{base}/{_OLD_NAME}" for base in ("/etc", "/var/lib", "/var/log", "/run"))
 
 
 def old_names_in_use(environ: dict[str, str] | None = None) -> list[str]:
     """Old-name variables set in the environment, and the old config file
-    if it exists without a new one. Names only, never values."""
+    if it exists (also next to a new one). Names only, never values."""
     env = os.environ if environ is None else environ
-    found = sorted(k for k in env if k.startswith(_OLD_ENV_PREFIX))
-    if _OLD_CONFIG_PATH.is_file():
+    old = _OLD_ENV_PREFIX.rstrip("_")
+    # Renaming only the prefix of LABDOG_SECURITY__LABDOG_SERVER_IP leaves  # old-name-ok
+    # the old key name after it, which the settings ignore: the server IP
+    # would fall back to 127.0.0.1 and a firewall sync could lock unbork out.
+    found = sorted(
+        k for k in env if k.startswith(_OLD_ENV_PREFIX) or (k.startswith("UNBORK_") and old in k)
+    )
+    if _old_config_present():
         found.append(str(_OLD_CONFIG_PATH))
     return found
 
 
+def _old_config_present() -> bool:
+    """Whether the old config file is there, without needing to read it.
+
+    Removing (not purging) the old package leaves its config directory
+    owned by the old group, mode 0750, so the new service user may not
+    even look inside. The directory being there and closed to us means the
+    file is: that must count as present, and must never stop the start.
+    """
+    try:
+        return _OLD_CONFIG_PATH.is_file()
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
 def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
-    """Keys in the config file that still carry the old name.
+    """Keys in the config file that still carry the old name, and path
+    settings that still point under the old directories.
 
     The settings models ignore unknown keys, so ``[security]`` with the old
     ``*_server_ip`` key would silently fall back to the default.
@@ -583,6 +611,11 @@ def old_toml_keys(data: dict, prefix: str = "") -> list[str]:
         dotted = f"{prefix}{key}"
         if _OLD_ENV_PREFIX.lower().rstrip("_") in key.lower():
             found.append(f"{dotted} (in the config file)")
+        elif isinstance(value, str) and value.startswith(_OLD_PATHS):
+            # A config copied from the old version keeps e.g. its packs
+            # directory under the old data path, which the new service may
+            # not write to (and which the upgrade guide later deletes).
+            found.append(f"{dotted} = {value!r} (an old path, in the config file)")
         if isinstance(value, dict):
             found += old_toml_keys(value, f"{dotted}.")
     return found

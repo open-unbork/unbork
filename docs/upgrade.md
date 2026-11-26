@@ -44,8 +44,10 @@ migrations. Read that section before upgrading.
 
 From 1.0.0, unbork follows [Semantic Versioning](https://semver.org/).
 A change that breaks existing use of anything below comes only in a new
-major version (2.0.0). A minor release (1.1.0) only adds to them, and a
-patch release (1.0.1) only fixes bugs.
+major version (3.0.0). A minor release (2.1.0) only adds to them, and a
+patch release (2.0.1) only fixes bugs. 2.0.0 was such a major release:
+it renamed everything below from the old product name (see
+[Upgrading to 2.0.0: the rename](#upgrading-to-200-the-rename)).
 
 - **Configuration**: the keys in `unbork.toml`, the `UNBORK_*`
   environment variables, and the setting keys under **Settings**.
@@ -62,8 +64,9 @@ patch release (1.0.1) only fixes bugs.
   [Metrics export](metrics-export.md).
 - **The REST calls these docs tell you to make**, such as
   `POST /api/hosts/{id}/trust-host-key`.
-- **The upgrade path**: every earlier release upgrades to every 1.x
-  release by the procedure on this page.
+- **The upgrade path**: every release from 1.0.0 upgrades to every 2.x
+  release by the procedure on this page, with the steps under
+  "Upgrading to 2.0.0" when coming from 1.x.
 
 Not covered, and free to change in a minor release: the web UI's layout,
 the rest of `/api` (it is the UI's backend), the database schema (only
@@ -78,7 +81,8 @@ that used to work, in any release. Its upgrade notes say so.
 2.0.0 is the first release under the name unbork. Every name an operator
 types or sees changed with it, and **the old names are not read any
 more**: there are no fallbacks, and nothing renames or removes old names
-for you, on the server or on managed hosts. Plan the upgrade as a short
+for you, on the server or on managed hosts (the one exception is the
+seeded pack, below). Plan the upgrade as a short
 maintenance window and work through this list before you start the new
 version.
 
@@ -105,19 +109,111 @@ Unchanged: the Postgres database and role keep whatever names your
 `database.url` gives them (only the example defaults now say `unbork`),
 and all data in the database is kept.
 
-**On the server, before starting 2.0.0:**
+These steps are for 1.1.x (1.1.0 or 1.1.1). From an older release,
+upgrade to 1.1.1 first by the procedure further down this page.
 
-1. Docker: rename every `LABDOG_` variable in your compose file or `.env`
-   to `UNBORK_`, and move volume mount targets from `/var/lib/labdog/…`
-   to `/var/lib/unbork/…`. The data in the volumes needs no change.
-2. Packages: install the `unbork` package, then remove `labdog`. Copy
-   `/etc/labdog/labdog.toml` to `/etc/unbork/unbork.toml`
-   (`root:unbork`, mode 0640) and rename `labdog_server_ip` in it if set.
-   Move `/var/lib/labdog` to `/var/lib/unbork` and
-   `chown -R unbork:unbork` it, then `systemctl enable --now unbork`.
-   Remove the `labdog` user when nothing runs as it any more.
-3. A server whose secrets are set only under the old names refuses to
-   start, and its error lists the old variables and config file it found.
+**Before you start:** back up the database and the config with its
+encryption key. On 1.1.x they still have the old names:
+
+```bash
+sudo -u postgres pg_dump --format=custom --dbname=<your database> \
+  --file=/var/backups/labdog-pre-2.0.0.dump
+sudo install -m 0600 /etc/labdog/labdog.toml /var/backups/labdog.toml-pre-2.0.0
+```
+
+On Docker, from the directory with `compose.yaml` (the 1.1.x compose
+calls its services `postgres` and `labdog`, and its database role and
+database `labdog`; use yours):
+
+```bash
+docker compose exec -T postgres pg_dump -U labdog --format=custom labdog \
+  > labdog-pre-2.0.0.dump
+cp -p .env .env.pre-2.0.0                     # the LABDOG_* secrets
+cp -p compose.yaml compose.yaml.pre-2.0.0
+cp -p labdog.toml labdog.toml.pre-2.0.0       # if you mount one
+```
+
+The way back is that backup; see [Rolling back to 1.1.x](#rolling-back-to-11x)
+below. Then upgrade the server for your install type.
+
+**Docker.** The image is `unbork/unbork` now; 1.1.x was published as
+`openlabdog/labdog` (1.1.1 also as `unbork/unbork:1.1.1`, still with the
+old names inside). In the compose file or `.env`:
+
+1. Set the image to `unbork/unbork:2.0.0`.
+2. Rename every `LABDOG_` variable to `UNBORK_`, including
+   `LABDOG_CONFIG` if you set it. One key also changes after the prefix:
+   `LABDOG_SECURITY__LABDOG_SERVER_IP` becomes
+   `UNBORK_SECURITY__UNBORK_SERVER_IP`. Left as
+   `UNBORK_SECURITY__LABDOG_SERVER_IP` it is not read, the address falls
+   back to `127.0.0.1`, and the next firewall sync can lock unbork out of
+   a host; 2.0.0 names it in its start-up warning.
+3. Move every volume mount target from `/var/lib/labdog/…` to
+   `/var/lib/unbork/…`. Keep the volume names, or the data stays behind
+   in the old volume.
+4. If you mount a config file (the 1.1.x compose has
+   `./labdog.toml:/etc/labdog/labdog.toml:ro`), mount it at
+   `/etc/unbork/unbork.toml` instead and rename its old key and paths,
+   as for packages: `sed -i -e 's/^labdog_server_ip/unbork_server_ip/'
+   -e 's|"/var/lib/labdog/|"/var/lib/unbork/|' -e
+   's|"/var/log/labdog/|"/var/log/unbork/|' labdog.toml` (rename the
+   file too if you like). Left at the old target, 2.0.0 starts, warns
+   that the file is not read, and ignores everything in it.
+5. Check the new image accepts the environment before you replace the
+   container, as [Docker: check the environment
+   variables](#docker-check-the-environment-variables) shows, then
+   `docker compose up -d`. The commands there name the service
+   `unbork`; the 1.1.x compose calls it `labdog`, so use that name, or
+   rename the service (and any `depends_on` on it) now.
+
+**Packages (.deb, .rpm).** The `unbork` package is installed next to
+`labdog`: it does not replace it, and nothing is copied for you. In this
+order, because removing an `.rpm` renames an edited config file to
+`labdog.toml.rpmsave`:
+
+```bash
+sudo systemctl stop labdog
+
+sudo apt install ./unbork_2.0.0-1_amd64.deb      # Debian, Ubuntu
+sudo dnf install ./unbork-2.0.0-1.x86_64.rpm     # RHEL, Rocky, Fedora
+
+# The config, with its secrets and database URL; then its one renamed key
+# and the paths under the old directories (packs_root_dir, by default).
+sudo install -o root -g unbork -m 0640 /etc/labdog/labdog.toml /etc/unbork/unbork.toml
+sudo sed -i -e 's/^labdog_server_ip/unbork_server_ip/' \
+  -e 's|"/var/lib/labdog/|"/var/lib/unbork/|' -e 's|"/var/log/labdog/|"/var/log/unbork/|' \
+  /etc/unbork/unbork.toml
+
+# The data (packs, the Claude Code sign-in): copied, so the old copy stays
+# for a rollback.
+sudo cp -a /var/lib/labdog/. /var/lib/unbork/
+sudo chown -R unbork:unbork /var/lib/unbork
+
+# Remove, not purge: a purge deletes /etc/labdog and /var/lib/labdog.
+sudo apt remove labdog                             # or: sudo dnf remove labdog
+
+sudo systemctl enable --now unbork
+sudo journalctl -u unbork -f                       # migrations run at start
+```
+
+**Tarball.** Stop `labdog`, extract the 2.0.0 tarball and run its
+`./install.sh`, then do the copy steps above (`install`, `sed`, `cp -a`,
+`chown`). Remove 1.1.x with the `./uninstall.sh` from its own tarball,
+without `--purge`, and start the service with
+`sudo systemctl enable --now unbork`.
+
+**After the upgrade:** go through [Verifying the upgrade](#verifying-the-upgrade).
+Everyone signs in again once, since the session cookies were renamed;
+accounts and passwords are unchanged. Until `/etc/labdog/labdog.toml` is
+gone, every start logs a warning that names it, as it does for any path
+setting still under `/var/lib/labdog` or another old directory. When you
+no longer want to roll back, delete what is left of 1.1.x: `sudo apt purge
+labdog`, which also removes the `labdog` user; on `.rpm` and tarball
+installs, `sudo rm -rf /etc/labdog /var/lib/labdog /var/log/labdog` and
+`sudo userdel labdog`.
+
+A server whose secrets are set only under the old names refuses to
+start, and its error lists the old variables and config file it found.
 
 **In Grafana and Prometheus:** rename the metric names in dashboards and
 alert rules (`labdog_` to `unbork_`), and the labels in alert rules that
@@ -156,6 +252,53 @@ nftables hosts need nothing for the firewall: the sync replaces the
 whole `inet filter` table. Old Proxmox snapshots named `labdog-…` are no
 longer cleaned up by unbork; delete them in Proxmox when you no longer
 need them.
+
+#### Rolling back to 1.1.x
+
+2.0.0's migrations run when it first starts, and 1.1.x refuses a
+database at a revision it does not know. So the way back is the backup:
+
+1. Stop unbork and keep it from starting again: `sudo systemctl disable
+   --now unbork`, or stop the container. Left enabled, it would start at
+   the next boot and migrate the restored database to 2.0.0 again.
+2. Restore the database from the pre-upgrade dump. Changes made in
+   unbork since the upgrade are lost:
+
+   ```bash
+   sudo -u postgres dropdb <your database>
+   sudo -u postgres createdb -O <its owner role> <your database>
+   sudo -u postgres pg_restore --no-owner --role=<its owner role> \
+     --dbname=<your database> /var/backups/labdog-pre-2.0.0.dump
+   ```
+
+   On Docker there is no `postgres` user to run these as: use the role
+   from `POSTGRES_USER` (`labdog` in the 1.1.x compose), which the
+   Postgres image makes a superuser:
+
+   ```bash
+   docker compose up -d postgres
+   docker compose exec -T postgres dropdb -U labdog --force labdog
+   docker compose exec -T postgres createdb -U labdog labdog
+   docker compose exec -T postgres pg_restore -U labdog --no-owner \
+     --dbname=labdog < labdog-pre-2.0.0.dump
+   ```
+
+3. Start 1.1.x again. Packages: `sudo apt install
+   ./labdog_1.1.1-1_amd64.deb`, which finds its config and data where
+   removing it left them (on `.rpm`: `sudo dnf install
+   ./labdog-1.1.1-1.x86_64.rpm`, then `sudo mv
+   /etc/labdog/labdog.toml.rpmsave /etc/labdog/labdog.toml`), then `sudo
+   systemctl enable --now labdog`, and remove unbork with `sudo apt
+   remove unbork` (`sudo dnf remove unbork`). Docker: put back the
+   saved `compose.yaml`, `.env` (with the `LABDOG_*` names) and
+   `labdog.toml`, then `docker compose up -d`. Tarball: the 1.1.x tarball's `./install.sh`,
+   then the 2.0.0 tarball's `./uninstall.sh` without `--purge`.
+
+On managed hosts, a 2.0.0 sync wrote the new names and 1.1.x does not
+know them: on iptables hosts both `UNBORK-*` and `LABDOG-*` chains are
+then jumped from `INPUT` and `OUTPUT`. Remove the new ones with the
+iptables commands above, with `UNBORK` in place of `LABDOG`, and resync from
+1.1.x. Files written under `unbork` names stay until you delete them.
 
 #### The Claude Code program is no longer in the image
 
@@ -296,7 +439,7 @@ Smaller things to know:
   header. See [Notifications](ui/notifications.md).
 - **Alerts moved** from the Assistant to **Operations → Alerts**, and
   their API from `/api/ai/alerts` to `/api/alerts`. The old paths still
-  answer, deprecated, until 2.0.
+  answer, deprecated (2.0.0 keeps them), until a later major release.
 - **Full auto** is for alerts whose Grafana rule is labelled
   `labdog_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled` on,
   those matching `ai.alert_full_auto_rules`. It needs Grafana's contact
@@ -546,8 +689,8 @@ run `alembic upgrade head` manually for a normal release upgrade.
 
 Pin the tag to a specific version — never run `:latest` in
 production. Each release is tagged on Docker Hub as `X.Y.Z`, `X.Y` and
-`X`: `unbork/unbork:1.0.0` never changes, while `1.0` follows the
-patch releases of 1.0 and `1` every 1.x release. `latest` follows every
+`X`: `unbork/unbork:2.0.0` never changes, while `2.0` follows the
+patch releases of 2.0 and `2` every 2.x release. `latest` follows every
 release, and the `dev-*` and `test-*` tags are unreleased builds.
 
 ```bash
@@ -576,13 +719,13 @@ points at:
 ```yaml
 services:
   unbork:
-    image: unbork/unbork:1.0.0
+    image: unbork/unbork:2.0.0
 ```
 
 ### Debian / Ubuntu (.deb)
 
 ```bash
-VERSION=1.0.0
+VERSION=2.0.0
 curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork_${VERSION}-1_amd64.deb
 sudo apt install ./unbork_${VERSION}-1_amd64.deb
 
@@ -594,7 +737,7 @@ sudo journalctl -u unbork -f
 ### RHEL / Fedora / Rocky (.rpm)
 
 ```bash
-VERSION=1.0.0
+VERSION=2.0.0
 curl -LO https://github.com/open-unbork/unbork/releases/download/v${VERSION}/unbork-${VERSION}-1.x86_64.rpm
 sudo dnf install ./unbork-${VERSION}-1.x86_64.rpm
 
@@ -659,6 +802,9 @@ is at a newer revision than it knows about, you must restore from
 backup — see [When alembic downgrade is not enough](#when-alembic-downgrade-is-not-enough).
 
 ### Reinstall the previous package
+
+From 2.0.0 back to 1.1.x the package name differs, so a downgrade does
+not apply: follow [Rolling back to 1.1.x](#rolling-back-to-11x).
 
 ```bash
 # Debian / Ubuntu

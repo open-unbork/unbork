@@ -272,6 +272,17 @@ later and are unranked.
 - A shared docs base URL constant in the frontend.
 Community, S. Status: open.
 
+## PR-34 A package rebuild without --clean ships stale backend code
+Found in stage 3 (C-052). `packaging/build.sh` without `--clean` reused
+`packaging/staging/`, and the `.deb` it built carried the previous
+`backend/app/config.py` although the working tree had changed: the venv
+step, which also copies the backend source, is skipped once its output
+exists. CI always builds in a fresh checkout, so releases are not
+affected; a developer testing a change locally is. Copy the backend
+source in a target of its own that always runs, or have `build.sh`
+clear `staging/usr/lib/unbork/backend` every time. Community, S.
+Status: open.
+
 ## Other work Dennis asked to add
 
 Added 2026-11-14. These are normal items with `source: user`; they get

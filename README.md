@@ -130,9 +130,28 @@ All technical content lives under **[the documentation site](https://open-unbork
 
 See **[BUGS.md](BUGS.md)** for known issues and **[CONTRIBUTING.md](CONTRIBUTING.md)** to file a new report or send a patch. Security-sensitive issues: **[SECURITY.md](SECURITY.md)**.
 
+## 🧩 Editions
+
+**unbork Community** is this repository. It is licensed AGPL-3.0-or-later, and it is complete and usable on its own:
+
+- Your own Ansible playbooks as actions, with a preview per server, and scheduled actions
+- The configuration modules, drift detection and remediation
+- Git integration, webhooks and configuration as code (GitOps)
+- Snapshot, apply, verify and rollback on Proxmox
+- The append-only audit log in the web UI
+- Local accounts with fixed roles (admin, operator, viewer)
+- The AI assistant with default-deny rules, which can be left out entirely
+- The REST API, alert intake and the Prometheus metrics endpoint
+
+**unbork Enterprise** is a separate package under a commercial licence, developed in a separate private repository. It installs next to Community and adds to it through a documented extension interface; it does not replace or modify Community code. Today it adds single sign-on through a company directory (OIDC and LDAP) and role-based access control scoped to hosts and groups. Further Enterprise features are planned, with no dates or commitments; their titles are listed in the [roadmap](planning/PLAN.md#enterprise-features).
+
+No Community feature is removed or limited to make room for Enterprise, and the extension interface is part of the AGPL code in this repository.
+
 ## 📜 License
 
-**AGPL-3.0-or-later.** See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+**AGPL-3.0-or-later.** Everything in this repository is licensed AGPL-3.0-or-later, including the extension interface, the documentation and the packaging, except third-party files bundled with it (such as fonts), which keep their own licences, stated next to them. See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+
+The Enterprise edition is not covered by this licence, and none of its code is in this repository.
 
 Images and packages list every third-party component they ship, with its licence, in `/usr/share/doc/unbork/THIRD-PARTY-NOTICES`, and say where to get each one's source in [SOURCE-OFFER.md](SOURCE-OFFER.md).
 

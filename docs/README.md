@@ -3,6 +3,12 @@
 Guides and reference material for running unbork. For a project
 summary see the [top-level README](https://github.com/open-unbork/unbork/blob/main/README.md).
 
+Everything in the unbork repository, these docs included, is licensed
+AGPL-3.0-or-later, apart from bundled third-party files such as fonts. unbork Enterprise is a separate commercial package that
+is not part of that repository or this documentation; see
+[Editions](https://github.com/open-unbork/unbork/blob/main/README.md#-editions)
+in the README.
+
 ## Contents
 
 - [Documentation index](#documentation-index)

@@ -115,3 +115,13 @@ Work branch: `claude/project-thread-1sra3u` (the session's assigned branch, in p
 
 Work branch: `claude/project-thread-6heftb`, from `dev` at `2e961d7`. Dennis asked for rollback phase 2 now; C-004 is not built, so C-014 went first without it (D-53).
 - 2026-11-22 C-014 review. Manifest fields, both executors, budgets, dialog line, docs and the `with-quiesce` example (C-015 step 2). `tests/test_action_quiesce.py`. Step 6 (relax the `stateful` default) waits for C-004. The live check on a "test" VM is still to do.
+
+## 2026-11-26 Stage 3 run
+
+Work branch: `claude/project-thread-noz19h` (the session's assigned branch, in place of `roadmap/stage-3`). Base: `94cf763` (dev after #308), with `main` (v1.1.1) merged in. Entry criterion: Dennis said to start ("Go ahead", 2026-11-26). Behaviours read with D-29 (no old-name fallbacks).
+- 2026-11-26 S-007 review 7314e5a. Wording waits for Dennis; no contact link (assumption).
+- 2026-11-26 C-003 in_progress 421edff. README links into the site checked in CI; the site was already deployed from dev (2026-11-15). The live check waits for the release merge.
+- 2026-11-26 C-052 review 884faa9. `upgrade-deb`, `upgrade-rpm`, `upgrade-tarball` in packaging-smoke, from v1.1.1 after the review; rpm runs only in CI (the session's proxy refuses Rocky mirrors).
+- 2026-11-26 C-001 review 04e08c7. Upgrade runs in `planning/reviews/stage-3-upgrade.md`; Docker and the first sync of a "test" host not verified (no Docker Hub, no SSH).
+- 2026-11-26 C-002 review 15dd8eb. VERSION 2.0.0, changelog closed. The dev→main PR opens after this branch merges into dev; Dennis merges it.
+- 2026-11-26 Stage 3 review: pass pending CI (planning/reviews/stage-3.md). 22 findings: 19 fixed, 1 deferred, 2 rejected. Four local packaging targets pass in about 100 s in parallel.

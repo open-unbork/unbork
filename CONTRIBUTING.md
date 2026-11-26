@@ -229,7 +229,8 @@ Then the flow:
    upstream.
 4. Merge the PR. On `main`, the `packaging-smoke` job first builds and
    install-tests the `.deb` / `.rpm` / tarball in clean target-OS
-   containers (Ubuntu 24.04, Rocky 9); `release-artifacts` **needs** it,
+   containers (Ubuntu 24.04, Rocky 9), and upgrades a 1.1.1 package
+   install with data to them; `release-artifacts` **needs** it,
    so a broken install path blocks the release rather than shipping.
    Once it passes, `release-artifacts` runs and:
    - syncs `backend/pyproject.toml` and `frontend/package.json`
@@ -273,7 +274,9 @@ the human-owned steps it cannot verify:
 - [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
   `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`,
-  trivy.
+  trivy. `docs-build-check` also checks that every README link into the
+  documentation site names a page and anchor the build has
+  (`website/scripts/check-readme-links.mjs`).
 
 Note: `main` is protected and the `version-check` context is a
 **required** status check, so a release PR cannot merge unless
