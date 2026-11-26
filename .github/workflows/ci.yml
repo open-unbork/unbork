@@ -439,6 +439,10 @@ jobs:
       - name: npm run build
         working-directory: website
         run: npm run build
+      - name: README links into the site resolve
+        # Every https://open-unbork.github.io/unbork/... link in README.md
+        # must name a page, and an anchor, the build above produced.
+        run: node website/scripts/check-readme-links.mjs
 
 
   # ---- BUILD & PUBLISH --------------------------------------------------

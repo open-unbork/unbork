@@ -273,7 +273,9 @@ the human-owned steps it cannot verify:
 - [ ] `plans/` is absent (never ships on `dev` or `main`). `planning/` is expected and stays.
 - [ ] CI green on the PR: `version-check`, lint, `backend-test`,
   `frontend-test`, `frontend-build-check`, `docs-build-check`, `build-test-image`,
-  trivy.
+  trivy. `docs-build-check` also checks that every README link into the
+  documentation site names a page and anchor the build has
+  (`website/scripts/check-readme-links.mjs`).
 
 Note: `main` is protected and the `version-check` context is a
 **required** status check, so a release PR cannot merge unless

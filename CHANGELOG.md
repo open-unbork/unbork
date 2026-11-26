@@ -219,6 +219,9 @@ The format follows [Keep a Changelog]; unbork follows
 
 ### Fixed
 
+- The documentation site is published again and every README link to it
+  is checked in CI.
+
 - An API path that no route serves (`GET /api/...`), such as the
   assistant's on a server without it, now answers a JSON 404 instead of
   the web page with status 200.
