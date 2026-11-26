@@ -1,10 +1,14 @@
-# Stage 3: upgrade runs from 1.1.0 to 2.0.0
+# Stage 3: upgrade runs from 1.1.x to 2.0.0
 
 Each run followed "Upgrading to 2.0.0: the rename" in `docs/upgrade.md`
 as written, by `packaging/tests/upgrade.sh` (C-052), which does the
 documented commands one by one. Candidate: built from the stage branch
 with `VERSION` 2.0.0 (`packaging/build.sh --clean --version=2.0.0`). Old
-artifacts: the `v1.1.0` release assets, checked against its `SHA256SUMS`.
+artifacts: the `v1.1.0` release assets at first, then, once the merge of
+`main` showed 1.1.1 to be the last release before the rename, the
+`v1.1.1` assets, each checked against its `SHA256SUMS`. The final run,
+after the review fixes, upgraded from 1.1.1 with all four targets in
+parallel (`PARALLEL=1`) and passed in about 100 s.
 
 Runs were in the session's own Docker, not on lin-manager-2: the
 session has no SSH to lin-manager or lin-manager-2. No managed host was
@@ -12,18 +16,18 @@ touched.
 
 | Install type | Where | Upgrade | Result |
 |---|---|---|---|
-| `.deb` | `ubuntu:24.04` container, PostgreSQL 16, Redis | install `unbork` next to `labdog`, copy config and data, `apt remove labdog` | passed |
-| tarball | `ubuntu:24.04` container | 2.0.0 `install.sh`, copy, 1.1.0 `uninstall.sh` without `--purge` | passed |
+| `.deb` | `ubuntu:24.04` container, PostgreSQL 16, Redis | install `unbork` next to `labdog`, copy config and data, `apt remove labdog` | passed from 1.1.0 and from 1.1.1 |
+| tarball | `ubuntu:24.04` container | stop labdog, 2.0.0 `install.sh`, copy, the old `uninstall.sh` without `--purge` | passed from 1.1.0 and from 1.1.1 |
 | `.rpm` | `rockylinux:9` | as `.deb` with `dnf` | **not run here**: the session's proxy refuses every Rocky mirror. Runs in CI (`packaging-smoke`, target `upgrade-rpm`) on the PR |
 | Docker | | | **not run**: Docker Hub answered 429 for `openlabdog/labdog:1.1.0` and `unbork/unbork:dev-latest` all session |
 
 Checked after each passing run: `/api/version` reports 2.0.0; Alembic
 moved from `0055_metrics_destinations` to the head `0062_rename_labdog_names`;
-the first admin signs in with the 1.1.0 password and has role `admin`;
-the group and the SSH key seeded through the 1.1.0 API are listed; the
-key decrypts with the copied encryption key to exactly what 1.1.0 stored;
-the copied config keeps the operator's edits, `root:unbork 0640`; data
-under `/var/lib/unbork` owned by `unbork`; removing 1.1.0 kept
+the first admin signs in with the old password and has role `admin`;
+the group and the SSH key seeded through the old API are listed; the
+key decrypts with the copied encryption key to exactly what the old version stored;
+the copied config keeps the operator's edits, `root:unbork 0640`, and no path setting under the old directories (`packs_root_dir` is `/var/lib/unbork/packs`); data
+under `/var/lib/unbork` owned by `unbork`; removing the old version kept
 `/var/lib/labdog`; the fresh-install `smoke.sh` holds afterwards. Before
 the config is copied, 2.0.0 refuses to start and names
 `/etc/labdog/labdog.toml` (D-29).
@@ -53,6 +57,15 @@ the config is copied, 2.0.0 refuses to start and names
    (fixed, `262d9b9`: 16.4.6).
 6. A local rebuild without `--clean` shipped stale backend code
    (PR-34; CI is not affected).
+7. **The copied config kept 1.1.x paths** (fixed in the stage review,
+   F-01 in `stage-3.md`): `packs_root_dir = "/var/lib/labdog/packs"` is
+   set, not commented, in the shipped `labdog.toml`. Under the unit's
+   `ProtectSystem=strict` packs could not sync, and the clean-up step
+   would have deleted them. The docs' sed now rewrites the paths, and
+   2.0.0 warns at start about any setting still under the old
+   directories.
+8. **The rollback left `unbork` enabled** (fixed, F-02): a reboot would
+   have started 2.0.0 on the restored 1.1.x database and migrated it.
 
 ## Not verified, and why
 
@@ -65,5 +78,5 @@ the config is copied, 2.0.0 refuses to start and names
   or files; the docs list the manual clean-up, which was not run on a
   real host.
 - The rollback on `.rpm` and Docker. On `.deb` and tarball the written
-  rollback ran after each upgrade (restore the dump, reinstall 1.1.0) and
-  1.1.0 started on its config at `0055` with the seeded group.
+  rollback ran after each upgrade (restore the dump, reinstall the old
+  version) and it started on its config at `0055` with the seeded group.

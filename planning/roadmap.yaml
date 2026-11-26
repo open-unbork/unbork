@@ -22,7 +22,7 @@ stages:
   - stage: 3
     goal: "Release unbork 2.0.0"
     base_commit: 94cf763
-    status: in_progress
+    status: review
     items: [S-007, C-052, C-001, C-002, C-003]
   - stage: 4
     goal: "Rollback you can trust"
@@ -435,8 +435,8 @@ items:
     depends_on: [C-049]
     autonomy: A
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-noz19h
     spec: items/C-052-test-the-upgrade-from-1-1-0.md
     notes: "Accepted proposal PR-03: turns C-001 from a one-off manual check into a gate."
   - id: C-001
@@ -449,8 +449,8 @@ items:
     depends_on: [C-048, C-049, C-050, C-052]
     autonomy: B
     effort: M
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-noz19h
     spec: items/C-001-verify-and-document-the-upgrade-from-labdog.md
     notes: "Nothing can be released until an existing install is known to survive it; the rename (D-02) makes the upgrade the riskiest step."
   - id: C-002
@@ -463,8 +463,8 @@ items:
     depends_on: [C-001, S-007, S-008, S-009, S-014, C-051]
     autonomy: B
     effort: S
-    status: todo
-    branch: null
+    status: review
+    branch: claude/project-thread-noz19h
     spec: items/C-002-release-dev-to-main-as-unbork-2.md
     notes: "632 unreleased commits is the largest single risk on the board; version decided in D-03. Dennis merges the PR."
   - id: C-003
@@ -477,8 +477,8 @@ items:
     depends_on: [C-002]
     autonomy: A
     effort: S
-    status: todo
-    branch: null
+    status: in_progress
+    branch: claude/project-thread-noz19h
     spec: items/C-003-bring-the-docs-site-back.md
     notes: "README links to a site that does not exist; cheap once the release is out. PR #295 already covers a manual deploy from dev."
   - id: C-004
