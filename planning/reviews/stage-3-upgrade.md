@@ -19,7 +19,7 @@ touched.
 | `.deb` | `ubuntu:24.04` container, PostgreSQL 16, Redis | install `unbork` next to `labdog`, copy config and data, `apt remove labdog` | passed from 1.1.0 and from 1.1.1 |
 | tarball | `ubuntu:24.04` container | stop labdog, 2.0.0 `install.sh`, copy, the old `uninstall.sh` without `--purge` | passed from 1.1.0 and from 1.1.1 |
 | `.rpm` | `rockylinux:9` | as `.deb` with `dnf` | **not run here**: the session's proxy refuses every Rocky mirror. Runs in CI (`packaging-smoke`, target `upgrade-rpm`) on the PR |
-| Docker | | | **not run**: Docker Hub answered 429 for `openlabdog/labdog:1.1.0` and `unbork/unbork:dev-latest` all session |
+| Docker | lin-manager-2, local Docker, Postgres 18, Redis (2026-11-26, after the review) | 1.1.1 compose with data, image built from the branch, the documented Docker steps, rollback from the backup, upgrade again | passed, with the documentation findings 9 to 13 below |
 
 Checked after each passing run: `/api/version` reports 2.0.0; Alembic
 moved from `0055_metrics_destinations` to the head `0062_rename_labdog_names`;
@@ -67,16 +67,44 @@ the config is copied, 2.0.0 refuses to start and names
 8. **The rollback left `unbork` enabled** (fixed, F-02): a reboot would
    have started 2.0.0 on the restored 1.1.x database and migrated it.
 
+9. **The Docker steps left the mounted config file behind** (fixed
+   after the live checks): the 1.1.x compose mounts
+   `./labdog.toml:/etc/labdog/labdog.toml`. Followed as written, 2.0.0
+   started, warned that the file is not read, and ignored it, so
+   `unbork_server_ip` fell back to `127.0.0.1`, which can lock unbork
+   out of a host on its next firewall sync. The steps now move the mount
+   and rename its key and paths.
+10. **Renaming only the prefix of `LABDOG_SECURITY__LABDOG_SERVER_IP`**
+    (`old-name-ok`) gives a variable nothing reads, with the same
+    lockout risk (found while fixing 9). The docs name the full new
+    variable, and the start-up warning now names such a variable.
+11. The documented pre-check ran `docker compose run … unbork`; the
+    1.1.x compose calls the service `labdog` (docs fixed).
+12. The Docker rollback did not say to put back the `.env` with the old
+    names, its restore commands assumed a `postgres` OS user, and the
+    backup step had no Docker `pg_dump` (docs fixed).
+13. The rollback pointed to clean-up commands "below" that are above
+    (docs fixed).
+
+Live checks on lin-manager-2 on the upgraded Docker stack, all passed:
+the first sync of an iptables target (a throwaway container, since the
+"test" VM `tester` was powered off) put the rules in `UNBORK-INPUT` /
+`UNBORK-OUTPUT` for IPv4 and IPv6, with the old `LABDOG-*` chains left
+unreached; on `tester2` (nftables) `inet filter` was replaced with the new
+names; the documented manual clean-up is right and safe to run twice.
+Drift was detected, a `*/2` `_builtin.drift_check` schedule fired, a
+Grafana alert with `unbork_*` labels started its action, the alert email
+(to a local Mailpit) carried only the new names, and `/metrics` (with
+`[metrics] enabled`) served 45 series, all `unbork_*`. `tester2`'s
+firewall was put back afterwards.
+
 ## Not verified, and why
 
-- The `.rpm` upgrade and the Docker upgrade, as above.
-- The first sync of a "test" host on iptables and on nftables after the
-  upgrade, a drift check before it, the schedule firing, the alert
-  webhook with the new labels and `/metrics`: they need a running stack
-  with managed hosts (lin-manager-2 and the "test" hosts), which this
-  session cannot reach. Under D-29 the sync does not remove old chains
-  or files; the docs list the manual clean-up, which was not run on a
-  real host.
-- The rollback on `.rpm` and Docker. On `.deb` and tarball the written
+- The `.rpm` upgrade locally: it runs in CI (`upgrade-rpm`), where it
+  passed.
+- A real iptables VM (the "test" VM was powered off; a container stood
+  in), and the email reporting an alert-started action's outcome, which
+  had not arrived when the stack was torn down.
+- The rollback on `.rpm`. On `.deb` and tarball the written
   rollback ran after each upgrade (restore the dump, reinstall the old
   version) and it started on its config at `0055` with the seeded group.

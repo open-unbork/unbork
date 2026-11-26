@@ -119,7 +119,18 @@ encryption key. On 1.1.x they still have the old names:
 sudo -u postgres pg_dump --format=custom --dbname=<your database> \
   --file=/var/backups/labdog-pre-2.0.0.dump
 sudo install -m 0600 /etc/labdog/labdog.toml /var/backups/labdog.toml-pre-2.0.0
-# Docker: the .env next to compose.yaml holds the LABDOG_* secrets.
+```
+
+On Docker, from the directory with `compose.yaml` (the 1.1.x compose
+calls its services `postgres` and `labdog`, and its database role and
+database `labdog`; use yours):
+
+```bash
+docker compose exec -T postgres pg_dump -U labdog --format=custom labdog \
+  > labdog-pre-2.0.0.dump
+cp -p .env .env.pre-2.0.0                     # the LABDOG_* secrets
+cp -p compose.yaml compose.yaml.pre-2.0.0
+cp -p labdog.toml labdog.toml.pre-2.0.0       # if you mount one
 ```
 
 The way back is that backup; see [Rolling back to 1.1.x](#rolling-back-to-11x)
@@ -131,14 +142,29 @@ old names inside). In the compose file or `.env`:
 
 1. Set the image to `unbork/unbork:2.0.0`.
 2. Rename every `LABDOG_` variable to `UNBORK_`, including
-   `LABDOG_CONFIG` if you set it.
+   `LABDOG_CONFIG` if you set it. One key also changes after the prefix:
+   `LABDOG_SECURITY__LABDOG_SERVER_IP` becomes
+   `UNBORK_SECURITY__UNBORK_SERVER_IP`. Left as
+   `UNBORK_SECURITY__LABDOG_SERVER_IP` it is not read, the address falls
+   back to `127.0.0.1`, and the next firewall sync can lock unbork out of
+   a host; 2.0.0 names it in its start-up warning.
 3. Move every volume mount target from `/var/lib/labdog/…` to
    `/var/lib/unbork/…`. Keep the volume names, or the data stays behind
    in the old volume.
-4. Check the new image accepts the environment before you replace the
+4. If you mount a config file (the 1.1.x compose has
+   `./labdog.toml:/etc/labdog/labdog.toml:ro`), mount it at
+   `/etc/unbork/unbork.toml` instead and rename its old key and paths,
+   as for packages: `sed -i -e 's/^labdog_server_ip/unbork_server_ip/'
+   -e 's|"/var/lib/labdog/|"/var/lib/unbork/|' -e
+   's|"/var/log/labdog/|"/var/log/unbork/|' labdog.toml` (rename the
+   file too if you like). Left at the old target, 2.0.0 starts, warns
+   that the file is not read, and ignores everything in it.
+5. Check the new image accepts the environment before you replace the
    container, as [Docker: check the environment
    variables](#docker-check-the-environment-variables) shows, then
-   `docker compose up -d`.
+   `docker compose up -d`. The commands there name the service
+   `unbork`; the 1.1.x compose calls it `labdog`, so use that name, or
+   rename the service (and any `depends_on` on it) now.
 
 **Packages (.deb, .rpm).** The `unbork` package is installed next to
 `labdog`: it does not replace it, and nothing is copied for you. In this
@@ -245,20 +271,33 @@ database at a revision it does not know. So the way back is the backup:
      --dbname=<your database> /var/backups/labdog-pre-2.0.0.dump
    ```
 
+   On Docker there is no `postgres` user to run these as: use the role
+   from `POSTGRES_USER` (`labdog` in the 1.1.x compose), which the
+   Postgres image makes a superuser:
+
+   ```bash
+   docker compose up -d postgres
+   docker compose exec -T postgres dropdb -U labdog --force labdog
+   docker compose exec -T postgres createdb -U labdog labdog
+   docker compose exec -T postgres pg_restore -U labdog --no-owner \
+     --dbname=labdog < labdog-pre-2.0.0.dump
+   ```
+
 3. Start 1.1.x again. Packages: `sudo apt install
    ./labdog_1.1.1-1_amd64.deb`, which finds its config and data where
    removing it left them (on `.rpm`: `sudo dnf install
    ./labdog-1.1.1-1.x86_64.rpm`, then `sudo mv
    /etc/labdog/labdog.toml.rpmsave /etc/labdog/labdog.toml`), then `sudo
    systemctl enable --now labdog`, and remove unbork with `sudo apt
-   remove unbork` (`sudo dnf remove unbork`). Docker: put back the old
-   compose file and image. Tarball: the 1.1.x tarball's `./install.sh`,
+   remove unbork` (`sudo dnf remove unbork`). Docker: put back the
+   saved `compose.yaml`, `.env` (with the `LABDOG_*` names) and
+   `labdog.toml`, then `docker compose up -d`. Tarball: the 1.1.x tarball's `./install.sh`,
    then the 2.0.0 tarball's `./uninstall.sh` without `--purge`.
 
 On managed hosts, a 2.0.0 sync wrote the new names and 1.1.x does not
 know them: on iptables hosts both `UNBORK-*` and `LABDOG-*` chains are
 then jumped from `INPUT` and `OUTPUT`. Remove the new ones with the
-commands below, with `UNBORK` in place of `LABDOG`, and resync from
+iptables commands above, with `UNBORK` in place of `LABDOG`, and resync from
 1.1.x. Files written under `unbork` names stay until you delete them.
 
 #### The Claude Code program is no longer in the image
