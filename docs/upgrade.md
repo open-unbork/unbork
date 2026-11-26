@@ -81,7 +81,8 @@ that used to work, in any release. Its upgrade notes say so.
 2.0.0 is the first release under the name unbork. Every name an operator
 types or sees changed with it, and **the old names are not read any
 more**: there are no fallbacks, and nothing renames or removes old names
-for you, on the server or on managed hosts. Plan the upgrade as a short
+for you, on the server or on managed hosts (the one exception is the
+seeded pack, below). Plan the upgrade as a short
 maintenance window and work through this list before you start the new
 version.
 
@@ -108,13 +109,25 @@ Unchanged: the Postgres database and role keep whatever names your
 `database.url` gives them (only the example defaults now say `unbork`),
 and all data in the database is kept.
 
-**Before you start:** take the backup in [Pre-upgrade](#pre-upgrade)
-(the database, and the config with its encryption key). The way back to
-1.1.0 is that backup; see [Rolling back to 1.1.0](#rolling-back-to-110)
+These steps are for 1.1.x (1.1.0 or 1.1.1). From an older release,
+upgrade to 1.1.1 first by the procedure further down this page.
+
+**Before you start:** back up the database and the config with its
+encryption key. On 1.1.x they still have the old names:
+
+```bash
+sudo -u postgres pg_dump --format=custom --dbname=<your database> \
+  --file=/var/backups/labdog-pre-2.0.0.dump
+sudo install -m 0600 /etc/labdog/labdog.toml /var/backups/labdog.toml-pre-2.0.0
+# Docker: the .env next to compose.yaml holds the LABDOG_* secrets.
+```
+
+The way back is that backup; see [Rolling back to 1.1.x](#rolling-back-to-11x)
 below. Then upgrade the server for your install type.
 
-**Docker.** The image is `unbork/unbork` now; 1.1.0 was
-`openlabdog/labdog:1.1.0`. In the compose file or `.env`:
+**Docker.** The image is `unbork/unbork` now; 1.1.x was published as
+`openlabdog/labdog` (1.1.1 also as `unbork/unbork:1.1.1`, still with the
+old names inside). In the compose file or `.env`:
 
 1. Set the image to `unbork/unbork:2.0.0`.
 2. Rename every `LABDOG_` variable to `UNBORK_`, including
@@ -138,9 +151,12 @@ sudo systemctl stop labdog
 sudo apt install ./unbork_2.0.0-1_amd64.deb      # Debian, Ubuntu
 sudo dnf install ./unbork-2.0.0-1.x86_64.rpm     # RHEL, Rocky, Fedora
 
-# The config, with its secrets and database URL, and its one renamed key.
+# The config, with its secrets and database URL; then its one renamed key
+# and the paths under the old directories (packs_root_dir, by default).
 sudo install -o root -g unbork -m 0640 /etc/labdog/labdog.toml /etc/unbork/unbork.toml
-sudo sed -i 's/^labdog_server_ip/unbork_server_ip/' /etc/unbork/unbork.toml
+sudo sed -i -e 's/^labdog_server_ip/unbork_server_ip/' \
+  -e 's|"/var/lib/labdog/|"/var/lib/unbork/|' -e 's|"/var/log/labdog/|"/var/log/unbork/|' \
+  /etc/unbork/unbork.toml
 
 # The data (packs, the Claude Code sign-in): copied, so the old copy stays
 # for a rollback.
@@ -154,18 +170,21 @@ sudo systemctl enable --now unbork
 sudo journalctl -u unbork -f                       # migrations run at start
 ```
 
-**Tarball.** Extract the 2.0.0 tarball and run its `./install.sh`, then
-do the copy steps above (`install`, `sed`, `cp -a`, `chown`). Remove 1.1.0
-with the `./uninstall.sh` from the 1.1.0 tarball, without `--purge`, and
-start the service with `sudo systemctl enable --now unbork`.
+**Tarball.** Stop `labdog`, extract the 2.0.0 tarball and run its
+`./install.sh`, then do the copy steps above (`install`, `sed`, `cp -a`,
+`chown`). Remove 1.1.x with the `./uninstall.sh` from its own tarball,
+without `--purge`, and start the service with
+`sudo systemctl enable --now unbork`.
 
 **After the upgrade:** go through [Verifying the upgrade](#verifying-the-upgrade).
 Everyone signs in again once, since the session cookies were renamed;
 accounts and passwords are unchanged. Until `/etc/labdog/labdog.toml` is
-gone, every start logs a warning that names it. When you no longer want
-to roll back, delete what is left of 1.1.0: `sudo apt purge labdog` (on
-`.rpm` and tarball installs, `sudo rm -rf /etc/labdog /var/lib/labdog
-/var/log/labdog`), and `sudo userdel labdog`.
+gone, every start logs a warning that names it, as it does for any path
+setting still under `/var/lib/labdog` or another old directory. When you
+no longer want to roll back, delete what is left of 1.1.x: `sudo apt purge
+labdog`, which also removes the `labdog` user; on `.rpm` and tarball
+installs, `sudo rm -rf /etc/labdog /var/lib/labdog /var/log/labdog` and
+`sudo userdel labdog`.
 
 A server whose secrets are set only under the old names refuses to
 start, and its error lists the old variables and config file it found.
@@ -208,29 +227,39 @@ whole `inet filter` table. Old Proxmox snapshots named `labdog-…` are no
 longer cleaned up by unbork; delete them in Proxmox when you no longer
 need them.
 
-#### Rolling back to 1.1.0
+#### Rolling back to 1.1.x
 
-2.0.0's migrations run when it first starts, and 1.1.0 refuses a
+2.0.0's migrations run when it first starts, and 1.1.x refuses a
 database at a revision it does not know. So the way back is the backup:
 
-1. Stop unbork (`sudo systemctl stop unbork`, or stop the container).
-2. Restore the database from the pre-upgrade dump, as [When alembic
-   downgrade is not enough](#when-alembic-downgrade-is-not-enough)
-   shows. Changes made in unbork since the upgrade are lost.
-3. Start 1.1.0 again. Packages: `sudo apt install
-   ./labdog_1.1.0-1_amd64.deb`, which finds its config and data where
-   removing it left them (on `.rpm`: `sudo dnf install
-   ./labdog-1.1.0-1.x86_64.rpm`, then `sudo mv
-   /etc/labdog/labdog.toml.rpmsave /etc/labdog/labdog.toml`), then `sudo
-   systemctl enable --now labdog` and `sudo apt remove unbork`. Docker: put back
-   the old compose file with `openlabdog/labdog:1.1.0`. Tarball: the
-   1.1.0 tarball's `./install.sh`.
+1. Stop unbork and keep it from starting again: `sudo systemctl disable
+   --now unbork`, or stop the container. Left enabled, it would start at
+   the next boot and migrate the restored database to 2.0.0 again.
+2. Restore the database from the pre-upgrade dump. Changes made in
+   unbork since the upgrade are lost:
 
-On managed hosts, a 2.0.0 sync wrote the new names and 1.1.0 does not
+   ```bash
+   sudo -u postgres dropdb <your database>
+   sudo -u postgres createdb -O <its owner role> <your database>
+   sudo -u postgres pg_restore --no-owner --role=<its owner role> \
+     --dbname=<your database> /var/backups/labdog-pre-2.0.0.dump
+   ```
+
+3. Start 1.1.x again. Packages: `sudo apt install
+   ./labdog_1.1.1-1_amd64.deb`, which finds its config and data where
+   removing it left them (on `.rpm`: `sudo dnf install
+   ./labdog-1.1.1-1.x86_64.rpm`, then `sudo mv
+   /etc/labdog/labdog.toml.rpmsave /etc/labdog/labdog.toml`), then `sudo
+   systemctl enable --now labdog`, and remove unbork with `sudo apt
+   remove unbork` (`sudo dnf remove unbork`). Docker: put back the old
+   compose file and image. Tarball: the 1.1.x tarball's `./install.sh`,
+   then the 2.0.0 tarball's `./uninstall.sh` without `--purge`.
+
+On managed hosts, a 2.0.0 sync wrote the new names and 1.1.x does not
 know them: on iptables hosts both `UNBORK-*` and `LABDOG-*` chains are
 then jumped from `INPUT` and `OUTPUT`. Remove the new ones with the
 commands below, with `UNBORK` in place of `LABDOG`, and resync from
-1.1.0. Files written under `unbork` names stay until you delete them.
+1.1.x. Files written under `unbork` names stay until you delete them.
 
 #### The Claude Code program is no longer in the image
 
@@ -371,7 +400,7 @@ Smaller things to know:
   header. See [Notifications](ui/notifications.md).
 - **Alerts moved** from the Assistant to **Operations → Alerts**, and
   their API from `/api/ai/alerts` to `/api/alerts`. The old paths still
-  answer, deprecated, until 2.0.
+  answer, deprecated (2.0.0 keeps them), until a later major release.
 - **Full auto** is for alerts whose Grafana rule is labelled
   `labdog_ai_automate=true`, or, with `ai.alert_full_auto_rules_enabled` on,
   those matching `ai.alert_full_auto_rules`. It needs Grafana's contact
@@ -734,6 +763,9 @@ is at a newer revision than it knows about, you must restore from
 backup — see [When alembic downgrade is not enough](#when-alembic-downgrade-is-not-enough).
 
 ### Reinstall the previous package
+
+From 2.0.0 back to 1.1.x the package name differs, so a downgrade does
+not apply: follow [Rolling back to 1.1.x](#rolling-back-to-11x).
 
 ```bash
 # Debian / Ubuntu

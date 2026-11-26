@@ -149,7 +149,7 @@ No Community feature is removed or limited to make room for Enterprise, and the 
 
 ## 📜 License
 
-**AGPL-3.0-or-later.** Everything in this repository is licensed AGPL-3.0-or-later, including the extension interface, the documentation and the packaging. See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
+**AGPL-3.0-or-later.** Everything in this repository is licensed AGPL-3.0-or-later, including the extension interface, the documentation and the packaging, except third-party files bundled with it (such as fonts), which keep their own licences, stated next to them. See [LICENSE](LICENSE). The network-use clause means anyone running a modified version of unbork as a service must make the source of their modifications available to its users. Private internal deployments without modifications carry no extra obligations.
 
 The Enterprise edition is not covered by this licence, and none of its code is in this repository.
 

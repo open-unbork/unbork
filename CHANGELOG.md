@@ -21,7 +21,8 @@ before you start it. What you must act on:
 - Docker: the image is `unbork/unbork:2.0.0`; rename `LABDOG_*` variables
   to `UNBORK_*` and move volume mount targets to `/var/lib/unbork`.
 - Packages and tarball: install `unbork` next to `labdog`, copy the config
-  and the data, then remove (not purge) `labdog`.
+  and the data, then remove (not purge) `labdog`. The steps are written
+  for 1.1.x; upgrade older installs to 1.1.1 first.
 - Grafana and Prometheus: rename `labdog_*` metrics and alert labels in
   dashboards and alert rules.
 - Managed hosts: after the first sync, remove the old iptables chains and
@@ -32,6 +33,11 @@ before you start it. What you must act on:
   Code on first use, and need outbound HTTPS to do so.
 
 ### Security
+
+- **Next.js 16.4.6.** Fixes seven advisories in the 16.4.3 the frontend
+  was built with (for example GHSA-pc58-hwjq-p385). The web UI is a static
+  export, so the server-side ones did not apply, but `next build` now
+  refuses an affected version.
 
 - The alert webhook can be limited to listed source addresses
   (`[alerts] allowed_sources`) and can require an HMAC signature over the
@@ -165,7 +171,8 @@ before you start it. What you must act on:
   the old names on the server or on managed hosts: follow
   [Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
   before starting this version. A server whose secrets are set only under the
-  old names refuses to start, and its error lists the old names it found. Sync run output
+  old names refuses to start, and its error lists the old names it found;
+  every start warns about a path setting still under an old directory. Sync run output
   shows play names beginning "unbork".
 
 - CI no longer publishes a floating `:test` image tag. Test images are
@@ -237,8 +244,8 @@ before you start it. What you must act on:
 
 ### Fixed
 
-- The documentation site is published again and every README link to it
-  is checked in CI.
+- Every README link into the documentation site is checked in CI, so a
+  moved page or renamed heading fails the pull request.
 
 - An API path that no route serves (`GET /api/...`), such as the
   assistant's on a server without it, now answers a JSON 404 instead of
