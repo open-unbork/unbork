@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# In-container upgrade test: a 1.1.0 package install (before the rename) with data,
-# upgraded to the candidate unbork package by the steps in docs/upgrade.md
-# ("Upgrading to 2.0.0", packages).
+# In-container upgrade test: a 1.1.x package or tarball install (before the
+# rename) with data, upgraded to the candidate unbork by the steps in
+# docs/upgrade.md ("Upgrading to 2.0.0", packages and tarball), then rolled
+# back by its "Rolling back to 1.1.x".
 #
 # Run inside a clean Ubuntu or Rocky container by run-smoke.sh, with the old
-# packages at /old, the candidate at /dist and this directory at /tests.
+# artifacts at /old (named as run-smoke.sh builds them), the candidate at /dist and this directory at /tests.
 #
 # Containers have no systemd, so each version is started the way its unit
 # says: User=, WorkingDirectory=, Environment= and ExecStart= are read from
@@ -16,7 +17,7 @@
 # The format defaults to the distribution's own package format.
 set -euo pipefail
 
-OLD="${1:?old version required (e.g. 1.1.0)}"
+OLD="${1:?old version required (e.g. 1.1.1)}"
 NEW="${2:?new version required (e.g. 2.0.0)}"
 
 OLD_NAME=labdog   # old-name-ok: the package being upgraded from
@@ -38,6 +39,9 @@ PG_PASS=$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
 MARKER="# upgrade-test-marker $(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
 fail() { echo "UPGRADE FAIL: $*" >&2; exit 1; }
+# Every request is bounded, so a service that accepts the connection and
+# then hangs fails the test instead of stalling it.
+curl() { command curl --connect-timeout 3 --max-time 15 "$@"; }
 ok()   { echo "  ok  - $*"; }
 step() { echo; echo "== $* =="; }
 
@@ -200,13 +204,15 @@ api "$OLD_NAME" POST /api/ssh-keys "$KEY_JSON" >/dev/null || fail "creating an S
 ok "seeded: first admin, group 'upgrade-group', SSH key 'upgrade-key'"
 
 OLD_REV=$(psql_db "SELECT version_num FROM alembic_version")
-echo "upgrade-marker $NEW" > "$OLD_DATA/upgrade-marker"
+echo "$MARKER" > "$OLD_DATA/upgrade-marker"
 chown "$OLD_NAME:$OLD_NAME" "$OLD_DATA/upgrade-marker"
 ok "alembic revision before the upgrade: $OLD_REV"
 
 step "Stop $OLD and take the pre-upgrade backup"
 stop_unit "$OLD_NAME"
-runuser -u postgres -- pg_dump -Fc -f /tmp/pre-upgrade.dump "$PG_DB"
+chmod 0755 "$WORK"
+install -o postgres -m 0600 /dev/null "$WORK/pre-upgrade.dump"
+runuser -u postgres -- pg_dump -Fc -f "$WORK/pre-upgrade.dump" "$PG_DB"
 ok "stopped; database dumped"
 
 # =============================================================================
@@ -232,7 +238,9 @@ ok "refuses to start on the old config alone, and names $OLD_CONF"
 
 step "Copy the config and the data"
 install -o root -g "$NEW_NAME" -m 0640 "$OLD_CONF" "$NEW_CONF"
-sed -i "s/^${OLD_NAME}_server_ip/${NEW_NAME}_server_ip/" "$NEW_CONF"
+sed -i -e "s/^${OLD_NAME}_server_ip/${NEW_NAME}_server_ip/" \
+    -e "s|\"/var/lib/${OLD_NAME}/|\"/var/lib/${NEW_NAME}/|" -e "s|\"/var/log/${OLD_NAME}/|\"/var/log/${NEW_NAME}/|" \
+    "$NEW_CONF"
 cp -a "$OLD_DATA/." "$NEW_DATA/"
 chown -R "$NEW_NAME:$NEW_NAME" "$NEW_DATA"
 ok "copied $OLD_CONF and $OLD_DATA"
@@ -241,14 +249,15 @@ step "Remove $OLD_NAME (not purge)"
 case "$FORMAT" in
     deb)
         apt-get remove -y -qq "$OLD_NAME" >/dev/null
-        dpkg-query -W -f='${db:Status-Abbrev}' "$OLD_NAME" 2>/dev/null | grep -q '^ii' \
-            && fail "$OLD_NAME is still installed" ;;
+        if dpkg-query -W -f='${db:Status-Abbrev}' "$OLD_NAME" 2>/dev/null | grep -q '^ii'; then
+            fail "$OLD_NAME is still installed"
+        fi ;;
     rpm)
         dnf remove -y -q "$OLD_NAME" >/dev/null
-        rpm -q "$OLD_NAME" >/dev/null 2>&1 && fail "$OLD_NAME is still installed" ;;
+        if rpm -q "$OLD_NAME" >/dev/null 2>&1; then fail "$OLD_NAME is still installed"; fi ;;
     tarball)
         ( cd "$(tarball_dir "$OLD_NAME" "$OLD")" && ./uninstall.sh >/dev/null )
-        [ -e "/usr/lib/$OLD_NAME" ] && fail "/usr/lib/$OLD_NAME is still there" ;;
+        if [ -e "/usr/lib/$OLD_NAME" ]; then fail "/usr/lib/$OLD_NAME is still there"; fi ;;
 esac
 [ -f "$OLD_DATA/upgrade-marker" ] || fail "removing $OLD_NAME deleted $OLD_DATA"
 ok "$OLD_NAME removed, $OLD_DATA kept"
@@ -257,6 +266,10 @@ ok "$OLD_NAME removed, $OLD_DATA kept"
 step "Check the copied config and data"
 tail -1 "$NEW_CONF" | grep -qxF "$MARKER" || fail "$NEW_CONF lost the edited old config (marker line missing)"
 grep -q "^${NEW_NAME}_server_ip" "$NEW_CONF" || fail "${NEW_NAME}_server_ip missing from $NEW_CONF"
+if grep -qE "^[a-z_]+ = \"/(etc|var/lib|var/log|run)/${OLD_NAME}" "$NEW_CONF"; then
+    fail "$NEW_CONF still points a path setting under the old directories"
+fi
+grep -q "^packs_root_dir = \"$NEW_DATA/packs\"" "$NEW_CONF" || fail "packs_root_dir is not under $NEW_DATA"
 [ "$(stat -c '%U:%G %a' "$NEW_CONF")" = "root:$NEW_NAME 640" ] || fail "$NEW_CONF is $(stat -c '%U:%G %a' "$NEW_CONF")"
 [ "$(stat -c '%U' "$NEW_DATA/upgrade-marker")" = "$NEW_NAME" ] || fail "marker in $NEW_DATA not owned by $NEW_NAME"
 ok "config carries the operator's edits; data owned by $NEW_NAME"
@@ -266,6 +279,10 @@ start_unit "$NEW_UNIT" "$WORK/new.log"
 wait_healthy "$WORK/new.log"
 [ "$(version_of)" = "$NEW" ] || fail "/api/version reports '$(version_of)', expected $NEW"
 ok "/api/version reports $NEW"
+if grep -q "an old path, in the config file" "$WORK/new.log"; then
+    grep "an old path" "$WORK/new.log" >&2
+    fail "$NEW warns about a path setting left under the old directories"
+fi
 
 HEAD_REV=$(cd "/usr/lib/${NEW_NAME}/backend" && "/usr/lib/${NEW_NAME}/venv/bin/python" -c '
 from alembic.config import Config
@@ -285,7 +302,7 @@ api "$NEW_NAME" GET /api/groups | grep -q '"name":"upgrade-group"' || fail "grou
 api "$NEW_NAME" GET /api/ssh-keys | grep -q '"name":"upgrade-key"' || fail "SSH key 'upgrade-key' missing"
 ok "group and SSH key present"
 
-# The encryption key still decrypts what 1.1.0 encrypted.
+# The encryption key still decrypts what the old version encrypted.
 psql_db "SELECT encode(encrypted_private_key, 'hex') FROM ssh_keys WHERE name = 'upgrade-key'" > "$WORK/key.hex"
 chmod 0644 "$WORK/key.hex" "$WORK/id_test"
 chmod 0755 "$WORK"
@@ -305,17 +322,17 @@ step "Fresh-install assertions on the upgraded system"
 /tests/smoke.sh "$NEW"
 
 # =============================================================================
-# docs/upgrade.md, "Rolling back to 1.1.0": restore the backup, put the old
+# docs/upgrade.md, "Rolling back to 1.1.x": restore the backup, put the old
 # version back, start it.
 step "Roll back to $OLD"
 runuser -u postgres -- dropdb "$PG_DB"
 runuser -u postgres -- createdb -O "$PG_USER" "$PG_DB"
-runuser -u postgres -- pg_restore --no-owner --role="$PG_USER" -d "$PG_DB" /tmp/pre-upgrade.dump
+runuser -u postgres -- pg_restore --no-owner --role="$PG_USER" -d "$PG_DB" "$WORK/pre-upgrade.dump"
 case "$FORMAT" in
     deb)     apt-get install -y -qq "/old/${OLD_NAME}_${OLD}-1_amd64.deb" >/dev/null ;;
     rpm)     dnf install -y -q "/old/${OLD_NAME}-${OLD}-1.x86_64.rpm" >/dev/null
              # Removing the .rpm saved the edited config aside.
-             [ -f "$OLD_CONF.rpmsave" ] && mv -f "$OLD_CONF.rpmsave" "$OLD_CONF" ;;
+             if [ -f "$OLD_CONF.rpmsave" ]; then mv -f "$OLD_CONF.rpmsave" "$OLD_CONF"; fi ;;
     tarball) ( cd "$(tarball_dir "$OLD_NAME" "$OLD")" && ./install.sh >/dev/null ) ;;
 esac
 tail -1 "$OLD_CONF" | grep -qxF "$MARKER" || fail "$OLD_CONF is not the operator's config after reinstalling $OLD"

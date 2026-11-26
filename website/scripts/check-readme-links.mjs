@@ -18,7 +18,8 @@ const build = join(here, '..', 'build');
 const live = process.argv.includes('--live');
 
 const readme = readFileSync(join(root, 'README.md'), 'utf8');
-const escaped = SITE.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const escaped = escapeRe(SITE);
 const links = [...new Set(readme.match(new RegExp(`${escaped}[^)\\s"'<>]*`, 'g')) ?? [])];
 
 if (links.length === 0) {
@@ -30,10 +31,19 @@ if (!live && !existsSync(join(build, 'index.html'))) {
   process.exit(1);
 }
 
+const pages = new Map();
 async function page(path) {
+  if (!pages.has(path)) pages.set(path, load(path));
+  return pages.get(path);
+}
+async function load(path) {
   if (live) {
-    const res = await fetch(SITE + path);
-    return res.ok ? await res.text() : null;
+    try {
+      const res = await fetch(SITE + path, { signal: AbortSignal.timeout(15000) });
+      return res.ok ? await res.text() : null;
+    } catch {
+      return null; // timed out or unreachable: reported as not answering 200
+    }
   }
   const file = join(build, path, 'index.html');
   return existsSync(file) ? readFileSync(file, 'utf8') : null;
@@ -42,7 +52,7 @@ async function page(path) {
 // The build is minified, so attributes may be unquoted (id=installation).
 function hasId(html, id) {
   const quoted = html.includes(`id="${id}"`) || html.includes(`id='${id}'`);
-  return quoted || new RegExp(`\\bid=${id.replace(/[-.]/g, '\\$&')}(?=[\\s>/])`).test(html);
+  return quoted || new RegExp(`\\bid=${escapeRe(id)}(?=[\\s>/])`).test(html);
 }
 
 let bad = 0;
@@ -52,7 +62,7 @@ for (const link of links) {
   const path = rawPath.replace(/^\/+|\/+$/g, '');
   const html = await page(path);
   let problem = null;
-  if (html === null) problem = live ? 'page does not answer 200' : `no page ${path || '/'} in the build`;
+  if (html === null) problem = live ? 'page does not answer 200 within 15 s' : `no page ${path || '/'} in the build`;
   else if (anchor && !hasId(html, anchor)) problem = `no anchor #${anchor} on the page`;
   if (problem) {
     bad += 1;
