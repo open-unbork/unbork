@@ -172,7 +172,8 @@ before you start it. What you must act on:
   [Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
   before starting this version. A server whose secrets are set only under the
   old names refuses to start, and its error lists the old names it found;
-  every start warns about a path setting still under an old directory. Sync run output
+  every start warns about a path setting still under an old directory, and about a
+  variable renamed only in its prefix (`UNBORK_SECURITY__LABDOG_SERVER_IP`). Sync run output
   shows play names beginning "unbork".
 
 - CI no longer publishes a floating `:test` image tag. Test images are

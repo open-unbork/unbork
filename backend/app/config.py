@@ -571,7 +571,13 @@ def old_names_in_use(environ: dict[str, str] | None = None) -> list[str]:
     """Old-name variables set in the environment, and the old config file
     if it exists (also next to a new one). Names only, never values."""
     env = os.environ if environ is None else environ
-    found = sorted(k for k in env if k.startswith(_OLD_ENV_PREFIX))
+    old = _OLD_ENV_PREFIX.rstrip("_")
+    # Renaming only the prefix of LABDOG_SECURITY__LABDOG_SERVER_IP leaves  # old-name-ok
+    # the old key name after it, which the settings ignore: the server IP
+    # would fall back to 127.0.0.1 and a firewall sync could lock unbork out.
+    found = sorted(
+        k for k in env if k.startswith(_OLD_ENV_PREFIX) or (k.startswith("UNBORK_") and old in k)
+    )
     if _old_config_present():
         found.append(str(_OLD_CONFIG_PATH))
     return found
