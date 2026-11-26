@@ -115,3 +115,7 @@ Work branch: `claude/project-thread-1sra3u` (the session's assigned branch, in p
 
 Work branch: `claude/project-thread-6heftb`, from `dev` at `2e961d7`. Dennis asked for rollback phase 2 now; C-004 is not built, so C-014 went first without it (D-53).
 - 2026-11-22 C-014 review. Manifest fields, both executors, budgets, dialog line, docs and the `with-quiesce` example (C-015 step 2). `tests/test_action_quiesce.py`. Step 6 (relax the `stateful` default) waits for C-004. The live check on a "test" VM is still to do.
+
+## 2026-11-26 Stage 3 run
+
+Work branch: `claude/project-thread-noz19h` (the session's assigned branch, in place of `roadmap/stage-3`). Base: `94cf763` (dev after #308), with `main` (v1.1.1) merged in. Entry criterion: Dennis said to start ("Go ahead", 2026-11-26). Behaviours read with D-29 (no old-name fallbacks).
