@@ -63,7 +63,13 @@ else
     dnf install -y -q postgresql-server redis procps-ng >/dev/null
     runuser -u postgres -- initdb -D /var/lib/pgsql/data \
         --auth-local=peer --auth-host=scram-sha-256 >/dev/null
-    runuser -u postgres -- pg_ctl -D /var/lib/pgsql/data -l /var/lib/pgsql/server.log -w start >/dev/null
+    # The socket directory comes from tmpfiles.d, which nothing runs in a
+    # container without systemd.
+    install -d -o postgres -g postgres -m 0755 /run/postgresql
+    if ! runuser -u postgres -- pg_ctl -D /var/lib/pgsql/data -l /var/lib/pgsql/server.log -w start >/dev/null; then
+        cat /var/lib/pgsql/server.log >&2 || true
+        fail "PostgreSQL did not start"
+    fi
 fi
 redis-server --daemonize yes >/dev/null
 psql_admin() { runuser -u postgres -- psql -v ON_ERROR_STOP=1 -qAt "$@"; }
