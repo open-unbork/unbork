@@ -8,6 +8,29 @@ The format follows [Keep a Changelog]; unbork follows
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-11-26
+
+**LabDog is now unbork.** This is a major release because the rename
+changes names that the 1.x line promised to keep: environment variables,
+config and data paths, the package, service and user, metric names, alert
+labels and the names unbork writes on managed hosts. 2.0.0 reads none of
+the old names, and nothing renames them for you. Follow
+[Upgrading to 2.0.0: the rename](docs/upgrade.md#upgrading-to-200-the-rename)
+before you start it. What you must act on:
+
+- Docker: the image is `unbork/unbork:2.0.0`; rename `LABDOG_*` variables
+  to `UNBORK_*` and move volume mount targets to `/var/lib/unbork`.
+- Packages and tarball: install `unbork` next to `labdog`, copy the config
+  and the data, then remove (not purge) `labdog`.
+- Grafana and Prometheus: rename `labdog_*` metrics and alert labels in
+  dashboards and alert rules.
+- Managed hosts: after the first sync, remove the old iptables chains and
+  files by hand.
+- Everyone signs in again once. Accounts that were not administrators get
+  the `operator` role.
+- The "Claude agent" and "Claude single-shot" providers download Claude
+  Code on first use, and need outbound HTTPS to do so.
+
 ### Security
 
 - The alert webhook can be limited to listed source addresses
@@ -75,7 +98,7 @@ The format follows [Keep a Changelog]; unbork follows
   `user_identities` table links an account to its directory identity.
   Plugin API 1.1.
 
-- **Run unbork as separate containers, one per role.** `LABDOG_ROLE` (or
+- **Run unbork as separate containers, one per role.** `UNBORK_ROLE` (or
   `--role`) picks `api`, `beat`, `orchestrator`, `worker` or
   `worker-drift`; the default `all` is the single container as before.
   Only `api` runs migrations; the other roles wait for the schema. The
@@ -166,8 +189,7 @@ The format follows [Keep a Changelog]; unbork follows
   sign-in page. Beside the mark, the name is drawn in the logo's own
   lettering (Familjen Grotesk Bold). The
   name beside the mark changes with it: the sign-in and setup pages, the
-  rail and the browser tab say unbork. Everything else, in the interface
-  text, the docs and the configuration, still says LabDog.
+  rail and the browser tab say unbork.
 
 - **The project moved to `open-unbork` on GitHub and `unbork` on Docker
   Hub.** The repositories are now
@@ -184,11 +206,7 @@ The format follows [Keep a Changelog]; unbork follows
 - **The README, the docs and the developer guide say unbork.** The
   remaining prose that still said LabDog is renamed, the README shows the
   new logo, and examples use `unbork` for names you choose yourself
-  (hostnames, compose services and volumes, directories). Names the code
-  still uses keep the old spelling and the docs show them as they are:
-  the `LABDOG_*` variables, `labdog.toml`, `/etc/labdog` and
-  `/var/lib/labdog`, the `labdog` package, service and user, metric names,
-  alert labels and on-host markers.
+  (hostnames, compose services and volumes, directories).
 
 - **The roadmap moved to a GitHub project.** `ROADMAP.md` and `TODO.md`
   are gone; planned work, open tasks and their design notes now live on the
@@ -240,7 +258,7 @@ The format follows [Keep a Changelog]; unbork follows
 - **Leftover snapshots are cleaned up on their own.** An hourly sweep
   removes action-run snapshots older than `workflow.snapshot_max_age_hours`
   that no running action uses. Before, only **Clean up orphaned
-  snapshots** did, by hand. Neither touches AI sessions' `labdog-ai-`
+  snapshots** did, by hand. Neither touches AI sessions' `unbork-ai-`
   snapshots any more: the manual cleanup used to read their session number
   as a run id (BUG-169).
 - **The AI snapshot sweep accepts a snapshot already gone.** One deleted
@@ -3617,7 +3635,8 @@ SSH-pushed Ansible reconciliation, and a per-host detail tab:
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[Unreleased]: https://github.com/open-unbork/unbork/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/open-unbork/unbork/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/open-unbork/unbork/compare/v1.1.1...v2.0.0
 [1.1.1]: https://github.com/open-unbork/unbork/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/open-labdog/labdog/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/open-labdog/labdog/compare/v0.10.0...v1.0.0
