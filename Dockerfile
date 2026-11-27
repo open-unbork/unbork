@@ -32,7 +32,7 @@ RUN if [ "$WITH_ASSISTANT" = "0" ]; then \
 # Output: /app/out/
 
 # ── Stage 2: Build Python backend + install deps ──────────────────────
-FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS backend-builder
+FROM python:3.12-slim@sha256:191083cdf6c7bda8c76158983163ead5d5cf7b77cf3033e805bb0f5296f51b4b AS backend-builder
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 COPY backend/pyproject.toml backend/uv.lock ./
@@ -57,7 +57,7 @@ RUN extra="--extra agent"; [ "$WITH_ASSISTANT" = "0" ] && extra=""; \
     && python /tmp/claude_code_pin.py --lock uv.lock --out /tmp/claude_code_pin.json
 
 # ── Stage 3: Runtime ──────────────────────────────────────────────────
-FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+FROM python:3.12-slim@sha256:191083cdf6c7bda8c76158983163ead5d5cf7b77cf3033e805bb0f5296f51b4b
 WORKDIR /app
 
 # Install the runtime tools we need, then fully upgrade every base
